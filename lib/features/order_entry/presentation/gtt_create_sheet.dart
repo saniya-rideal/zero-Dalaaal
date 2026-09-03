@@ -1,0 +1,232 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/trading_colors.dart';
+import '../../../core/theme/typography.dart';
+import '../../../data/mock/order_simulation_engine.dart';
+import '../../../data/mock/seed_instruments.dart';
+import '../../../data/models/models.dart';
+
+class GttCreateSheet extends ConsumerStatefulWidget {
+  final Instrument? prefilledInstrument;
+
+  const GttCreateSheet({super.key, this.prefilledInstrument});
+
+  static Future<void> show(BuildContext context, {Instrument? instrument}) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => GttCreateSheet(prefilledInstrument: instrument),
+    );
+  }
+
+  @override
+  ConsumerState<GttCreateSheet> createState() => _GttCreateSheetState();
+}
+
+class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
+  late Instrument _instrument;
+  TransactionType _side = TransactionType.BUY;
+  GttType _type = GttType.SINGLE;
+  final int _quantity = 1;
+  late TextEditingController _triggerPriceController;
+  late TextEditingController _orderPriceController;
+  late TextEditingController _targetTriggerController;
+  late TextEditingController _targetOrderController;
+
+  @override
+  void initState() {
+    super.initState();
+    _instrument = widget.prefilledInstrument ?? SeedInstruments.findByToken('eq_reliance')!;
+    _triggerPriceController = TextEditingController(text: '2900.00');
+    _orderPriceController = TextEditingController(text: '2900.00');
+    _targetTriggerController = TextEditingController(text: '3200.00');
+    _targetOrderController = TextEditingController(text: '3200.00');
+  }
+
+  @override
+  void dispose() {
+    _triggerPriceController.dispose();
+    _orderPriceController.dispose();
+    _targetTriggerController.dispose();
+    _targetOrderController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.tradingColors;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: colors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Text('Create GTT (Good Till Triggered)', style: AppTypography.h1(color: colors.textPrimary)),
+              const SizedBox(height: 4),
+              Text(
+                'Place an order that stays active until your trigger price is reached.',
+                style: AppTypography.caption(color: colors.textSecondary),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Instrument + Side
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(_instrument.symbol, style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('BUY'),
+                        selected: _side == TransactionType.BUY,
+                        selectedColor: colors.bullish,
+                        onSelected: (_) => setState(() => _side = TransactionType.BUY),
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('SELL'),
+                        selected: _side == TransactionType.SELL,
+                        selectedColor: colors.bearish,
+                        onSelected: (_) => setState(() => _side = TransactionType.SELL),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Trigger Type: Single vs OCO
+              Text('TRIGGER TYPE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Single (Stoploss or Target)'),
+                    selected: _type == GttType.SINGLE,
+                    onSelected: (_) => setState(() => _type = GttType.SINGLE),
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('OCO (Both)'),
+                    selected: _type == GttType.OCO,
+                    onSelected: (_) => setState(() => _type = GttType.OCO),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Trigger & Order Price
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('TRIGGER PRICE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _triggerPriceController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: AppTypography.body(tabular: true, weight: FontWeight.w600),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: colors.surface,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('LIMIT PRICE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: _orderPriceController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: AppTypography.body(tabular: true, weight: FontWeight.w600),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: colors.surface,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              ElevatedButton(
+                onPressed: () async {
+                  final engine = ref.read(orderSimulationEngineProvider);
+                  final triggerPrice = double.tryParse(_triggerPriceController.text) ?? 0.0;
+                  final orderPrice = double.tryParse(_orderPriceController.text) ?? 0.0;
+
+                  await engine.createGtt(GttRequest(
+                    instrumentToken: _instrument.token,
+                    side: _side,
+                    type: _type,
+                    quantity: _quantity,
+                    triggerPrice: triggerPrice,
+                    orderPrice: orderPrice,
+                  ));
+
+                  if (mounted) {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(context);
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('GTT Created Successfully!')),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                ),
+                child: const Text('CREATE GTT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
