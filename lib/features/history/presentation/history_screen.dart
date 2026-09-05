@@ -11,6 +11,8 @@ import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import 'statement_view_dialog.dart';
+import 'transaction_detail_sheet.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -23,22 +25,136 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  late ScrollController _transactionsScrollController;
+
   HistoryDateFilter _selectedDateFilter = HistoryDateFilter.all;
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
+  TransactionCategory? _selectedCategory;
+  String _selectedStatus = 'ALL'; // 'ALL', 'COMPLETE', 'PENDING', 'FAILED', 'CANCELLED'
+  String _sortBy = 'DATE_DESC'; // 'DATE_DESC', 'DATE_ASC', 'AMOUNT_DESC', 'AMOUNT_ASC', 'ALPHA_ASC', 'ALPHA_DESC'
   bool _isSortAscending = true;
 
-  final List<String> _subTabs = ['CLASSIC', 'POSITIONS', 'ORDERS', 'DEALS'];
+  // Pagination state
+  int _currentPage = 1;
+  static const int _pageSize = 15;
+  final List<TransactionRecord> _loadedTransactions = [];
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
+
+  final List<String> _subTabs = ['TRANSACTIONS', 'CLASSIC', 'POSITIONS', 'ORDERS', 'DEALS'];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _subTabs.length, vsync: this);
+    _transactionsScrollController = ScrollController()..addListener(_onTransactionsScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resetAndLoadTransactions());
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _transactionsScrollController.dispose();
     super.dispose();
+  }
+
+  void _onTransactionsScroll() {
+    if (_transactionsScrollController.position.pixels >=
+        _transactionsScrollController.position.maxScrollExtent - 200) {
+      if (_hasMore && !_isLoadingMore) {
+        _loadNextPage();
+      }
+    }
+  }
+
+  void _resetAndLoadTransactions() {
+    final engine = ref.read(orderSimulationEngineProvider);
+    _currentPage = 1;
+    final result = engine.getPaginatedTransactions(
+      page: 1,
+      pageSize: _pageSize,
+      query: _searchController.text,
+      category: _selectedCategory,
+      status: _selectedStatus,
+      startDate: _customStartDate,
+      endDate: _customEndDate,
+      sortBy: _sortBy,
+    );
+
+    setState(() {
+      _loadedTransactions.clear();
+      _loadedTransactions.addAll(result.items);
+      _hasMore = result.hasMore;
+      _isLoadingMore = false;
+    });
+  }
+
+  Future<void> _loadNextPage() async {
+    setState(() => _isLoadingMore = true);
+    await Future.delayed(const Duration(milliseconds: 300));
+    final engine = ref.read(orderSimulationEngineProvider);
+    final nextPage = _currentPage + 1;
+    final result = engine.getPaginatedTransactions(
+      page: nextPage,
+      pageSize: _pageSize,
+      query: _searchController.text,
+      category: _selectedCategory,
+      status: _selectedStatus,
+      startDate: _customStartDate,
+      endDate: _customEndDate,
+      sortBy: _sortBy,
+    );
+
+    if (mounted) {
+      setState(() {
+        _currentPage = nextPage;
+        _loadedTransactions.addAll(result.items);
+        _hasMore = result.hasMore;
+        _isLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _pickCustomDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _customStartDate != null && _customEndDate != null
+          ? DateTimeRange(start: _customStartDate!, end: _customEndDate!)
+          : DateTimeRange(start: DateTime.now().subtract(const Duration(days: 30)), end: DateTime.now()),
+    );
+    if (picked != null) {
+      setState(() {
+        _customStartDate = picked.start;
+        _customEndDate = picked.end;
+        _selectedDateFilter = HistoryDateFilter.custom;
+      });
+      _resetAndLoadTransactions();
+    }
+  }
+
+  void _applyPresetDateFilter(HistoryDateFilter filter) {
+    final now = DateTime.now();
+    setState(() {
+      _selectedDateFilter = filter;
+      if (filter == HistoryDateFilter.lastDay) {
+        _customStartDate = DateTime(now.year, now.month, now.day);
+        _customEndDate = now;
+      } else if (filter == HistoryDateFilter.lastWeek) {
+        _customStartDate = now.subtract(const Duration(days: 7));
+        _customEndDate = now;
+      } else if (filter == HistoryDateFilter.lastMonth) {
+        _customStartDate = now.subtract(const Duration(days: 30));
+        _customEndDate = now;
+      } else if (filter == HistoryDateFilter.all) {
+        _customStartDate = null;
+        _customEndDate = null;
+      }
+    });
+    _resetAndLoadTransactions();
   }
 
   @override
@@ -51,7 +167,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         engine.orders.where((o) => o.status == OrderStatus.COMPLETE));
     var closedPositions = List<Position>.from(engine.positions);
 
-    // Filter by Date
+    // Apply Legacy Sub-tab Date Filter
     final now = DateTime.now();
     if (_selectedDateFilter == HistoryDateFilter.lastDay) {
       executedOrders = executedOrders
@@ -70,7 +186,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           executedOrders.where((o) => o.placedAt.isAfter(monthAgo)).toList();
     }
 
-    // Apply Search Filter
+    // Apply Search Filter for Legacy tabs
     final query = _searchController.text.trim().toLowerCase();
     if (query.isNotEmpty) {
       executedOrders = executedOrders
@@ -85,7 +201,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           .toList();
     }
 
-    // Apply Sorting
+    // Apply Legacy Sorting
     executedOrders.sort((a, b) => _isSortAscending
         ? a.instrument.symbol.compareTo(b.instrument.symbol)
         : b.instrument.symbol.compareTo(a.instrument.symbol));
@@ -104,16 +220,29 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       backgroundColor: colors.background,
       drawer: const ZeroDrawer(activeRoute: '/history'),
       appBar: ZeroAppBar(
-        title: 'History',
+        title: 'History & Reports',
         showFilterAction: true,
         showSortAction: true,
         showCalendarAction: true,
         isSortAscending: _isSortAscending,
-        onSortTap: () => setState(() => _isSortAscending = !_isSortAscending),
-        selectedDateFilter: _selectedDateFilter,
-        onDateFilterSelected: (filter) {
-          setState(() => _selectedDateFilter = filter);
+        onSortTap: () {
+          setState(() {
+            _isSortAscending = !_isSortAscending;
+            _sortBy = _isSortAscending ? 'DATE_ASC' : 'DATE_DESC';
+          });
+          _resetAndLoadTransactions();
         },
+        selectedDateFilter: _selectedDateFilter,
+        onDateFilterSelected: _applyPresetDateFilter,
+        trailingAction: IconButton(
+          icon: Icon(Icons.description_outlined, color: colors.textPrimary, size: 22),
+          tooltip: 'Account Statement',
+          onPressed: () => StatementViewDialog.show(
+            context,
+            startDate: _customStartDate,
+            endDate: _customEndDate,
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -123,70 +252,71 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           // Dual Script Selector Bar
           const ScriptSelectorBar(),
 
-          // Search Bar
+          // Universal Search Bar
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
             child: Container(
               height: 40,
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(20),
-                border:
-                    Border.all(color: colors.divider.withValues(alpha: 0.5)),
+                border: Border.all(color: colors.divider.withValues(alpha: 0.5)),
               ),
               child: TextField(
                 controller: _searchController,
                 textAlignVertical: TextAlignVertical.center,
                 style: AppTypography.body(color: colors.textPrimary),
                 decoration: InputDecoration(
-                  hintText: 'Search history by script or ID',
+                  hintText: 'Search by symbol, narration, order ID, or txn ID',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
-                  prefixIcon:
-                      Icon(Icons.search, color: colors.textSecondary, size: 20),
+                  prefixIcon: Icon(Icons.search, color: colors.textSecondary, size: 20),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear,
-                              color: colors.textSecondary, size: 18),
+                          icon: Icon(Icons.clear, color: colors.textSecondary, size: 18),
                           onPressed: () {
                             _searchController.clear();
-                            setState(() {});
+                            _resetAndLoadTransactions();
                           },
                         )
                       : null,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 ),
-                onChanged: (val) => setState(() {}),
+                onChanged: (_) => _resetAndLoadTransactions(),
               ),
             ),
           ),
 
-          // Sub Tabs Strip with Dot Indicator (CLASSIC, POSITIONS, ORDERS, DEALS)
+          // Sub Tabs Strip with Dot Indicator
           Container(
             height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: colors.background,
               border: Border(
-                  bottom: BorderSide(
-                      color: colors.divider.withValues(alpha: 0.4),
-                      width: 0.5)),
+                bottom: BorderSide(
+                  color: colors.divider.withValues(alpha: 0.4),
+                  width: 0.5,
+                ),
+              ),
             ),
             child: TabBar(
               controller: _tabController,
-              isScrollable: false,
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
               labelColor: colors.primary,
               unselectedLabelColor: colors.textSecondary,
               indicator: DotTabIndicator(color: colors.primary, radius: 2.5),
               labelStyle: GoogleFonts.inter(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12.5,
-                  letterSpacing: 0.3),
+                fontWeight: FontWeight.w800,
+                fontSize: 12.5,
+                letterSpacing: 0.3,
+              ),
               unselectedLabelStyle: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12.5,
-                  letterSpacing: 0.3),
+                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                letterSpacing: 0.3,
+              ),
               tabs: _subTabs.map((title) => Tab(text: title)).toList(),
             ),
           ),
@@ -196,31 +326,404 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildClassicView(colors,
-                    profit: totalRealizedProfit,
-                    deposit: totalDeposit,
-                    withdrawal: totalWithdrawal,
-                    commission: totalCommission),
-                _buildPositionsView(closedPositions, colors,
-                    profit: totalRealizedProfit,
-                    deposit: totalDeposit,
-                    withdrawal: totalWithdrawal,
-                    commission: totalCommission),
-                _buildOrdersView(executedOrders, colors,
-                    profit: totalRealizedProfit,
-                    deposit: totalDeposit,
-                    withdrawal: totalWithdrawal,
-                    commission: totalCommission),
-                _buildDealsView(executedOrders, colors,
-                    profit: totalRealizedProfit,
-                    deposit: totalDeposit,
-                    withdrawal: totalWithdrawal,
-                    commission: totalCommission),
+                _buildTransactionsView(colors, engine),
+                _buildClassicView(
+                  colors,
+                  profit: totalRealizedProfit,
+                  deposit: totalDeposit,
+                  withdrawal: totalWithdrawal,
+                  commission: totalCommission,
+                ),
+                _buildPositionsView(
+                  closedPositions,
+                  colors,
+                  profit: totalRealizedProfit,
+                  deposit: totalDeposit,
+                  withdrawal: totalWithdrawal,
+                  commission: totalCommission,
+                ),
+                _buildOrdersView(
+                  executedOrders,
+                  colors,
+                  profit: totalRealizedProfit,
+                  deposit: totalDeposit,
+                  withdrawal: totalWithdrawal,
+                  commission: totalCommission,
+                ),
+                _buildDealsView(
+                  executedOrders,
+                  colors,
+                  profit: totalRealizedProfit,
+                  deposit: totalDeposit,
+                  withdrawal: totalWithdrawal,
+                  commission: totalCommission,
+                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // ─── Unified Transactions Tab View (with Filters, Sort, Pagination) ───────
+  Widget _buildTransactionsView(TradingColors colors, OrderSimulationEngine engine) {
+    return Column(
+      children: [
+        // Filter Controls Bar
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            children: [
+              // Category Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    _buildCategoryChip(null, 'All Types', colors),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(TransactionCategory.TRADE, 'Trades', colors),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(TransactionCategory.DEPOSIT, 'Deposits', colors),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(TransactionCategory.WITHDRAWAL, 'Withdrawals', colors),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(TransactionCategory.FEE_CHARGE, 'Charges & Fees', colors),
+                    const SizedBox(width: 6),
+                    _buildCategoryChip(TransactionCategory.DIVIDEND, 'Dividends', colors),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Secondary Filters: Status + Custom Date Range + Sort
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    // Status Dropdown / Chips
+                    _buildStatusChip('ALL', 'All Status', colors),
+                    const SizedBox(width: 6),
+                    _buildStatusChip('COMPLETE', 'Completed', colors),
+                    const SizedBox(width: 6),
+                    _buildStatusChip('PENDING', 'Pending', colors),
+                    const SizedBox(width: 6),
+                    _buildStatusChip('CANCELLED', 'Cancelled', colors),
+                    const SizedBox(width: 10),
+
+                    // Custom Date Picker Action Chip
+                    ActionChip(
+                      avatar: Icon(Icons.calendar_month_outlined, size: 14, color: colors.primary),
+                      label: Text(
+                        _selectedDateFilter == HistoryDateFilter.custom && _customStartDate != null
+                            ? '${DateFormatter.formatOrderDate(_customStartDate!)} - ${DateFormatter.formatOrderDate(_customEndDate!)}'
+                            : 'Custom Dates',
+                        style: GoogleFonts.inter(
+                          color: _selectedDateFilter == HistoryDateFilter.custom ? colors.primary : colors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                      onPressed: _pickCustomDateRange,
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Multi-criteria Sort Popup
+                    PopupMenuButton<String>(
+                      icon: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: colors.divider, width: 0.5),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.sort_rounded, size: 14, color: colors.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Sort',
+                              style: GoogleFonts.inter(
+                                color: colors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      offset: const Offset(0, 36),
+                      color: colors.cardBackground,
+                      onSelected: (val) {
+                        setState(() => _sortBy = val);
+                        _resetAndLoadTransactions();
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'DATE_DESC', child: Text('Date: Newest First')),
+                        const PopupMenuItem(value: 'DATE_ASC', child: Text('Date: Oldest First')),
+                        const PopupMenuItem(value: 'AMOUNT_DESC', child: Text('Amount: High to Low')),
+                        const PopupMenuItem(value: 'AMOUNT_ASC', child: Text('Amount: Low to High')),
+                        const PopupMenuItem(value: 'ALPHA_ASC', child: Text('Alphabetical: A to Z')),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const Divider(height: 1),
+
+        // Infinite Scroll / Paginated List
+        Expanded(
+          child: _loadedTransactions.isEmpty
+              ? _buildEmptyState('No transactions match the selected filters.', colors)
+              : ListView.builder(
+                  controller: _transactionsScrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: _loadedTransactions.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index < _loadedTransactions.length) {
+                      final txn = _loadedTransactions[index];
+                      return _buildUnifiedTransactionTile(txn, colors);
+                    }
+
+                    // Bottom Pagination / Infinite Scroll Loading / Finished indicator
+                    if (_isLoadingMore) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: colors.primary),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                'Loading more records...',
+                                style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                        child: Text(
+                          _hasMore
+                              ? 'Scroll down to load more records'
+                              : 'All ${_loadedTransactions.length} records loaded (End of Statement)',
+                          style: GoogleFonts.inter(
+                            color: colors.textSecondary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUnifiedTransactionTile(TransactionRecord txn, TradingColors colors) {
+    final isCredit = txn.isCredit;
+    final amtColor = isCredit ? colors.bullish : colors.bearish;
+
+    IconData catIcon;
+    switch (txn.category) {
+      case TransactionCategory.TRADE:
+        catIcon = Icons.candlestick_chart_rounded;
+        break;
+      case TransactionCategory.DEPOSIT:
+        catIcon = Icons.south_west_rounded;
+        break;
+      case TransactionCategory.WITHDRAWAL:
+        catIcon = Icons.north_east_rounded;
+        break;
+      case TransactionCategory.FEE_CHARGE:
+        catIcon = Icons.receipt_long_rounded;
+        break;
+      case TransactionCategory.DIVIDEND:
+        catIcon = Icons.stars_rounded;
+        break;
+      case TransactionCategory.TRANSFER:
+        catIcon = Icons.swap_horiz_rounded;
+        break;
+    }
+
+    Color badgeBg;
+    Color badgeText;
+    switch (txn.status.toUpperCase()) {
+      case 'COMPLETE':
+      case 'SUCCESS':
+      case 'COMPLETED':
+        badgeBg = colors.bullish.withValues(alpha: 0.1);
+        badgeText = colors.bullish;
+        break;
+      case 'PENDING':
+      case 'INITIATED':
+        badgeBg = colors.warning.withValues(alpha: 0.1);
+        badgeText = colors.warning;
+        break;
+      case 'FAILED':
+      case 'REJECTED':
+        badgeBg = colors.bearish.withValues(alpha: 0.1);
+        badgeText = colors.bearish;
+        break;
+      case 'CANCELLED':
+      default:
+        badgeBg = colors.divider.withValues(alpha: 0.3);
+        badgeText = colors.textSecondary;
+        break;
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: colors.cardBackground,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: colors.divider.withValues(alpha: 0.6), width: 0.5),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => TransactionDetailSheet.show(context, txn),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (isCredit ? colors.bullish : colors.primary).withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(catIcon, color: isCredit ? colors.bullish : colors.primary, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            txn.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              color: colors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            txn.status,
+                            style: GoogleFonts.inter(
+                              color: badgeText,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 9.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${txn.id} • ${DateFormatter.formatOrderDateTime(txn.timestamp)}',
+                      style: GoogleFonts.inter(
+                        color: colors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isCredit ? '+' : '-'}${CurrencyFormatter.format(txn.amount)}',
+                    style: GoogleFonts.inter(
+                      color: amtColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13.5,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Bal: ${CurrencyFormatter.format(txn.runningBalance)}',
+                    style: GoogleFonts.inter(
+                      color: colors.textSecondary,
+                      fontSize: 10.5,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(TransactionCategory? cat, String label, TradingColors colors) {
+    final isSelected = _selectedCategory == cat;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: colors.primary.withValues(alpha: 0.15),
+      labelStyle: GoogleFonts.inter(
+        color: isSelected ? colors.primary : colors.textSecondary,
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        fontSize: 11.5,
+      ),
+      onSelected: (_) {
+        setState(() => _selectedCategory = cat);
+        _resetAndLoadTransactions();
+      },
+    );
+  }
+
+  Widget _buildStatusChip(String statusKey, String label, TradingColors colors) {
+    final isSelected = _selectedStatus == statusKey;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: colors.primary.withValues(alpha: 0.15),
+      labelStyle: GoogleFonts.inter(
+        color: isSelected ? colors.primary : colors.textSecondary,
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        fontSize: 11,
+      ),
+      onSelected: (_) {
+        setState(() => _selectedStatus = statusKey);
+        _resetAndLoadTransactions();
+      },
     );
   }
 

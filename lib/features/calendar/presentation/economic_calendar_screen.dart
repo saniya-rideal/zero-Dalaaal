@@ -300,7 +300,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                         style: GoogleFonts.inter(
                                           fontSize: 12.5,
                                           fontWeight: FontWeight.w600,
-                                          color: const Color(0xFF475569),
+                                          color: colors.textSecondary,
                                           fontFeatures: const [
                                             FontFeature.tabularFigures()
                                           ],
@@ -318,7 +318,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                         style: const TextStyle(fontSize: 15),
                                       ),
                                       const SizedBox(width: 4),
-                                      _buildSignalBars(e['signal'] as int),
+                                      _buildSignalBars(e['signal'] as int, colors),
                                     ],
                                   ),
                                 ],
@@ -341,7 +341,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                             style: GoogleFonts.inter(
                                               fontSize: 12.5,
                                               fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF0F172A),
+                                              color: colors.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -350,7 +350,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                               ? Icons.keyboard_arrow_up
                                               : Icons.keyboard_arrow_down,
                                           size: 16,
-                                          color: Colors.grey.shade600,
+                                          color: colors.textSecondary,
                                         ),
                                       ],
                                     ),
@@ -358,19 +358,20 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                   const SizedBox(height: 4),
 
                                   // Metrics Row (A: Actual, F: Forecast, P: Previous)
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 4,
                                     children: [
-                                      // Actual / Forecast
-                                      Row(
-                                        children: [
-                                          if (e['actual'].toString().isNotEmpty) ...[
+                                      // Actual
+                                      if (e['actual'].toString().isNotEmpty)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
                                             Text(
                                               'A: ',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
-                                                color: Colors.grey.shade600,
+                                                color: colors.textSecondary,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -379,7 +380,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                               style: GoogleFonts.inter(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.w800,
-                                                color: Colors.black,
+                                                color: colors.textPrimary,
                                               ),
                                             ),
                                             if (e['actualUnit'].toString().isNotEmpty)
@@ -387,17 +388,22 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                                 ' ${e['actualUnit']}',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 10,
-                                                  color: Colors.grey.shade600,
+                                                  color: colors.textSecondary,
                                                 ),
                                               ),
-                                            const SizedBox(width: 8),
                                           ],
-                                          if (e['forecast'].toString().isNotEmpty) ...[
+                                        ),
+
+                                      // Forecast
+                                      if (e['forecast'].toString().isNotEmpty)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
                                             Text(
                                               'F: ',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
-                                                color: Colors.grey.shade600,
+                                                color: colors.textSecondary,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -406,7 +412,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                               style: GoogleFonts.inter(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.w700,
-                                                color: Colors.black87,
+                                                color: colors.textPrimary,
                                               ),
                                             ),
                                             if (e['forecastUnit'].toString().isNotEmpty)
@@ -414,22 +420,22 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                                 ' ${e['forecastUnit']}',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 10,
-                                                  color: Colors.grey.shade600,
+                                                  color: colors.textSecondary,
                                                 ),
                                               ),
                                           ],
-                                        ],
-                                      ),
+                                        ),
 
                                       // Previous
                                       if (e['previous'].toString().isNotEmpty)
                                         Row(
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
                                               'P: ',
                                               style: GoogleFonts.inter(
                                                 fontSize: 11,
-                                                color: Colors.grey.shade600,
+                                                color: colors.textSecondary,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
@@ -438,7 +444,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                               style: GoogleFonts.inter(
                                                 fontSize: 11.5,
                                                 fontWeight: FontWeight.w700,
-                                                color: Colors.black,
+                                                color: colors.textPrimary,
                                               ),
                                             ),
                                             if (e['previousUnit'].toString().isNotEmpty)
@@ -446,7 +452,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                                 ' ${e['previousUnit']}',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 10,
-                                                  color: Colors.grey.shade600,
+                                                  color: colors.textSecondary,
                                                 ),
                                               ),
                                           ],
@@ -465,10 +471,10 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: colors.surface,
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                  color: Colors.grey.shade200, width: 1),
+                                  color: colors.divider, width: 1),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,7 +492,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                                   e['description'],
                                   style: GoogleFonts.inter(
                                     fontSize: 11,
-                                    color: Colors.grey.shade700,
+                                    color: colors.textSecondary,
                                     height: 1.3,
                                   ),
                                 ),
@@ -616,7 +622,8 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
     );
   }
 
-  Widget _buildSignalBars(int level) {
+  Widget _buildSignalBars(int level, TradingColors colors) {
+    final inactiveBarColor = colors.divider;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -625,7 +632,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           width: 2.2,
           height: 4,
           decoration: BoxDecoration(
-            color: level >= 1 ? const Color(0xFF1E88E5) : Colors.grey.shade300,
+            color: level >= 1 ? const Color(0xFF1E88E5) : inactiveBarColor,
             borderRadius: BorderRadius.circular(0.5),
           ),
         ),
@@ -634,7 +641,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           width: 2.2,
           height: 7,
           decoration: BoxDecoration(
-            color: level >= 2 ? const Color(0xFF1E88E5) : Colors.grey.shade300,
+            color: level >= 2 ? const Color(0xFF1E88E5) : inactiveBarColor,
             borderRadius: BorderRadius.circular(0.5),
           ),
         ),
@@ -643,7 +650,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           width: 2.2,
           height: 10,
           decoration: BoxDecoration(
-            color: level >= 3 ? const Color(0xFF1E88E5) : Colors.grey.shade300,
+            color: level >= 3 ? const Color(0xFF1E88E5) : inactiveBarColor,
             borderRadius: BorderRadius.circular(0.5),
           ),
         ),

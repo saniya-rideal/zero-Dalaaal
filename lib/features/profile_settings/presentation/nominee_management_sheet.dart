@@ -60,14 +60,19 @@ class _NomineeManagementSheetState extends State<NomineeManagementSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Nominee / Beneficiary',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: colors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      'Nominee / Beneficiary',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(Icons.close, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(context),
@@ -112,6 +117,7 @@ class _NomineeManagementSheetState extends State<NomineeManagementSheet> {
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
                     value: _relation,
+                    isExpanded: true,
                     dropdownColor: colors.cardBackground,
                     decoration: InputDecoration(
                       isDense: true,

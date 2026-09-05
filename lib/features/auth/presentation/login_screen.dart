@@ -264,24 +264,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 20),
 
                 // Register Link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      "Don't have an account? ",
+                Center(
+                  child: Text.rich(
+                    TextSpan(
+                      text: "Don't have an account? ",
                       style: AppTypography.body(color: colors.textSecondary),
-                    ),
-                    InkWell(
-                      onTap: () => context.push('/register'),
-                      child: Text(
-                        'Sign Up',
-                        style: AppTypography.body(
-                          color: colors.primary,
-                          weight: FontWeight.w700,
+                      children: [
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.baseline,
+                          baseline: TextBaseline.alphabetic,
+                          child: InkWell(
+                            onTap: () => context.push('/register'),
+                            child: Text(
+                              'Sign Up',
+                              style: AppTypography.body(
+                                color: colors.primary,
+                                weight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),

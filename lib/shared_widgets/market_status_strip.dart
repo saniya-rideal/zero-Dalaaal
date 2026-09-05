@@ -17,72 +17,77 @@ class MarketStatusStrip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
         color: colors.surface.withValues(alpha: 0.5),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // NSE / BSE Status Pill
-            Row(
-              children: [
-                Container(
-                  width: 6.5,
-                  height: 6.5,
-                  decoration: BoxDecoration(
-                    color: nseStatus.badgeColor,
-                    shape: BoxShape.circle,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // NSE / BSE Status Pill
+              Row(
+                children: [
+                  Container(
+                    width: 6.5,
+                    height: 6.5,
+                    decoration: BoxDecoration(
+                      color: nseStatus.badgeColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  nseStatus.label,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: nseStatus.badgeColor,
+                  const SizedBox(width: 5),
+                  Text(
+                    nseStatus.label,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: nseStatus.badgeColor,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 10),
 
-                // MCX Status Pill
-                Container(
-                  width: 6.5,
-                  height: 6.5,
-                  decoration: BoxDecoration(
-                    color: mcxStatus.badgeColor,
-                    shape: BoxShape.circle,
+                  // MCX Status Pill
+                  Container(
+                    width: 6.5,
+                    height: 6.5,
+                    decoration: BoxDecoration(
+                      color: mcxStatus.badgeColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  mcxStatus.label,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: mcxStatus.badgeColor,
+                  const SizedBox(width: 5),
+                  Text(
+                    mcxStatus.label,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: mcxStatus.badgeColor,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            // Time-Zone Tag & Info Icon
-            Row(
-              children: [
-                Text(
-                  MarketStatusService.timeZoneLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: colors.textSecondary,
+              const SizedBox(width: 16),
+
+              // Time-Zone Tag & Info Icon
+              Row(
+                children: [
+                  Text(
+                    MarketStatusService.timeZoneLabel,
+                    style: GoogleFonts.inter(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textSecondary,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.info_outline,
-                  size: 13,
-                  color: colors.textSecondary.withValues(alpha: 0.7),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.info_outline,
+                    size: 13,
+                    color: colors.textSecondary.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

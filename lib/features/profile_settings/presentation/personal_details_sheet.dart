@@ -81,14 +81,19 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Personal & Demat Profile',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: colors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      'Personal & Demat Profile',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(Icons.close, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(context),
@@ -105,8 +110,11 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: colors.divider),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 12,
+                  runSpacing: 8,
                   children: [
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,15 +291,25 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textSecondary)),
-            if (verified)
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: colors.textSecondary),
+              ),
+            ),
+            if (verified) ...[
+              const SizedBox(width: 8),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Icon(Icons.verified, size: 14, color: Color(0xFF00A854)),
                   const SizedBox(width: 4),
                   Text('Verified', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF00A854))),
                 ],
               ),
+            ],
           ],
         ),
         const SizedBox(height: 4),

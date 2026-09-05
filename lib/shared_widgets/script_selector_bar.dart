@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
+import '../data/mock/pinned_scripts_provider.dart';
 import '../data/mock/seed_instruments.dart';
-import '../data/models/instrument.dart';
+import '../data/mock/ticker_service.dart';
+import '../data/models/models.dart';
+import '../../features/order_entry/presentation/order_entry_sheet.dart';
 
-class ScriptSelectorBar extends StatefulWidget {
+class ScriptSelectorBar extends ConsumerStatefulWidget {
   final Instrument? leftScript;
   final Instrument? rightScript;
   final ValueChanged<Instrument>? onLeftScriptChanged;
@@ -19,20 +24,10 @@ class ScriptSelectorBar extends StatefulWidget {
   });
 
   @override
-  State<ScriptSelectorBar> createState() => _ScriptSelectorBarState();
+  ConsumerState<ScriptSelectorBar> createState() => _ScriptSelectorBarState();
 }
 
-class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
-  Instrument? _left;
-  Instrument? _right;
-
-  @override
-  void initState() {
-    super.initState();
-    _left = widget.leftScript;
-    _right = widget.rightScript;
-  }
-
+class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
   void _openScriptPicker(bool isLeft) {
     showModalBottomSheet(
       context: context,
@@ -52,8 +47,12 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
                 ? allScripts
                 : allScripts
                     .where((s) =>
-                        s.symbol.toLowerCase().contains(pickerQuery.toLowerCase()) ||
-                        s.name.toLowerCase().contains(pickerQuery.toLowerCase()))
+                        s.symbol
+                            .toLowerCase()
+                            .contains(pickerQuery.toLowerCase()) ||
+                        s.name
+                            .toLowerCase()
+                            .contains(pickerQuery.toLowerCase()))
                     .toList();
 
             return DraggableScrollableSheet(
@@ -74,14 +73,20 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       child: Text(
-                        isLeft ? 'Select Left Quick Script' : 'Select Right Quick Script',
-                        style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700),
+                        isLeft
+                            ? 'Select Left Quick Script'
+                            : 'Select Right Quick Script',
+                        style: AppTypography.h2(
+                            color: colors.textPrimary,
+                            weight: FontWeight.w700),
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       child: Container(
                         height: 40,
                         decoration: BoxDecoration(
@@ -92,9 +97,11 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
                         child: TextField(
                           decoration: InputDecoration(
                             hintText: 'Search script to bind...',
-                            prefixIcon: Icon(Icons.search, color: colors.textSecondary, size: 20),
+                            prefixIcon: Icon(Icons.search,
+                                color: colors.textSecondary, size: 20),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 12),
                           ),
                           onChanged: (val) {
                             setModalState(() => pickerQuery = val);
@@ -111,19 +118,25 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
                         itemBuilder: (context, index) {
                           final script = filtered[index];
                           return ListTile(
-                            title: Text(script.symbol, style: AppTypography.body(weight: FontWeight.w600)),
-                            subtitle: Text('${script.name} • ${script.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
-                            trailing: Icon(Icons.add_circle_outline, color: colors.secondary),
+                            title: Text(script.symbol,
+                                style:
+                                    AppTypography.body(weight: FontWeight.w600)),
+                            subtitle: Text(
+                                '${script.name} • ${script.exchange.name}',
+                                style: AppTypography.caption(
+                                    color: colors.textSecondary)),
+                            trailing: Icon(Icons.add_circle_outline,
+                                color: colors.secondary),
                             onTap: () {
-                              setState(() {
-                                if (isLeft) {
-                                  _left = script;
-                                  widget.onLeftScriptChanged?.call(script);
-                                } else {
-                                  _right = script;
-                                  widget.onRightScriptChanged?.call(script);
-                                }
-                              });
+                              final notifier =
+                                  ref.read(pinnedScriptsProvider.notifier);
+                              if (isLeft) {
+                                notifier.setLeftScript(script);
+                                widget.onLeftScriptChanged?.call(script);
+                              } else {
+                                notifier.setRightScript(script);
+                                widget.onRightScriptChanged?.call(script);
+                              }
                               Navigator.pop(context);
                             },
                           );
@@ -140,9 +153,107 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
     );
   }
 
+  void _showScriptQuickActions(Instrument script, bool isLeft) {
+    final colors = context.tradingColors;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: colors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          script.symbol,
+                          style: AppTypography.h2(
+                              color: colors.textPrimary,
+                              weight: FontWeight.w700),
+                        ),
+                        Text(
+                          '${script.name} • ${script.exchange.name}',
+                          style: AppTypography.caption(
+                              color: colors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(Icons.trending_up, color: colors.primary),
+              title: Text('Trade / Place Order',
+                  style: TextStyle(
+                      color: colors.primary, fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                OrderEntrySheet.show(context, instrument: script);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.candlestick_chart, color: colors.textPrimary),
+              title: Text('View Fullscreen Chart',
+                  style: TextStyle(color: colors.textPrimary)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                context.push('/chart-fullscreen/${script.token}');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.info_outline, color: colors.textPrimary),
+              title: Text('Script Details',
+                  style: TextStyle(color: colors.textPrimary)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                context.push('/quote/${script.token}');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.swap_horiz, color: colors.secondary),
+              title: Text('Change Script',
+                  style: TextStyle(color: colors.textPrimary)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                _openScriptPicker(isLeft);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: colors.bearish),
+              title: Text('Unpin from Bar',
+                  style: TextStyle(color: colors.bearish)),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                ref.read(pinnedScriptsProvider.notifier).clearSlot(isLeft);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final pinned = ref.watch(pinnedScriptsProvider);
+    final leftScript = widget.leftScript ?? pinned.leftScript;
+    final rightScript = widget.rightScript ?? pinned.rightScript;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
@@ -152,8 +263,8 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
           // Left Script Button
           Expanded(
             child: _buildScriptButton(
-              script: _left,
-              onTap: () => _openScriptPicker(true),
+              script: leftScript,
+              isLeft: true,
               colors: colors,
             ),
           ),
@@ -161,8 +272,8 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
           // Right Script Button
           Expanded(
             child: _buildScriptButton(
-              script: _right,
-              onTap: () => _openScriptPicker(false),
+              script: rightScript,
+              isLeft: false,
               colors: colors,
             ),
           ),
@@ -173,12 +284,26 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
 
   Widget _buildScriptButton({
     required Instrument? script,
-    required VoidCallback onTap,
+    required bool isLeft,
     required TradingColors colors,
   }) {
+    Quote? liveQuote;
+    if (script != null) {
+      try {
+        final ticker = ref.watch(tickerServiceProvider);
+        liveQuote = ticker.getQuote(script.token);
+      } catch (_) {}
+    }
+
     return InkWell(
-      onTap: onTap,
-      onLongPress: onTap,
+      onTap: () {
+        if (script != null) {
+          _showScriptQuickActions(script, isLeft);
+        } else {
+          _openScriptPicker(isLeft);
+        }
+      },
+      onLongPress: () => _openScriptPicker(isLeft),
       borderRadius: BorderRadius.circular(6),
       child: Container(
         height: 38,
@@ -194,22 +319,55 @@ class _ScriptSelectorBarState extends State<ScriptSelectorBar> {
               width: 20,
               height: 20,
               decoration: BoxDecoration(
-                color: colors.secondary,
+                color: script != null ? colors.primary : colors.secondary,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add, size: 14, color: Colors.white),
+              child: Icon(
+                script != null ? Icons.check : Icons.add,
+                size: 14,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(width: 6),
             Flexible(
-              child: Text(
-                script?.symbol ?? 'Press and hold to select script',
-                style: AppTypography.labelSmall(
-                  color: colors.textPrimary,
-                  weight: script != null ? FontWeight.w700 : FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: script != null
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            script.symbol,
+                            style: AppTypography.labelSmall(
+                              color: colors.textPrimary,
+                              weight: FontWeight.w700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (liveQuote != null) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            liveQuote.ltp.toStringAsFixed(1),
+                            style: AppTypography.caption(
+                              color: liveQuote.changePercent >= 0
+                                  ? colors.bullish
+                                  : colors.bearish,
+                              weight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
+                    )
+                  : Text(
+                      'Press and hold to select script',
+                      style: AppTypography.labelSmall(
+                        color: colors.textPrimary,
+                        weight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
             ),
           ],
         ),

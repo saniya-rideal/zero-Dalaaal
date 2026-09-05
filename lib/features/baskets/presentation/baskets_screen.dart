@@ -132,11 +132,15 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(basket.name,
-                                    style: GoogleFonts.inter(
-                                        color: colors.textPrimary,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 15)),
+                                Expanded(
+                                  child: Text(basket.name,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(
+                                          color: colors.textPrimary,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15)),
+                                ),
+                                const SizedBox(width: 8),
                                 Text('${basket.legs.length} Orders',
                                     style: GoogleFonts.inter(
                                         color: colors.textSecondary,
@@ -154,37 +158,44 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 5, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color:
-                                                leg.side == TransactionType.BUY
-                                                    ? colors.bullish
-                                                    : colors.bearish,
-                                            borderRadius:
-                                                BorderRadius.circular(3),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  leg.side == TransactionType.BUY
+                                                      ? colors.bullish
+                                                      : colors.bearish,
+                                              borderRadius:
+                                                  BorderRadius.circular(3),
+                                            ),
+                                            child: Text(
+                                              leg.side.name,
+                                              style: GoogleFonts.inter(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 10),
+                                            ),
                                           ),
-                                          child: Text(
-                                            leg.side.name,
-                                            style: GoogleFonts.inter(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 10),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              inst?.symbol ??
+                                                  leg.instrumentToken,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: GoogleFonts.inter(
+                                                  color: colors.textPrimary,
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13.5),
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                            inst?.symbol ??
-                                                leg.instrumentToken,
-                                            style: GoogleFonts.inter(
-                                                color: colors.textPrimary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13.5)),
-                                      ],
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Text(
                                         '${leg.quantity} Qty • ${leg.product.name}',
                                         style: GoogleFonts.inter(

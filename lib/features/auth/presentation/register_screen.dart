@@ -528,8 +528,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           const SizedBox(height: 18),
 
           // Back to Login Link
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text('Already have an account? ',
                   style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13)),

@@ -1,43 +1,65 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/trading_colors.dart';
+import '../../../data/mock/news_repository.dart';
+import '../../../data/mock/seed_instruments.dart';
+import '../../../data/models/models.dart';
 import '../../../shared_widgets/zero_drawer.dart';
-import 'news_feed_screen.dart';
+import '../../order_entry/presentation/leverage_education_dialog.dart';
+import '../../quote_detail/presentation/quote_detail_screen.dart';
 
-class NewsScreen extends StatelessWidget {
-  const NewsScreen({super.key});
+class NewsScreen extends ConsumerStatefulWidget {
+  final int initialTabIndex;
+
+  const NewsScreen({
+    super.key,
+    this.initialTabIndex = 0,
+  });
+
+  @override
+  ConsumerState<NewsScreen> createState() => _NewsScreenState();
+}
+
+class _NewsScreenState extends ConsumerState<NewsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // News Tab State
+  NewsCategory _selectedNewsCategory = NewsCategory.ALL;
+  final TextEditingController _newsSearchController = TextEditingController();
+  int _newsPage = 1;
+  static const int _newsPageSize = 6;
+
+  // Academy Tab State
+  LearningCategory _selectedLearningCategory = LearningCategory.ALL;
+
+  // Glossary Tab State
+  final TextEditingController _glossarySearchController = TextEditingController();
+  LearningCategory _selectedGlossaryCategory = LearningCategory.ALL;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _newsSearchController.dispose();
+    _glossarySearchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-
-    final newsSources = [
-      {
-        'title': 'FXStreet News',
-        'desc': 'Real-time Forex & Commodities market breaking news',
-        'badge': 'LIVE',
-      },
-      {
-        'title': 'DailyForex News',
-        'desc': 'Daily market analysis, central bank outlook, and forecasts',
-        'badge': 'DAILY',
-      },
-      {
-        'title': 'MarketWatch News',
-        'desc': 'Global equity indices, earnings reports, and economic pulse',
-        'badge': 'STOCKS',
-      },
-      {
-        'title': 'ForexLive News',
-        'desc': 'Live fast-breaking financial news wire and trader commentary',
-        'badge': 'FAST',
-      },
-      {
-        'title': 'FXMarkets News',
-        'desc': 'Institutional foreign exchange market intelligence',
-        'badge': 'FOREX',
-      },
-    ];
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -46,87 +68,1444 @@ class NewsScreen extends StatelessWidget {
         backgroundColor: colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
+        centerTitle: false,
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: Text(
-          'News',
-          style: GoogleFonts.inter(
-            color: colors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'News, Insights & Learning',
+              style: GoogleFonts.inter(
+                color: colors.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              'Real-time Market Feeds • Trading Academy • Glossary',
+              style: GoogleFonts.inter(
+                color: colors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: const Color(0xFF1E88E5),
+          unselectedLabelColor: colors.textSecondary,
+          indicatorColor: const Color(0xFF1E88E5),
+          indicatorWeight: 3,
+          labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+          unselectedLabelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.newspaper_outlined, size: 18),
+              text: 'Market News',
+            ),
+            Tab(
+              icon: Icon(Icons.school_outlined, size: 18),
+              text: 'Academy',
+            ),
+            Tab(
+              icon: Icon(Icons.menu_book_outlined, size: 18),
+              text: 'Glossary',
+            ),
+          ],
         ),
       ),
-      body: ListView.separated(
-        itemCount: newsSources.length,
-        separatorBuilder: (_, __) =>
-            Divider(height: 1, thickness: 0.8, color: colors.divider),
-        itemBuilder: (context, index) {
-          final source = newsSources[index];
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildMarketNewsTab(colors),
+          _buildAcademyTab(colors),
+          _buildGlossaryTab(colors),
+        ],
+      ),
+    );
+  }
 
-          return Material(
-            color: Colors.transparent,
-            child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              title: Row(
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TAB 1: MARKET NEWS FEED
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildMarketNewsTab(TradingColors colors) {
+    final repo = ref.watch(newsRepositoryProvider);
+    final result = repo.getArticles(
+      query: _newsSearchController.text,
+      category: _selectedNewsCategory,
+      page: 1,
+      pageSize: _newsPage * _newsPageSize,
+    );
+
+    return RefreshIndicator(
+      color: const Color(0xFF1E88E5),
+      onRefresh: () async {
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) {
+          setState(() {
+            _newsPage = 1;
+          });
+        }
+      },
+      child: CustomScrollView(
+        slivers: [
+          // 1. Search Bar
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.divider),
+                ),
+                child: TextField(
+                  controller: _newsSearchController,
+                  style: GoogleFonts.inter(color: colors.textPrimary, fontSize: 13.5),
+                  decoration: InputDecoration(
+                    hintText: 'Search news by headline, symbol, or source...',
+                    hintStyle: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13),
+                    prefixIcon: Icon(Icons.search, size: 20, color: colors.textSecondary),
+                    suffixIcon: _newsSearchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _newsSearchController.clear();
+                              setState(() => _newsPage = 1);
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (_) => setState(() => _newsPage = 1),
+                ),
+              ),
+            ),
+          ),
+
+          // 2. Category Filter Chips
+          SliverToBoxAdapter(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
                 children: [
-                  Text(
-                    source['title']!,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E88E5).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      source['badge']!,
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E88E5),
-                      ),
-                    ),
-                  ),
+                  _buildNewsCategoryChip('All', NewsCategory.ALL, colors),
+                  _buildNewsCategoryChip('Equities', NewsCategory.EQUITIES, colors),
+                  _buildNewsCategoryChip('F&O', NewsCategory.FNO, colors),
+                  _buildNewsCategoryChip('Commodities', NewsCategory.COMMODITIES, colors),
+                  _buildNewsCategoryChip('Forex', NewsCategory.FOREX, colors),
+                  _buildNewsCategoryChip('Economy', NewsCategory.ECONOMY, colors),
                 ],
               ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Text(
-                  source['desc']!,
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    color: colors.textSecondary,
+            ),
+          ),
+
+          // 3. Third-party Disclaimer Notice
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: colors.divider),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 14, color: colors.textSecondary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Third-party curated wires for informational purposes only. Not investment advice.',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.5,
+                          color: colors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 4. Articles List or Empty State
+          if (result.items.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: colors.textSecondary),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No matching news articles found',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Try searching for another keyword or switch category filter.',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(fontSize: 12.5, color: colors.textSecondary),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton.icon(
+                        onPressed: () {
+                          _newsSearchController.clear();
+                          setState(() {
+                            _selectedNewsCategory = NewsCategory.ALL;
+                            _newsPage = 1;
+                          });
+                        },
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: const Text('Reset Filters'),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              trailing: Icon(Icons.chevron_right,
-                  color: colors.textSecondary, size: 22),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        NewsFeedScreen(sourceTitle: source['title']!),
-                  ),
-                );
-              },
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final article = result.items[index];
+                    return _buildArticleCard(article, colors);
+                  },
+                  childCount: result.items.length,
+                ),
+              ),
             ),
-          );
+
+          // 5. Pagination ("Load More" button)
+          if (result.hasMore)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() => _newsPage++);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: colors.divider),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.arrow_downward, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Load More Articles (${result.totalCount - result.items.length} remaining)',
+                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewsCategoryChip(String label, NewsCategory category, TradingColors colors) {
+    final isSelected = _selectedNewsCategory == category;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (selected) {
+          if (selected) {
+            setState(() {
+              _selectedNewsCategory = category;
+              _newsPage = 1;
+            });
+          }
         },
+        selectedColor: const Color(0xFF1E88E5),
+        backgroundColor: colors.surface,
+        labelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? Colors.white : colors.textPrimary,
+        ),
+        side: BorderSide(color: isSelected ? const Color(0xFF1E88E5) : colors.divider),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      ),
+    );
+  }
+
+  Widget _buildArticleCard(NewsArticle article, TradingColors colors) {
+    final sentimentColor = article.sentiment == NewsSentiment.BULLISH
+        ? const Color(0xFF00A854)
+        : (article.sentiment == NewsSentiment.BEARISH
+            ? const Color(0xFFE82B57)
+            : colors.textSecondary);
+
+    final sentimentText = article.sentiment == NewsSentiment.BULLISH
+        ? 'BULLISH'
+        : (article.sentiment == NewsSentiment.BEARISH ? 'BEARISH' : 'NEUTRAL');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: colors.cardBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.divider, width: 0.8),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => _showArticleDetailsSheet(article, colors),
+          child: Padding(
+            padding: const EdgeInsets.all(14.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Meta Row: Source • Sentiment • Timestamp
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E88E5).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            article.source,
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF1E88E5),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: sentimentColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            sentimentText,
+                            style: GoogleFonts.inter(
+                              color: sentimentColor,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      article.timeAgo,
+                      style: GoogleFonts.inter(
+                        color: colors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // Headline
+                Text(
+                  article.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
+                    height: 1.3,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // Summary
+                Text(
+                  article.summary,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    color: colors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Footer Row: Related Instrument Tags & Share Button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Related Instruments
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: article.relatedSymbols.map((sym) {
+                          return InkWell(
+                            onTap: () => _openRelatedInstrument(sym),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: colors.surface,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: colors.divider),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.show_chart, size: 12, color: Color(0xFF1E88E5)),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    sym,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF1E88E5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    // Read Time & Share Icon
+                    Row(
+                      children: [
+                        Text(
+                          '${article.readTimeMinutes}m read',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: colors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: Icon(Icons.share_outlined, size: 18, color: colors.textSecondary),
+                          onPressed: () => _promptShareArticle(article),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          tooltip: 'Share Article',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openRelatedInstrument(String symbol) {
+    final instrument = SeedInstruments.all.firstWhere(
+      (i) => i.symbol.toUpperCase() == symbol.toUpperCase(),
+      orElse: () => SeedInstruments.findByToken('eq_sbin')!,
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QuoteDetailScreen(token: instrument.token),
+      ),
+    );
+  }
+
+  void _showArticleDetailsSheet(NewsArticle article, TradingColors colors) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, scrollController) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                // Top Action Bar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E88E5).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        article.source,
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF1E88E5),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          article.timeAgo,
+                          style: GoogleFonts.inter(
+                            color: colors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        IconButton(
+                          icon: Icon(Icons.share_outlined, size: 20, color: colors.textPrimary),
+                          onPressed: () => _promptShareArticle(article),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, size: 22, color: colors.textPrimary),
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Headline
+                Text(
+                  article.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                    height: 1.3,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Related Instruments Row
+                if (article.relatedSymbols.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Related:',
+                        style: GoogleFonts.inter(fontSize: 12, color: colors.textSecondary, fontWeight: FontWeight.w600),
+                      ),
+                      ...article.relatedSymbols.map((sym) {
+                        return ActionChip(
+                          avatar: const Icon(Icons.trending_up, size: 14, color: Color(0xFF1E88E5)),
+                          label: Text(sym, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            _openRelatedInstrument(sym);
+                          },
+                          backgroundColor: colors.surface,
+                          side: BorderSide(color: colors.divider),
+                        );
+                      }),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
+                // Key Takeaways Box
+                if (article.keyTakeaways.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E88E5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF1E88E5).withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.lightbulb_outline, color: Color(0xFF1E88E5), size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Key Market Takeaways',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E88E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...article.keyTakeaways.map((takeaway) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('• ', style: TextStyle(color: Color(0xFF1E88E5), fontWeight: FontWeight.bold)),
+                                  Expanded(
+                                    child: Text(
+                                      takeaway,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        color: colors.textPrimary,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // Full Content
+                Text(
+                  article.fullContent,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: colors.textPrimary,
+                    height: 1.6,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Statutory External Source Disclaimer Box
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.divider),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.gavel_outlined, size: 16, color: colors.textSecondary),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Third-Party Sourced Content & Risk Disclaimer',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'This article was published by ${article.source} and curated by ZeroDalali for informational purposes only. ZeroDalali does not independently verify or guarantee the accuracy, completeness, or timeliness of external wire feeds. This content does not constitute financial, investment, or legal advice.',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: colors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Share & Close Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.share_outlined, size: 16),
+                        label: const Text('Share'),
+                        onPressed: () => _promptShareArticle(article),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E88E5),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Close Article', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _promptShareArticle(NewsArticle article) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.tradingColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (shareCtx) {
+        final shareText = '${article.title}\n\n${article.summary}\n\nSource: ${article.source}\nRead on ZeroDalali Trading App';
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Share Article',
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Share market insights with friends and trading groups:',
+                  style: GoogleFonts.inter(fontSize: 12.5, color: context.tradingColors.textSecondary),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.tradingColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: context.tradingColors.divider),
+                  ),
+                  child: Text(
+                    shareText,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(fontSize: 12, color: context.tradingColors.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.copy, size: 18),
+                    label: const Text('Copy to Clipboard', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: shareText));
+                      Navigator.pop(shareCtx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Article summary copied to clipboard!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E88E5),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TAB 2: LEARNING ACADEMY
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildAcademyTab(TradingColors colors) {
+    final repo = ref.watch(newsRepositoryProvider);
+    final modules = repo.getModules(category: _selectedLearningCategory);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Banner: Master the Markets
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E2B60), Color(0xFF1E88E5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ZeroDalali Trading Academy',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Curated market guides, risk discipline rules, and practical tutorials for beginner to advanced traders.',
+                        style: GoogleFonts.inter(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.school, color: Colors.white, size: 28),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Category Filters
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildLearningCategoryChip('All Topics', LearningCategory.ALL, colors),
+                _buildLearningCategoryChip('Basics', LearningCategory.BASICS, colors),
+                _buildLearningCategoryChip('Risk Management', LearningCategory.RISK_MANAGEMENT, colors),
+                _buildLearningCategoryChip('Leverage & Margin', LearningCategory.MARGIN_LEVERAGE, colors),
+                _buildLearningCategoryChip('Intraday MIS', LearningCategory.INTRADAY, colors),
+                _buildLearningCategoryChip('F&O Derivatives', LearningCategory.FNO, colors),
+                _buildLearningCategoryChip('Commodities & Forex', LearningCategory.COMMODITY_FOREX, colors),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Modules List
+          ...modules.map((module) => _buildModuleCard(module, colors)),
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLearningCategoryChip(String label, LearningCategory category, TradingColors colors) {
+    final isSelected = _selectedLearningCategory == category;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (selected) {
+          if (selected) {
+            setState(() => _selectedLearningCategory = category);
+          }
+        },
+        selectedColor: const Color(0xFF1E88E5),
+        backgroundColor: colors.surface,
+        labelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? Colors.white : colors.textPrimary,
+        ),
+        side: BorderSide(color: isSelected ? const Color(0xFF1E88E5) : colors.divider),
+      ),
+    );
+  }
+
+  Widget _buildModuleCard(LearningModule module, TradingColors colors) {
+    final levelColor = module.level == DifficultyLevel.BEGINNER
+        ? const Color(0xFF00A854)
+        : (module.level == DifficultyLevel.INTERMEDIATE
+            ? const Color(0xFFF57C00)
+            : const Color(0xFFE82B57));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: colors.cardBackground,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colors.divider, width: 0.8),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => _openModuleViewer(module, colors),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: levelColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        module.level.name,
+                        style: GoogleFonts.inter(
+                          color: levelColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${module.readTimeMinutes} min read',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: colors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  module.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  module.description,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    color: colors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${module.sections.length} Lessons',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF1E88E5),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          'Start Lesson',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E88E5),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward, size: 14, color: Color(0xFF1E88E5)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openModuleViewer(LearningModule module, TradingColors colors) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (mCtx) => DraggableScrollableSheet(
+        initialChildSize: 0.90,
+        minChildSize: 0.6,
+        maxChildSize: 0.96,
+        expand: false,
+        builder: (_, scrollController) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                // Module Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E88E5).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        module.level.name,
+                        style: const TextStyle(
+                          color: Color(0xFF1E88E5),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: colors.textPrimary),
+                      onPressed: () => Navigator.pop(mCtx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  module.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  module.description,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const Divider(height: 24),
+
+                // Sections
+                ...module.sections.map((section) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          section.title,
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: colors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          section.content,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            color: colors.textPrimary,
+                            height: 1.55,
+                          ),
+                        ),
+                        if (section.keyTakeaways.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: colors.divider),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Key Takeaways:',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1E88E5),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                ...section.keyTakeaways.map((t) => Padding(
+                                      padding: const EdgeInsets.only(bottom: 2.0),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('• ', style: TextStyle(color: Color(0xFF1E88E5), fontWeight: FontWeight.bold)),
+                                          Expanded(child: Text(t, style: GoogleFonts.inter(fontSize: 12, color: colors.textSecondary))),
+                                        ],
+                                      ),
+                                    )),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (section.proTip != null) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF57C00).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFF57C00).withValues(alpha: 0.4)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.tips_and_updates_outlined, color: Color(0xFFF57C00), size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Pro Tip: ${section.proTip!}',
+                                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFFF57C00), fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                }),
+
+                // Interactive Simulator Launcher for Margin & Leverage Module
+                if (module.category == LearningCategory.MARGIN_LEVERAGE) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF1E88E5).withValues(alpha: 0.4)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Interactive Leverage & Risk Simulator',
+                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF1E88E5)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Test live leverage sliders and market moves to see how account equity reacts to gains and losses.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(fontSize: 12, color: colors.textSecondary),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.tune, size: 16),
+                          label: const Text('Launch Leverage Simulator'),
+                          onPressed: () {
+                            Navigator.pop(mCtx);
+                            LeverageEducationDialog.show(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E88E5),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Finished Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(mCtx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1E2B60),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text('Complete Lesson', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TAB 3: TRADING GLOSSARY
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  Widget _buildGlossaryTab(TradingColors colors) {
+    final repo = ref.watch(newsRepositoryProvider);
+    final terms = repo.getGlossaryTerms(
+      query: _glossarySearchController.text,
+      category: _selectedGlossaryCategory,
+    );
+
+    return Column(
+      children: [
+        // Search Input
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colors.divider),
+            ),
+            child: TextField(
+              controller: _glossarySearchController,
+              style: GoogleFonts.inter(color: colors.textPrimary, fontSize: 13.5),
+              decoration: InputDecoration(
+                hintText: 'Search 40+ trading terms (e.g. spread, circuit, margin, delta)...',
+                hintStyle: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13),
+                prefixIcon: Icon(Icons.search, size: 20, color: colors.textSecondary),
+                suffixIcon: _glossarySearchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _glossarySearchController.clear();
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+
+        // Category Filter Chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              _buildGlossaryCategoryChip('All Terms', LearningCategory.ALL, colors),
+              _buildGlossaryCategoryChip('Basics', LearningCategory.BASICS, colors),
+              _buildGlossaryCategoryChip('Risk', LearningCategory.RISK_MANAGEMENT, colors),
+              _buildGlossaryCategoryChip('Leverage', LearningCategory.MARGIN_LEVERAGE, colors),
+              _buildGlossaryCategoryChip('Intraday', LearningCategory.INTRADAY, colors),
+              _buildGlossaryCategoryChip('F&O', LearningCategory.FNO, colors),
+              _buildGlossaryCategoryChip('Commodity & FX', LearningCategory.COMMODITY_FOREX, colors),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 4),
+
+        // Terms List
+        Expanded(
+          child: terms.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.search_off, size: 40, color: colors.textSecondary),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No glossary terms matched your query.',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: colors.textPrimary),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: terms.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final item = terms[index];
+                    return _buildGlossaryCard(item, colors);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGlossaryCategoryChip(String label, LearningCategory category, TradingColors colors) {
+    final isSelected = _selectedGlossaryCategory == category;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (selected) {
+          if (selected) {
+            setState(() => _selectedGlossaryCategory = category);
+          }
+        },
+        selectedColor: const Color(0xFF1E88E5),
+        backgroundColor: colors.surface,
+        labelStyle: GoogleFonts.inter(
+          fontSize: 11.5,
+          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          color: isSelected ? Colors.white : colors.textPrimary,
+        ),
+        side: BorderSide(color: isSelected ? const Color(0xFF1E88E5) : colors.divider),
+      ),
+    );
+  }
+
+  Widget _buildGlossaryCard(GlossaryTerm item, TradingColors colors) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.cardBackground,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.divider, width: 0.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                item.term,
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: colors.textPrimary,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E88E5).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  item.category.name,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFF1E88E5),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.definition,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: colors.textPrimary,
+              height: 1.4,
+            ),
+          ),
+          if (item.formula != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: colors.divider),
+              ),
+              child: Text(
+                'Formula: ${item.formula!}',
+                style: GoogleFonts.firaCode(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E88E5),
+                ),
+              ),
+            ),
+          ],
+          if (item.example != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Example: ${item.example!}',
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontStyle: FontStyle.italic,
+                color: colors.textSecondary,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

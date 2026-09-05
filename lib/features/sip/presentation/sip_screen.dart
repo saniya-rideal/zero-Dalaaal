@@ -109,37 +109,43 @@ class _SipScreenState extends State<SipScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Row(
-                                  children: [
-                                    Text(sip.instrument.symbol,
-                                        style: GoogleFonts.inter(
-                                            color: colors.textPrimary,
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 15)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: (isActive
-                                                ? colors.bullish
-                                                : colors.warning)
-                                            .withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(4),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(sip.instrument.symbol,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: GoogleFonts.inter(
+                                                color: colors.textPrimary,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 15)),
                                       ),
-                                      child: Text(
-                                        sip.status.name,
-                                        style: GoogleFonts.inter(
-                                          color: isActive
-                                              ? colors.bullish
-                                              : colors.warning,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 11,
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (isActive
+                                                  ? colors.bullish
+                                                  : colors.warning)
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          sip.status.name,
+                                          style: GoogleFonts.inter(
+                                            color: isActive
+                                                ? colors.bullish
+                                                : colors.warning,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 Text(
                                   CurrencyFormatter.format(sip.amount),
                                   style: GoogleFonts.inter(

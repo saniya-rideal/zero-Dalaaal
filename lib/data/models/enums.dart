@@ -11,12 +11,16 @@ enum OrderVariety { REGULAR, BO, CO, AMO, GTT }
 enum OrderKind { MARKET, LIMIT, SL, SL_M }
 
 enum OrderStatus {
-  OPEN,
-  TRIGGER_PENDING,
-  PARTIALLY_FILLED,
-  COMPLETE,
-  CANCELLED,
-  REJECTED
+  DRAFT,           // Order being composed / not yet submitted
+  SUBMITTED,       // Sent to exchange, awaiting acknowledgement
+  OPEN,            // Acknowledged, active in the order book
+  TRIGGER_PENDING, // Stop order awaiting trigger price
+  PARTIALLY_FILLED,// Some quantity filled, rest still pending
+  COMPLETE,        // Fully filled
+  CANCELLED,       // Cancelled by client
+  REJECTED,        // Rejected by exchange/risk engine
+  EXPIRED,         // Expired at end of day (DAY) or not filled (IOC)
+  FAILED,          // Failed due to network timeout or system error
 }
 
 enum Validity { DAY, IOC }

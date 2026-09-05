@@ -7,8 +7,10 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/models/enums.dart';
-import '../../../data/models/instrument.dart';
+import '../../../data/mock/order_simulation_engine.dart';
+import '../../../data/mock/seed_instruments.dart';
+import '../../../data/mock/settings_repository.dart';
+import '../../../data/models/models.dart';
 import '../../../shared_widgets/market_status_strip.dart';
 import '../../../shared_widgets/mt_price_text.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
@@ -16,6 +18,7 @@ import '../../../shared_widgets/script_selector_bar.dart';
 import '../../funds/presentation/add_funds_sheet.dart';
 import '../../funds/presentation/withdraw_funds_sheet.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
+import '../../profile_settings/presentation/live_chat_sheet.dart';
 import '../../watchlist/presentation/watchlist_controller.dart';
 
 class QuoteItemData {
@@ -367,12 +370,20 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final settings = ref.watch(appSettingsProvider);
 
     final filteredQuotes = _query.isEmpty
         ? _quotes
         : _quotes
             .where((q) => q.symbol.toLowerCase().contains(_query.toLowerCase()))
             .toList();
+
+    final Map<String, List<QuoteItemData>> groupedQuotes = {};
+    if (settings.quotesGrouping) {
+      for (final quote in filteredQuotes) {
+        groupedQuotes.putIfAbsent(quote.category, () => []).add(quote);
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -469,13 +480,17 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
           Column(
             children: [
               // Dual-line Public & Private News Ticker Strip (Permanently Pinned)
-              const NewsTickerStrip(),
+              NewsTickerStrip(
+                onPublicNewsTap: () => context.push('/news'),
+                onPrivateNewsTap: () => context.push('/mails'),
+              ),
 
               // Real-time Market Status Strip (NSE/MCX Open/Closed & IST Timezone)
               const MarketStatusStrip(),
 
-              // Dual Script Selector Bar (Permanently Pinned)
-              const ScriptSelectorBar(),
+              // Dual Script Selector Bar (Sticky Scripts Toggle)
+              if (settings.showStickyScripts)
+                const ScriptSelectorBar(),
 
               // Scrollable Quotes & Actions Area
               Expanded(
@@ -554,74 +569,83 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                           Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16.0, vertical: 4.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                 // Pro View Switch
-                                Row(
-                                  children: [
-                                    Transform.scale(
-                                      scale: 0.75,
-                                      child: Switch(
-                                        value: _isProView,
-                                        activeColor: colors.primary,
-                                        onChanged: (val) =>
-                                            setState(() => _isProView = val),
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Pro View Switch
+                                  Row(
+                                    children: [
+                                      Transform.scale(
+                                        scale: 0.75,
+                                        child: Switch(
+                                          value: _isProView,
+                                          activeColor: colors.primary,
+                                          onChanged: (val) =>
+                                              setState(() => _isProView = val),
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      'Pro View',
-                                      style: AppTypography.caption(
-                                          color: colors.textPrimary,
-                                          weight: FontWeight.w600),
-                                    ),
-                                  ],
-                                ),
+                                      Text(
+                                        'Pro View',
+                                        style: AppTypography.caption(
+                                            color: colors.textPrimary,
+                                            weight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
 
-                                // Live Last Updated Timestamp Badge
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF00A854),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Live • ${DateFormat('HH:mm:ss').format(DateTime.now())}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: colors.textSecondary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  const SizedBox(width: 12),
 
-                                // One Click Trade Switch
-                                Row(
-                                  children: [
-                                    Text(
-                                      'One Click Trade',
-                                      style: AppTypography.caption(
-                                          color: colors.textPrimary,
-                                          weight: FontWeight.w600),
-                                    ),
-                                    Transform.scale(
-                                      scale: 0.75,
-                                      child: Switch(
-                                        value: _isOneClickTrade,
-                                        activeColor: colors.primary,
-                                        onChanged: (val) => setState(
-                                            () => _isOneClickTrade = val),
+                                  // Live Last Updated Timestamp Badge
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF00A854),
+                                          shape: BoxShape.circle,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Live • ${DateFormat('HH:mm:ss').format(DateTime.now())}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: colors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(width: 12),
+
+                                  // One Click Trade Switch
+                                  Row(
+                                    children: [
+                                      Text(
+                                        settings.defaultLots > 0
+                                            ? 'One Click (${settings.defaultLots.toStringAsFixed(1)}L)'
+                                            : 'One Click Trade',
+                                        style: AppTypography.caption(
+                                            color: colors.textPrimary,
+                                            weight: FontWeight.w600),
+                                      ),
+                                      Transform.scale(
+                                        scale: 0.75,
+                                        child: Switch(
+                                          value: _isOneClickTrade,
+                                          activeColor: colors.primary,
+                                          onChanged: (val) => setState(
+                                              () => _isOneClickTrade = val),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
 
@@ -712,6 +736,21 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                           );
                         },
                       )
+                    else if (settings.quotesGrouping)
+                      ...groupedQuotes.entries.expand((entry) => [
+                        SliverToBoxAdapter(
+                          child: _buildCategoryHeader(
+                              entry.key, entry.value.length, colors),
+                        ),
+                        SliverList.separated(
+                          itemCount: entry.value.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final item = entry.value[index];
+                            return _buildQuoteRow(item, colors);
+                          },
+                        ),
+                      ])
                     else
                       SliverList.separated(
                         itemCount: filteredQuotes.length,
@@ -849,14 +888,14 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 ),
               ),
 
-              // Edit Mode Reorder Handle (⠿ in #2A3B5C)
+              // Edit Mode Reorder Handle (⠿)
               if (_isEditMode && index != null) ...[
                 const SizedBox(width: 8),
                 ReorderableDragStartListener(
                   index: index,
-                  child: const Icon(
+                  child: Icon(
                     Icons.drag_indicator,
-                    color: Color(0xFF2A3B5C),
+                    color: colors.textSecondary,
                     size: 22,
                   ),
                 ),
@@ -915,23 +954,27 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       // Change indicator
                       Expanded(
                         flex: 4,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.show_chart,
-                              size: 16,
-                              color: colors.textPrimary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${CurrencyFormatter.formatSigned(item.change, showSymbol: false)} (${CurrencyFormatter.formatPercent(item.changePercent)})',
-                              style: AppTypography.labelSmall(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.show_chart,
+                                size: 16,
                                 color: colors.textPrimary,
-                                weight: FontWeight.w500,
-                                tabular: true,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 4),
+                              Text(
+                                '${CurrencyFormatter.formatSigned(item.change, showSymbol: false)} (${CurrencyFormatter.formatPercent(item.changePercent)})',
+                                style: AppTypography.labelSmall(
+                                  color: colors.textPrimary,
+                                  weight: FontWeight.w500,
+                                  tabular: true,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
 
@@ -977,33 +1020,41 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       children: [
                         Expanded(
                           flex: 4,
-                          child: Row(
-                            children: [
-                              Text(
-                                timeStr,
-                                style: AppTypography.labelSmall(
-                                    color: colors.textSecondary, tabular: true),
-                              ),
-                              const SizedBox(width: 4),
-                              Icon(Icons.swap_horiz,
-                                  size: 13, color: colors.textSecondary),
-                              const SizedBox(width: 2),
-                              Text(
-                                '${item.spread}',
-                                style: AppTypography.labelSmall(
-                                    color: colors.textSecondary, tabular: true),
-                              ),
-                            ],
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              children: [
+                                Text(
+                                  timeStr,
+                                  style: AppTypography.labelSmall(
+                                      color: colors.textSecondary, tabular: true),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(Icons.swap_horiz,
+                                    size: 13, color: colors.textSecondary),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${item.spread}',
+                                  style: AppTypography.labelSmall(
+                                      color: colors.textSecondary, tabular: true),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         Expanded(
                           flex: 3,
                           child: Align(
                             alignment: Alignment.centerRight,
-                            child: Text(
-                              '↓ ${CurrencyFormatter.format(item.low, showSymbol: false)}',
-                              style: AppTypography.labelSmall(
-                                  color: colors.textSecondary, tabular: true),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '↓ ${CurrencyFormatter.format(item.low, showSymbol: false)}',
+                                style: AppTypography.labelSmall(
+                                    color: colors.textSecondary, tabular: true),
+                              ),
                             ),
                           ),
                         ),
@@ -1062,7 +1113,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
               ),
             ),
 
-            // Edit Mode: 6-dot Reorder Drag Handle (::: in Slate Navy #2A3B5C)
+            // Edit Mode: 6-dot Reorder Drag Handle (:::)
             if (_isEditMode && index != null) ...[
               const SizedBox(width: 8),
               ReorderableDragStartListener(
@@ -1070,9 +1121,9 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                  child: const Icon(
+                  child: Icon(
                     Icons.drag_indicator,
-                    color: Color(0xFF2A3B5C),
+                    color: colors.textSecondary,
                     size: 26,
                   ),
                 ),
@@ -1085,14 +1136,50 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   }
 
   // Quote Tap Action Sheet (Matching WhatsApp Image 2026-09-02 at 10.20.31 AM.jpeg)
-  void _handleQuoteTap(QuoteItemData item) {
+  void _handleQuoteTap(QuoteItemData item) async {
     if (_isOneClickTrade) {
+      final settings = ref.read(appSettingsProvider);
+      final lots = settings.defaultLots > 0 ? settings.defaultLots : 1.0;
+      final engine = ref.read(orderSimulationEngineProvider);
+      final isCommodity = item.category == 'COMMODITIES';
+
+      final seedInst = SeedInstruments.all.firstWhere(
+        (s) =>
+            s.symbol.toLowerCase() == item.symbol.toLowerCase() ||
+            s.token == item.id,
+        orElse: () =>
+            SeedInstruments.findByToken(item.id) ?? SeedInstruments.all.first,
+      );
+
+      final idempotencyKey =
+          'oneclick_${DateTime.now().millisecondsSinceEpoch}_${seedInst.token}';
+
+      final request = OrderRequest(
+        idempotencyKey: idempotencyKey,
+        instrumentToken: seedInst.token,
+        side: TransactionType.BUY,
+        product: isCommodity ? ProductType.NRML : ProductType.MIS,
+        kind: OrderKind.MARKET,
+        quantity: (lots * (seedInst.lotSize > 0 ? seedInst.lotSize : 1))
+            .toInt()
+            .clamp(1, seedInst.freezeQty > 0 ? seedInst.freezeQty : 100000),
+        validity: Validity.DAY,
+      );
+
+      final placedOrder = await engine.placeOrder(request);
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('Instant Market Buy placed for 1 lot of ${item.symbol}'),
-          backgroundColor: const Color(0xFF00A854),
-          duration: const Duration(seconds: 1),
+          content: Text(
+            placedOrder.status == OrderStatus.REJECTED
+                ? 'One-Click Buy rejected: ${placedOrder.rejectionReason ?? "Insufficient Margin"}'
+                : 'Instant Market Buy executed: ${lots.toStringAsFixed(1)} lot(s) of ${item.symbol} @ ${item.ask > 0 ? item.ask.toStringAsFixed(2) : item.ltp.toStringAsFixed(2)}',
+          ),
+          backgroundColor: placedOrder.status == OrderStatus.REJECTED
+              ? const Color(0xFFD32F2F)
+              : const Color(0xFF00A854),
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
@@ -1150,8 +1237,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF4A5568), size: 22),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
                     OrderEntrySheet.show(context, instrument: dummyInst);
@@ -1174,8 +1261,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF4A5568), size: 22),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1200,8 +1287,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF4A5568), size: 22),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
                     context.push('/alerts');
@@ -1224,8 +1311,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF4A5568), size: 22),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
                     context.push('/chart-fullscreen/${dummyInst.token}');
@@ -1248,8 +1335,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF4A5568), size: 22),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
                     context.push('/quote/${dummyInst.token}');
@@ -1272,8 +1359,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  trailing: const Icon(Icons.chevron_right,
-                      color: Color(0xFF4A5568), size: 22),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
                     setState(() => _isProView = !_isProView);
@@ -1288,80 +1375,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   }
 
   void _openSupportModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) {
-        final colors = context.tradingColors;
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: 20.0,
-              right: 20.0,
-              top: 20.0,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20.0,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                      backgroundColor: colors.primary,
-                      child:
-                          const Icon(Icons.headset_mic, color: Colors.white)),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Zero Support Desk',
-                          style: AppTypography.h2(
-                              color: colors.textPrimary,
-                              weight: FontWeight.w700)),
-                      Text('Live 24/7 Agent Connected',
-                          style: AppTypography.caption(
-                              color: colors.bullish, weight: FontWeight.w600)),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Type your message to support desk...',
-                  filled: true,
-                  fillColor: colors.surface,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text(
-                            'Support ticket raised. Agent will reply in under 2 minutes.')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: const Text('SEND MESSAGE',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
+    LiveChatSheet.show(context);
+  }
 
   Widget _buildTopMoversStrip(TradingColors colors) {
     final sortedByGain = List<QuoteItemData>.from(_quotes)
@@ -1427,6 +1442,45 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildCategoryHeader(
+      String category, int count, TradingColors colors) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: colors.surface.withValues(alpha: 0.75),
+      child: Row(
+        children: [
+          Icon(Icons.label_outline, size: 16, color: colors.primary),
+          const SizedBox(width: 8),
+          Text(
+            category,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: colors.textPrimary,
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              '$count SCRIPTS',
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: colors.primary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -37,6 +37,7 @@ class OrderRequest {
   final int disclosedQty;
   final OrderVariety variety;
   final BracketParams? bracket;
+  final String? idempotencyKey;
 
   const OrderRequest({
     required this.instrumentToken,
@@ -50,6 +51,7 @@ class OrderRequest {
     this.disclosedQty = 0,
     this.variety = OrderVariety.REGULAR,
     this.bracket,
+    this.idempotencyKey,
   });
 
   OrderRequest copyWith({
@@ -64,6 +66,7 @@ class OrderRequest {
     int? disclosedQty,
     OrderVariety? variety,
     BracketParams? bracket,
+    String? idempotencyKey,
   }) {
     return OrderRequest(
       instrumentToken: instrumentToken ?? this.instrumentToken,
@@ -77,6 +80,7 @@ class OrderRequest {
       disclosedQty: disclosedQty ?? this.disclosedQty,
       variety: variety ?? this.variety,
       bracket: bracket ?? this.bracket,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
     );
   }
 
@@ -92,6 +96,7 @@ class OrderRequest {
     'disclosedQty': disclosedQty,
     'variety': variety.name,
     'bracket': bracket?.toJson(),
+    'idempotencyKey': idempotencyKey,
   };
 
   factory OrderRequest.fromJson(Map<String, dynamic> json) => OrderRequest(
@@ -106,6 +111,7 @@ class OrderRequest {
     disclosedQty: (json['disclosedQty'] as num?)?.toInt() ?? 0,
     variety: OrderVariety.values.byName(json['variety'] as String),
     bracket: json['bracket'] != null ? BracketParams.fromJson(json['bracket'] as Map<String, dynamic>) : null,
+    idempotencyKey: json['idempotencyKey'] as String?,
   );
 }
 
@@ -171,9 +177,50 @@ class ChargesBreakdown {
   );
 }
 
+class OrderAuditEntry {
+  final DateTime timestamp;
+  final OrderStatus fromStatus;
+  final OrderStatus toStatus;
+  final String action;
+  final String actorId;
+  final String? details;
+  final String? clientIp;
+
+  const OrderAuditEntry({
+    required this.timestamp,
+    required this.fromStatus,
+    required this.toStatus,
+    required this.action,
+    this.actorId = 'SYSTEM',
+    this.details,
+    this.clientIp,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'timestamp': timestamp.toIso8601String(),
+    'fromStatus': fromStatus.name,
+    'toStatus': toStatus.name,
+    'action': action,
+    'actorId': actorId,
+    'details': details,
+    'clientIp': clientIp,
+  };
+
+  factory OrderAuditEntry.fromJson(Map<String, dynamic> json) => OrderAuditEntry(
+    timestamp: DateTime.parse(json['timestamp'] as String),
+    fromStatus: OrderStatus.values.byName(json['fromStatus'] as String),
+    toStatus: OrderStatus.values.byName(json['toStatus'] as String),
+    action: json['action'] as String,
+    actorId: json['actorId'] as String? ?? 'SYSTEM',
+    details: json['details'] as String?,
+    clientIp: json['clientIp'] as String?,
+  );
+}
+
 class Order {
   final String orderId;
   final String exchangeOrderId;
+  final String? serverOrderId;
   final Instrument instrument;
   final OrderRequest request;
   final OrderStatus status;
@@ -181,12 +228,14 @@ class Order {
   final double averagePrice;
   final DateTime placedAt;
   final List<OrderEvent> timeline;
+  final List<OrderAuditEntry> auditTrail;
   final ChargesBreakdown charges;
   final String? rejectionReason;
 
   const Order({
     required this.orderId,
     required this.exchangeOrderId,
+    this.serverOrderId,
     required this.instrument,
     required this.request,
     required this.status,
@@ -194,13 +243,18 @@ class Order {
     required this.averagePrice,
     required this.placedAt,
     required this.timeline,
+    this.auditTrail = const [],
     required this.charges,
     this.rejectionReason,
   });
 
+  String get effectiveServerOrderId => serverOrderId ?? 'ZD-SRV-$orderId';
+  String? get idempotencyKey => request.idempotencyKey;
+
   Order copyWith({
     String? orderId,
     String? exchangeOrderId,
+    String? serverOrderId,
     Instrument? instrument,
     OrderRequest? request,
     OrderStatus? status,
@@ -208,12 +262,14 @@ class Order {
     double? averagePrice,
     DateTime? placedAt,
     List<OrderEvent>? timeline,
+    List<OrderAuditEntry>? auditTrail,
     ChargesBreakdown? charges,
     String? rejectionReason,
   }) {
     return Order(
       orderId: orderId ?? this.orderId,
       exchangeOrderId: exchangeOrderId ?? this.exchangeOrderId,
+      serverOrderId: serverOrderId ?? this.serverOrderId,
       instrument: instrument ?? this.instrument,
       request: request ?? this.request,
       status: status ?? this.status,
@@ -221,6 +277,7 @@ class Order {
       averagePrice: averagePrice ?? this.averagePrice,
       placedAt: placedAt ?? this.placedAt,
       timeline: timeline ?? this.timeline,
+      auditTrail: auditTrail ?? this.auditTrail,
       charges: charges ?? this.charges,
       rejectionReason: rejectionReason ?? this.rejectionReason,
     );
@@ -229,6 +286,7 @@ class Order {
   Map<String, dynamic> toJson() => {
     'orderId': orderId,
     'exchangeOrderId': exchangeOrderId,
+    'serverOrderId': serverOrderId,
     'instrument': instrument.toJson(),
     'request': request.toJson(),
     'status': status.name,
@@ -236,6 +294,7 @@ class Order {
     'averagePrice': averagePrice,
     'placedAt': placedAt.toIso8601String(),
     'timeline': timeline.map((e) => e.toJson()).toList(),
+    'auditTrail': auditTrail.map((e) => e.toJson()).toList(),
     'charges': charges.toJson(),
     'rejectionReason': rejectionReason,
   };
@@ -243,6 +302,7 @@ class Order {
   factory Order.fromJson(Map<String, dynamic> json) => Order(
     orderId: json['orderId'] as String,
     exchangeOrderId: json['exchangeOrderId'] as String,
+    serverOrderId: json['serverOrderId'] as String?,
     instrument: Instrument.fromJson(json['instrument'] as Map<String, dynamic>),
     request: OrderRequest.fromJson(json['request'] as Map<String, dynamic>),
     status: OrderStatus.values.byName(json['status'] as String),
@@ -250,6 +310,7 @@ class Order {
     averagePrice: (json['averagePrice'] as num).toDouble(),
     placedAt: DateTime.parse(json['placedAt'] as String),
     timeline: (json['timeline'] as List<dynamic>).map((e) => OrderEvent.fromJson(e as Map<String, dynamic>)).toList(),
+    auditTrail: (json['auditTrail'] as List<dynamic>?)?.map((e) => OrderAuditEntry.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
     charges: ChargesBreakdown.fromJson(json['charges'] as Map<String, dynamic>),
     rejectionReason: json['rejectionReason'] as String?,
   );

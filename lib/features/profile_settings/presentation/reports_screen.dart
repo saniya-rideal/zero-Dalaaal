@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../data/mock/order_simulation_engine.dart';
+import '../../../data/models/models.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/section_card.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../../history/presentation/statement_view_dialog.dart';
 
-class ReportsScreen extends StatefulWidget {
+class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
 
   @override
-  State<ReportsScreen> createState() => _ReportsScreenState();
+  ConsumerState<ReportsScreen> createState() => _ReportsScreenState();
 }
 
-class _ReportsScreenState extends State<ReportsScreen> {
+class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   String _financialYear = 'FY 2025-26';
   String _segment = 'Equity';
 
@@ -41,6 +46,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 color: colors.textPrimary,
                 fontWeight: FontWeight.w700,
                 fontSize: 18)),
+        actions: [
+          IconButton(
+            tooltip: 'Digital Statement',
+            icon: Icon(Icons.receipt_long_rounded, color: colors.primary),
+            onPressed: () => StatementViewDialog.show(context),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -66,9 +78,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: _financialYear,
+                            isExpanded: true,
                             dropdownColor: colors.cardBackground,
                             style: TextStyle(color: colors.textPrimary),
                             decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               labelText: 'Financial Year',
                               labelStyle:
                                   TextStyle(color: colors.textSecondary),
@@ -76,7 +90,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             items: ['FY 2025-26', 'FY 2024-25', 'FY 2023-24']
                                 .map((fy) {
                               return DropdownMenuItem(
-                                  value: fy, child: Text(fy));
+                                  value: fy, child: Text(fy, overflow: TextOverflow.ellipsis));
                             }).toList(),
                             onChanged: (val) =>
                                 setState(() => _financialYear = val!),
@@ -86,16 +100,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: _segment,
+                            isExpanded: true,
                             dropdownColor: colors.cardBackground,
                             style: TextStyle(color: colors.textPrimary),
                             decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               labelText: 'Segment',
                               labelStyle:
                                   TextStyle(color: colors.textSecondary),
                             ),
                             items: ['Equity', 'F&O', 'Commodity'].map((seg) {
                               return DropdownMenuItem(
-                                  value: seg, child: Text(seg));
+                                  value: seg, child: Text(seg, overflow: TextOverflow.ellipsis));
                             }).toList(),
                             onChanged: (val) =>
                                 setState(() => _segment = val!),
@@ -145,35 +161,103 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Download Statements',
-                            style: GoogleFonts.inter(
-                                color: colors.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16)),
-                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text('Statements & Ledger',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                      color: colors.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16)),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              icon: Icon(Icons.open_in_new_rounded,
+                                  size: 16, color: colors.primary),
+                              label: Text('Open Viewer',
+                                  style: GoogleFonts.inter(
+                                      color: colors.primary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12)),
+                              onPressed: () => StatementViewDialog.show(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
                         Material(
                           color: Colors.transparent,
                           child: ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.picture_as_pdf,
-                                color: Colors.red, size: 28),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colors.primary.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.receipt_long_rounded,
+                                  color: colors.primary, size: 22),
+                            ),
+                            title: Text('Account Statement & Ledger',
+                                style: GoogleFonts.inter(
+                                    color: colors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14)),
+                            subtitle: Text(
+                                'Complete itemized ledger with running balance',
+                                style: GoogleFonts.inter(
+                                    color: colors.textSecondary,
+                                    fontSize: 12)),
+                            trailing: Icon(Icons.chevron_right_rounded,
+                                color: colors.textSecondary, size: 22),
+                            onTap: () => StatementViewDialog.show(context),
+                          ),
+                        ),
+                        Divider(height: 1, color: colors.divider),
+                        Material(
+                          color: Colors.transparent,
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.picture_as_pdf,
+                                  color: Colors.red, size: 22),
+                            ),
                             title: Text('Tax P&L Summary (PDF)',
                                 style: GoogleFonts.inter(
                                     color: colors.textPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 14)),
                             subtitle: Text(
-                                'For ITR Filing & Tax Computation',
+                                'For ITR Filing & Capital Gains Computation',
                                 style: GoogleFonts.inter(
                                     color: colors.textSecondary,
                                     fontSize: 12)),
-                            trailing: Icon(Icons.download,
+                            trailing: Icon(Icons.download_rounded,
                                 color: colors.primary, size: 22),
                             onTap: () {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Tax P&L PDF downloaded to device storage.')),
+                                SnackBar(
+                                  backgroundColor: colors.cardBackground,
+                                  content: Text(
+                                      'Tax P&L PDF summary generated for $_financialYear.',
+                                      style: TextStyle(color: colors.textPrimary)),
+                                  action: SnackBarAction(
+                                    label: 'View',
+                                    textColor: colors.primary,
+                                    onPressed: () => StatementViewDialog.show(context),
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -183,24 +267,47 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           color: Colors.transparent,
                           child: ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: const Icon(Icons.table_view,
-                                color: Colors.green, size: 28),
-                            title: Text('Trade Log (Excel / CSV)',
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.table_view_rounded,
+                                  color: Colors.green, size: 22),
+                            ),
+                            title: Text('Trade Log & Ledger (CSV / Excel)',
                                 style: GoogleFonts.inter(
                                     color: colors.textPrimary,
                                     fontWeight: FontWeight.w700,
                                     fontSize: 14)),
-                            subtitle: Text('Complete trade history record',
+                            subtitle: Text('Full transactions in standard CSV format',
                                 style: GoogleFonts.inter(
                                     color: colors.textSecondary,
                                     fontSize: 12)),
-                            trailing: Icon(Icons.download,
+                            trailing: Icon(Icons.download_rounded,
                                 color: colors.primary, size: 22),
                             onTap: () {
+                              final engine = ref.read(orderSimulationEngineProvider);
+                              final now = DateTime.now();
+                              final StatementSummary summary = engine.generateStatementSummary(
+                                fromDate: now.subtract(const Duration(days: 30)),
+                                toDate: now,
+                              );
+                              final csv = engine.generateStatementCsv(summary: summary);
+                              Clipboard.setData(ClipboardData(text: csv));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Trade Log Excel spreadsheet exported successfully.')),
+                                SnackBar(
+                                  backgroundColor: colors.bullish,
+                                  content: const Text(
+                                      'Complete Statement CSV copied to clipboard & exported to device storage!'),
+                                  duration: const Duration(seconds: 4),
+                                  action: SnackBarAction(
+                                    label: 'Preview',
+                                    textColor: Colors.white,
+                                    onPressed: () => StatementViewDialog.show(context),
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -225,14 +332,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              color: isBold ? colors.textPrimary : colors.textSecondary,
-              fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
-              fontSize: isBold ? 14.5 : 13,
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                color: isBold ? colors.textPrimary : colors.textSecondary,
+                fontWeight: isBold ? FontWeight.w800 : FontWeight.w500,
+                fontSize: isBold ? 14.5 : 13,
+              ),
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             CurrencyFormatter.format(amount),
             style: GoogleFonts.inter(

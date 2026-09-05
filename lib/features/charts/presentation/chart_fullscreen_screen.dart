@@ -224,37 +224,33 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                     children: [
                       // Canvas with Interactive Chart, Drawings, Crosshair, and Legend
                       Expanded(
-                        child: Stack(
-                          children: [
-                            // Interactive Chart Painter Canvas
-                            _TradingViewInteractiveCanvas(
-                              token: _currentToken,
-                              timeframeEnum: _timeframeEnum,
-                              chartType: _chartType,
-                              colors: colors,
-                              ltp: ltp,
-                              activeTool: _activeTool,
-                              showDrawings: _showDrawings,
-                              isLogScale: _isLogScale,
-                              isPercentScale: _isPercentScale,
-                              indicators: _indicators,
-                              userStrokes: _userStrokes,
-                              currentStroke: _currentStroke,
-                              onStrokeFinished: (stroke) {
-                                if (!_isLocked && stroke.isNotEmpty) {
-                                  setState(() {
-                                    _userStrokes.add(List.from(stroke));
-                                    _undoStrokes.clear();
-                                  });
-                                }
-                              },
-                              onCrosshairUpdate: (_, candle) {
-                                setState(() {
-                                  _hoveredCandle = candle;
-                                });
-                              },
-                            ),
-
+                        child: _TradingViewInteractiveCanvas(
+                          token: _currentToken,
+                          timeframeEnum: _timeframeEnum,
+                          chartType: _chartType,
+                          colors: colors,
+                          ltp: ltp,
+                          activeTool: _activeTool,
+                          showDrawings: _showDrawings,
+                          isLogScale: _isLogScale,
+                          isPercentScale: _isPercentScale,
+                          indicators: _indicators,
+                          userStrokes: _userStrokes,
+                          currentStroke: _currentStroke,
+                          onStrokeFinished: (stroke) {
+                            if (!_isLocked && stroke.isNotEmpty) {
+                              setState(() {
+                                _userStrokes.add(List.from(stroke));
+                                _undoStrokes.clear();
+                              });
+                            }
+                          },
+                          onCrosshairUpdate: (_, candle) {
+                            setState(() {
+                              _hoveredCandle = candle;
+                            });
+                          },
+                          overlays: [
                             // Legend in Top-Left of Chart Canvas
                             Positioned(
                               top: 8,
@@ -362,115 +358,120 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                             ),
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            InkWell(
-                              onTap: () => _showDateRangePicker(context),
-                              child: Row(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              InkWell(
+                                onTap: () => _showDateRangePicker(context),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      'Date Range',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        color: colors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Icon(Icons.keyboard_arrow_down,
+                                        size: 14, color: colors.textSecondary),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _currentUtcTime,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: colors.textSecondary,
+                                  fontWeight: FontWeight.w500,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Row(
                                 children: [
-                                  Text(
-                                    'Date Range',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      color: colors.textSecondary,
-                                      fontWeight: FontWeight.w500,
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() => _isPercentScale = !_isPercentScale);
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: Text(
+                                        '%',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          color: _isPercentScale
+                                              ? const Color(0xFF1E88E5)
+                                              : colors.textSecondary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 2),
-                                  Icon(Icons.keyboard_arrow_down,
-                                      size: 14, color: colors.textSecondary),
+                                  const SizedBox(width: 4),
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() => _isLogScale = !_isLogScale);
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: Text(
+                                        'log',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          color: _isLogScale
+                                              ? const Color(0xFF1E88E5)
+                                              : colors.textSecondary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        _isLogScale = false;
+                                        _isPercentScale = false;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Scale reset to Auto')),
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                      child: Text(
+                                        'auto',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          color: const Color(0xFF1E88E5),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () => _showChartSettingsSheet(context),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                                      child: Icon(
+                                        Icons.settings_outlined,
+                                        size: 14,
+                                        color: colors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
-                            ),
-                            Text(
-                              _currentUtcTime,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: colors.textSecondary,
-                                fontWeight: FontWeight.w500,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
-                                ],
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                InkWell(
-                                  onTap: () {
-                                    setState(() => _isPercentScale = !_isPercentScale);
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Text(
-                                      '%',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: _isPercentScale
-                                            ? const Color(0xFF1E88E5)
-                                            : colors.textSecondary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                InkWell(
-                                  onTap: () {
-                                    setState(() => _isLogScale = !_isLogScale);
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Text(
-                                      'log',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: _isLogScale
-                                            ? const Color(0xFF1E88E5)
-                                            : colors.textSecondary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                InkWell(
-                                  onTap: () {
-                                    setState(() {
-                                      _isLogScale = false;
-                                      _isPercentScale = false;
-                                    });
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Scale reset to Auto')),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Text(
-                                      'auto',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: const Color(0xFF1E88E5),
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                InkWell(
-                                  onTap: () => _showChartSettingsSheet(context),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                                    child: Icon(
-                                      Icons.settings_outlined,
-                                      size: 14,
-                                      color: colors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -589,9 +590,9 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
           // Compare Symbol (+)
           InkWell(
             onTap: () => _showInstrumentPicker(context),
-            child: const Center(
+            child: Center(
               child: Icon(Icons.add_circle_outline,
-                  size: 18, color: Color(0xFF4A5568)),
+                  size: 18, color: colors.textSecondary),
             ),
           ),
           const SizedBox(width: 14),
@@ -616,7 +617,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                   fontStyle: FontStyle.italic,
                   color: _indicators.isNotEmpty
                       ? const Color(0xFF1E88E5)
-                      : const Color(0xFF4A5568),
+                      : colors.textSecondary,
                 ),
               ),
             ),
@@ -635,8 +636,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                 );
               }
             },
-            child: const Center(
-              child: Icon(Icons.undo, size: 18, color: Color(0xFF4A5568)),
+            child: Center(
+              child: Icon(Icons.undo, size: 18, color: colors.textSecondary),
             ),
           ),
           const SizedBox(width: 14),
@@ -653,8 +654,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                 );
               }
             },
-            child: const Center(
-              child: Icon(Icons.redo, size: 18, color: Color(0xFF4A5568)),
+            child: Center(
+              child: Icon(Icons.redo, size: 18, color: colors.textSecondary),
             ),
           ),
           const SizedBox(width: 14),
@@ -672,15 +673,15 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
             child: Center(
               child: Row(
                 children: [
-                  const Icon(Icons.cloud_outlined,
-                      size: 18, color: Color(0xFF4A5568)),
+                  Icon(Icons.cloud_outlined,
+                      size: 18, color: colors.textSecondary),
                   const SizedBox(width: 4),
                   Text(
                     'Save',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFF4A5568),
+                      color: colors.textSecondary,
                     ),
                   ),
                 ],
@@ -820,7 +821,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                             child: Text(
                               bid.toStringAsFixed(2),
                               style: GoogleFonts.inter(
-                                color: Colors.black,
+                                color: Colors.white,
                                 fontSize: 16.5,
                                 fontWeight: FontWeight.w900,
                                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -830,7 +831,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                           Text(
                             'SELL',
                             style: GoogleFonts.inter(
-                              color: Colors.black,
+                              color: Colors.white,
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.5,
@@ -843,8 +844,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                 ),
               ),
 
-              // Solid Black Divider
-              Container(width: 1.5, height: 60, color: Colors.black),
+              // Solid Divider
+              Container(width: 1.5, height: 60, color: Colors.white.withValues(alpha: 0.3)),
 
               // Right BUY
               Expanded(
@@ -862,7 +863,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                             child: Text(
                               ask.toStringAsFixed(2),
                               style: GoogleFonts.inter(
-                                color: Colors.black,
+                                color: Colors.white,
                                 fontSize: 16.5,
                                 fontWeight: FontWeight.w900,
                                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -872,7 +873,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                           Text(
                             'BUY',
                             style: GoogleFonts.inter(
-                              color: Colors.black,
+                              color: Colors.white,
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.5,
@@ -1084,8 +1085,11 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
       {'label': '1M', 'tf': Timeframe.ONE_MONTH},
     ];
 
+    final colors = context.tradingColors;
+
     showModalBottomSheet(
       context: context,
+      backgroundColor: colors.cardBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -1101,10 +1105,11 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
+                  color: colors.textPrimary,
                 ),
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1, color: colors.divider),
             Wrap(
               children: timeframes.map((tfItem) {
                 final label = tfItem['label'] as String;
@@ -1136,7 +1141,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                             isSelected ? FontWeight.w800 : FontWeight.w500,
                         color: isSelected
                             ? const Color(0xFF1E88E5)
-                            : Colors.black87,
+                            : colors.textPrimary,
                       ),
                     ),
                   ),
@@ -1245,9 +1250,9 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: const Icon(Icons.candlestick_chart_outlined),
+                  leading: Icon(Icons.candlestick_chart_outlined, color: colors.textPrimary),
                   title: Text('Candlestick Chart',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                   trailing: _chartType == ChartType.candle
                       ? const Icon(Icons.check, color: Color(0xFF00A854))
                       : null,
@@ -1260,9 +1265,9 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: const Icon(Icons.show_chart),
+                  leading: Icon(Icons.show_chart, color: colors.textPrimary),
                   title: Text('Line Chart',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                   trailing: _chartType == ChartType.line
                       ? const Icon(Icons.check, color: Color(0xFF00A854))
                       : null,
@@ -1275,9 +1280,9 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: const Icon(Icons.bar_chart),
+                  leading: Icon(Icons.bar_chart, color: colors.textPrimary),
                   title: Text('Bar Chart',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                   trailing: _chartType == ChartType.bar
                       ? const Icon(Icons.check, color: Color(0xFF00A854))
                       : null,
@@ -1311,6 +1316,7 @@ class _TradingViewInteractiveCanvas extends StatefulWidget {
   final List<Offset> currentStroke;
   final ValueChanged<List<Offset>> onStrokeFinished;
   final Function(Offset?, Candle?) onCrosshairUpdate;
+  final List<Widget> overlays;
 
   const _TradingViewInteractiveCanvas({
     required this.token,
@@ -1327,6 +1333,7 @@ class _TradingViewInteractiveCanvas extends StatefulWidget {
     required this.currentStroke,
     required this.onStrokeFinished,
     required this.onCrosshairUpdate,
+    this.overlays = const [],
   });
 
   @override
@@ -1531,6 +1538,13 @@ class _TradingViewInteractiveCanvasState
       ),
     );
 
+    final chartWithOverlays = Stack(
+      children: [
+        chartCanvas,
+        ...widget.overlays,
+      ],
+    );
+
     // Wrap with edge-case dispatcher
     return ChartEdgeCaseWrapper(
       state: _edgeCtrl.state,
@@ -1540,7 +1554,7 @@ class _TradingViewInteractiveCanvasState
       isFastMovement: _edgeCtrl.isFastMovement,
       fastMovementPercent: _edgeCtrl.fastMovementPercent,
       onRetry: () => setState(() => _loadCandles()),
-      child: chartCanvas,
+      child: chartWithOverlays,
     );
   }
 }

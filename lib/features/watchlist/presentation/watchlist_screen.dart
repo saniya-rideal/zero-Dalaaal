@@ -13,6 +13,7 @@ import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'watchlist_controller.dart';
 import 'watchlist_row_actions.dart';
 import 'watchlist_tab_strip.dart';
+import '../../../core/services/notification_service.dart';
 
 class WatchlistScreen extends ConsumerStatefulWidget {
   const WatchlistScreen({super.key});
@@ -90,25 +91,42 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
             icon: const Icon(Icons.search),
             onPressed: () => context.push('/search'),
           ),
-          IconButton(
-            icon: Stack(
-              children: [
-                const Icon(Icons.notifications_none_outlined),
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: colors.bearish,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+          Consumer(
+            builder: (context, ref, child) {
+              final unreadCount = ref.watch(unreadNotificationsCountProvider);
+              return IconButton(
+                icon: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_none_outlined),
+                    if (unreadCount > 0)
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          decoration: BoxDecoration(
+                            color: colors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              unreadCount > 9 ? '9+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
-            onPressed: () => context.push('/notifications'),
+                onPressed: () => context.push('/notifications'),
+              );
+            },
           ),
           const SizedBox(width: 8),
         ],

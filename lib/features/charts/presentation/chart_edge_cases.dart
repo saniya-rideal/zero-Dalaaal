@@ -204,7 +204,15 @@ class ChartDelayedDataBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      color: const Color(0xFFF57C00).withValues(alpha: 0.15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF57C00).withValues(alpha: 0.15),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFFF57C00).withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           const Icon(Icons.access_time, size: 13, color: Color(0xFFF57C00)),
@@ -239,7 +247,15 @@ class ChartMarketClosedBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      color: colors.textSecondary.withValues(alpha: 0.10),
+      decoration: BoxDecoration(
+        color: colors.textSecondary.withValues(alpha: 0.10),
+        border: Border(
+          bottom: BorderSide(
+            color: colors.divider.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           Icon(Icons.lock_clock_outlined, size: 13, color: colors.textSecondary),
@@ -647,42 +663,45 @@ class ChartEdgeCaseWrapper extends StatelessWidget {
     }
 
     // Partial overlays — chart is visible with banners/badges on top
-    return Stack(
-      children: [
-        child,
+    final hasTopBanner = (state == ChartDataState.marketClosed) ||
+        (hasDelayedData && state == ChartDataState.loaded);
 
-        // Market-closed banner (top strip)
-        if (state == ChartDataState.marketClosed)
+    Widget mainContent = child;
+    if (isFastMovement) {
+      mainContent = Stack(
+        children: [
+          child,
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ChartMarketClosedBanner(
-                colors: colors, message: closedMessage),
-          ),
-
-        // Delayed-data banner (top strip, shown during loaded state only)
-        if (hasDelayedData && state == ChartDataState.loaded)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ChartDelayedDataBanner(colors: colors),
-          ),
-
-        // Fast-movement badge (top-right, floats above banners)
-        if (isFastMovement)
-          Positioned(
-            top: (hasDelayedData || state == ChartDataState.marketClosed)
-                ? 30
-                : 8,
+            top: 8,
             right: 70,
             child: ChartFastMovementBadge(
               colors: colors,
               changePercent: fastMovementPercent,
             ),
           ),
-      ],
-    );
+        ],
+      );
+    }
+
+    if (hasTopBanner) {
+      return Column(
+        children: [
+          // Market-closed banner (top strip)
+          if (state == ChartDataState.marketClosed)
+            ChartMarketClosedBanner(
+              colors: colors,
+              message: closedMessage,
+            ),
+
+          // Delayed-data banner (top strip, shown during loaded state only)
+          if (hasDelayedData && state == ChartDataState.loaded)
+            ChartDelayedDataBanner(colors: colors),
+
+          Expanded(child: mainContent),
+        ],
+      );
+    }
+
+    return mainContent;
   }
 }

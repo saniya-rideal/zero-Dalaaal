@@ -203,25 +203,36 @@ class _IpoListScreenState extends State<IpoListScreen>
               ),
               const SizedBox(height: 10),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildSubStat('Price Band',
-                      '₹${ipo.priceBandLow.toInt()} - ₹${ipo.priceBandHigh.toInt()}', colors),
-                  _buildSubStat('Lot Size', '${ipo.lotSize} Shares', colors),
-                  _buildSubStat('Min Investment',
-                      CurrencyFormatter.format(minAmount), colors),
+                  Expanded(
+                    child: _buildSubStat('Price Band',
+                        '₹${ipo.priceBandLow.toInt()} - ₹${ipo.priceBandHigh.toInt()}', colors),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildSubStat('Lot Size', '${ipo.lotSize} Shares', colors),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _buildSubStat('Min Investment',
+                        CurrencyFormatter.format(minAmount), colors),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Dates: ${DateFormatter.formatOrderDate(ipo.openDate)} - ${DateFormatter.formatOrderDate(ipo.closeDate)}',
-                    style: GoogleFonts.inter(
-                        color: colors.textSecondary, fontSize: 11.5),
+                  Expanded(
+                    child: Text(
+                      'Dates: ${DateFormatter.formatOrderDate(ipo.openDate)} - ${DateFormatter.formatOrderDate(ipo.closeDate)}',
+                      style: GoogleFonts.inter(
+                          color: colors.textSecondary, fontSize: 11.5),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  if (isCurrent)
+                  if (isCurrent) ...[
+                    const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: () => _showApplyIpoDialog(ipo),
                       style: ElevatedButton.styleFrom(
@@ -236,6 +247,7 @@ class _IpoListScreenState extends State<IpoListScreen>
                           style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 12)),
                     ),
+                  ],
                 ],
               ),
             ],
@@ -247,17 +259,8 @@ class _IpoListScreenState extends State<IpoListScreen>
 
   Widget _buildClosedIpos(TradingColors colors) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inventory_2_outlined,
-              size: 42, color: colors.textSecondary.withValues(alpha: 0.5)),
-          const SizedBox(height: 8),
-          Text('No closed IPOs recorded this month',
-              style: GoogleFonts.inter(
-                  color: colors.textSecondary, fontSize: 14)),
-        ],
-      ),
+      child: Text('No closed IPO history available',
+          style: AppTypography.body(color: colors.textSecondary)),
     );
   }
 
@@ -266,15 +269,21 @@ class _IpoListScreenState extends State<IpoListScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
                 color: colors.textSecondary, fontSize: 11)),
         const SizedBox(height: 2),
-        Text(value,
-            style: GoogleFonts.inter(
-                color: colors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                fontFeatures: const [FontFeature.tabularFigures()])),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(value,
+              style: GoogleFonts.inter(
+                  color: colors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontFeatures: const [FontFeature.tabularFigures()])),
+        ),
       ],
     );
   }

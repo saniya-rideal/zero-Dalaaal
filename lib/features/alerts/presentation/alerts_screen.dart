@@ -286,12 +286,17 @@ class _AlertsScreenState extends State<AlertsScreen> {
                           color: colors.secondary, weight: FontWeight.w600),
                     ),
                   ),
-                  Text(
-                    'Alerts (${filteredAlerts.length})',
-                    style: GoogleFonts.inter(
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.5),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Alerts (${filteredAlerts.length})',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5),
+                      ),
+                    ),
                   ),
                   InkWell(
                     onTap: () {

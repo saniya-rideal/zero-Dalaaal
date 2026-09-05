@@ -92,6 +92,34 @@ class AppTheme {
         labelStyle: AppTypography.body(weight: FontWeight.w600),
         unselectedLabelStyle: AppTypography.body(weight: FontWeight.w400),
       ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: tradingColors.cardBackground,
+        modalBackgroundColor: tradingColors.cardBackground,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: tradingColors.cardBackground,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: AppTypography.h2(
+          color: tradingColors.textPrimary,
+          weight: FontWeight.w700,
+        ),
+        contentTextStyle: AppTypography.body(color: tradingColors.textSecondary),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        labelStyle: TextStyle(color: tradingColors.textSecondary),
+        hintStyle: TextStyle(color: tradingColors.textSecondary.withValues(alpha: 0.7)),
+        prefixIconColor: tradingColors.textSecondary,
+        suffixIconColor: tradingColors.textSecondary,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: tradingColors.divider),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: tradingColors.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
       extensions: const [
         TradingColors.light,
       ],
@@ -182,6 +210,34 @@ class AppTheme {
         indicatorColor: tradingColors.primary,
         labelStyle: AppTypography.body(weight: FontWeight.w600),
         unselectedLabelStyle: AppTypography.body(weight: FontWeight.w400),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: tradingColors.cardBackground,
+        modalBackgroundColor: tradingColors.cardBackground,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: tradingColors.cardBackground,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: AppTypography.h2(
+          color: tradingColors.textPrimary,
+          weight: FontWeight.w700,
+        ),
+        contentTextStyle: AppTypography.body(color: tradingColors.textSecondary),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        labelStyle: TextStyle(color: tradingColors.textSecondary),
+        hintStyle: TextStyle(color: tradingColors.textSecondary.withValues(alpha: 0.7)),
+        prefixIconColor: tradingColors.textSecondary,
+        suffixIconColor: tradingColors.textSecondary,
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: tradingColors.divider),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: tradingColors.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
       extensions: const [
         TradingColors.dark,

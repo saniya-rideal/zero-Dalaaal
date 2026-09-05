@@ -282,13 +282,20 @@ class _MailsScreenState extends State<MailsScreen> {
                           title: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(item.sender,
+                              Expanded(
+                                child: Text(
+                                  item.sender,
+                                  overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
-                                      fontWeight: item.isRead
-                                          ? FontWeight.w600
-                                          : FontWeight.w800,
-                                      color: colors.textPrimary,
-                                      fontSize: 14)),
+                                    fontWeight: item.isRead
+                                        ? FontWeight.w600
+                                        : FontWeight.w800,
+                                    color: colors.textPrimary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Text(item.date,
                                   style: GoogleFonts.inter(
                                       color: colors.textSecondary,

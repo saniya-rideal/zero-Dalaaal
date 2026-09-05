@@ -12,10 +12,15 @@ class Position {
   final double sellAvg;
   final double ltp;
   final double realizedPnl;
-  final double unrealizedPnl;
+  final double? _unrealizedPnl;
   final bool isDayPosition;
+  final double? stopLoss;
+  final double? takeProfit;
+  final double leverage;
+  final double usedMargin;
+  final DateTime openTime;
 
-  const Position({
+  Position({
     required this.id,
     required this.instrument,
     required this.product,
@@ -26,13 +31,42 @@ class Position {
     required this.sellAvg,
     required this.ltp,
     required this.realizedPnl,
-    required this.unrealizedPnl,
+    double? unrealizedPnl,
     this.isDayPosition = true,
-  });
+    this.stopLoss,
+    this.takeProfit,
+    this.leverage = 5.0,
+    this.usedMargin = 0.0,
+    DateTime? openTime,
+  })  : _unrealizedPnl = unrealizedPnl,
+        openTime = openTime ?? DateTime.now();
 
+  double get unrealizedPnl {
+    if (netQty != 0 && entryPrice > 0 && ltp > 0) {
+      final multiplier = instrument.exchange == Exchange.MCX ? instrument.contractMultiplier : 1.0;
+      return netQty * (ltp - entryPrice) * multiplier;
+    }
+    return _unrealizedPnl ?? 0.0;
+  }
+
+  // Helper getters
+  bool get isLong => netQty > 0;
+  bool get isShort => netQty < 0;
+  bool get isClosed => netQty == 0;
+  TransactionType get side => isLong ? TransactionType.BUY : TransactionType.SELL;
+
+  double get entryPrice => isLong ? buyAvg : (sellAvg > 0 ? sellAvg : buyAvg);
   double get totalPnl => realizedPnl + unrealizedPnl;
-  double get currentValue => netQty * ltp;
-  double get investedValue => netQty * (buyAvg > 0 ? buyAvg : sellAvg);
+  double get exposure => netQty.abs() * ltp * (instrument.exchange == Exchange.MCX ? instrument.contractMultiplier : 1.0);
+  double get currentValue => netQty * ltp * (instrument.exchange == Exchange.MCX ? instrument.contractMultiplier : 1.0);
+  double get investedValue => netQty.abs() * (entryPrice > 0 ? entryPrice : ltp) * (instrument.exchange == Exchange.MCX ? instrument.contractMultiplier : 1.0);
+
+  /// Unrealized P&L percentage based on entry price
+  double get pnlPercent {
+    if (entryPrice <= 0) return 0.0;
+    final diff = ltp - entryPrice;
+    return (diff / entryPrice) * 100 * (isLong ? 1 : -1);
+  }
 
   Position copyWith({
     String? id,
@@ -47,6 +81,11 @@ class Position {
     double? realizedPnl,
     double? unrealizedPnl,
     bool? isDayPosition,
+    double? stopLoss,
+    double? takeProfit,
+    double? leverage,
+    double? usedMargin,
+    DateTime? openTime,
   }) {
     return Position(
       id: id ?? this.id,
@@ -61,6 +100,11 @@ class Position {
       realizedPnl: realizedPnl ?? this.realizedPnl,
       unrealizedPnl: unrealizedPnl ?? this.unrealizedPnl,
       isDayPosition: isDayPosition ?? this.isDayPosition,
+      stopLoss: stopLoss ?? this.stopLoss,
+      takeProfit: takeProfit ?? this.takeProfit,
+      leverage: leverage ?? this.leverage,
+      usedMargin: usedMargin ?? this.usedMargin,
+      openTime: openTime ?? this.openTime,
     );
   }
 
@@ -77,6 +121,11 @@ class Position {
     'realizedPnl': realizedPnl,
     'unrealizedPnl': unrealizedPnl,
     'isDayPosition': isDayPosition,
+    'stopLoss': stopLoss,
+    'takeProfit': takeProfit,
+    'leverage': leverage,
+    'usedMargin': usedMargin,
+    'openTime': openTime.toIso8601String(),
   };
 
   factory Position.fromJson(Map<String, dynamic> json) => Position(
@@ -92,5 +141,10 @@ class Position {
     realizedPnl: (json['realizedPnl'] as num).toDouble(),
     unrealizedPnl: (json['unrealizedPnl'] as num).toDouble(),
     isDayPosition: json['isDayPosition'] as bool? ?? true,
+    stopLoss: (json['stopLoss'] as num?)?.toDouble(),
+    takeProfit: (json['takeProfit'] as num?)?.toDouble(),
+    leverage: (json['leverage'] as num?)?.toDouble() ?? 5.0,
+    usedMargin: (json['usedMargin'] as num?)?.toDouble() ?? 0.0,
+    openTime: json['openTime'] != null ? DateTime.parse(json['openTime'] as String) : DateTime.now(),
   );
 }

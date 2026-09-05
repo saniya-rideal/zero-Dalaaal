@@ -18,17 +18,62 @@ class OrderDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
     final engine = ref.watch(orderSimulationEngineProvider);
-    final order = engine.orders.firstWhere(
-      (o) => o.orderId == orderId,
-      orElse: () => throw Exception('Order not found'),
-    );
+    final Order? order = engine.orders.where((o) => o.orderId == orderId).firstOrNull;
+
+    if (order == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Order Details', style: AppTypography.h1(color: colors.textPrimary)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.receipt_long_outlined, size: 64, color: colors.textSecondary.withValues(alpha: 0.5)),
+                const SizedBox(height: 16),
+                Text(
+                  'Order Not Found',
+                  style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Order #$orderId could not be located. It may have expired, been cancelled, or removed during session refresh.',
+                  style: AppTypography.body(color: colors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.of(context).canPop() ? Navigator.of(context).pop() : null,
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Return to Order Book'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final isBuy = order.request.side == TransactionType.BUY;
-    final statusColor = order.status == OrderStatus.COMPLETE
-        ? colors.bullish
-        : (order.status == OrderStatus.CANCELLED || order.status == OrderStatus.REJECTED
-            ? colors.bearish
-            : colors.warning);
+    final statusColor = switch (order.status) {
+      OrderStatus.COMPLETE                  => colors.bullish,
+      OrderStatus.CANCELLED                 => colors.bearish,
+      OrderStatus.REJECTED                  => colors.bearish,
+      OrderStatus.EXPIRED                   => colors.bearish,
+      OrderStatus.FAILED                    => colors.bearish,
+      OrderStatus.PARTIALLY_FILLED          => colors.warning,
+      OrderStatus.DRAFT                     => colors.textSecondary,
+      OrderStatus.SUBMITTED                 => colors.warning,
+      OrderStatus.OPEN                      => colors.warning,
+      OrderStatus.TRIGGER_PENDING           => colors.warning,
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -197,23 +242,49 @@ class OrderDetailScreen extends ConsumerWidget {
               ),
             ),
 
-            // Cancel button if still open
+            // Cancel / Modify buttons (only for cancellable/modifiable states)
             if (order.status == OrderStatus.OPEN || order.status == OrderStatus.TRIGGER_PENDING) ...[
               Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: OutlinedButton(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  label: const Text('CANCEL ORDER', style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () async {
-                    await engine.cancelOrder(order.orderId);
-                    Navigator.pop(context);
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Confirm Cancellation'),
+                        content: Text(
+                          'Are you sure you want to cancel order ${order.orderId}?\n\n'
+                          'This action cannot be undone.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('No, Keep Order'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: ElevatedButton.styleFrom(backgroundColor: colors.bearish),
+                            child: const Text('Yes, Cancel Order', style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && context.mounted) {
+                      await engine.cancelOrder(order.orderId);
+                      if (context.mounted) Navigator.pop(context);
+                    }
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colors.bearish,
                     side: BorderSide(color: colors.bearish),
                     padding: const EdgeInsets.symmetric(vertical: 14),
+                    minimumSize: const Size(double.infinity, 0),
                   ),
-                  child: const Text('CANCEL ORDER', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
+              const SizedBox(height: 8),
             ],
           ],
         ),

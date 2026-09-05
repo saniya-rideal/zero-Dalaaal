@@ -25,7 +25,6 @@ class SectionCard extends StatelessWidget {
       padding: margin,
       child: Material(
         color: colors.cardBackground,
-        borderRadius: BorderRadius.circular(borderRadius),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
           side: BorderSide(color: colors.divider, width: 0.5),

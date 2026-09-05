@@ -84,14 +84,19 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Identity & KYC Verification',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: colors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      'Identity & KYC Verification',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
                     icon: Icon(Icons.close, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(context),
@@ -177,6 +182,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
               // Document Type Selector
               DropdownButtonFormField<String>(
                 value: _selectedDocType,
+                isExpanded: true,
                 dropdownColor: colors.cardBackground,
                 decoration: InputDecoration(
                   labelText: 'Document Type',
@@ -184,7 +190,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 items: ['PAN Card', 'Aadhaar Card (Front & Back)', 'Passport', 'Driving License', 'Bank Proof / Cheque']
-                    .map((doc) => DropdownMenuItem(value: doc, child: Text(doc, style: TextStyle(color: colors.textPrimary, fontSize: 13))))
+                    .map((doc) => DropdownMenuItem(value: doc, child: Text(doc, overflow: TextOverflow.ellipsis, style: TextStyle(color: colors.textPrimary, fontSize: 13))))
                     .toList(),
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedDocType = val);
@@ -261,7 +267,10 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
               ] else ...[
                 OutlinedButton.icon(
                   icon: const Icon(Icons.cloud_upload_outlined),
-                  label: Text('Upload $_selectedDocType (JPG, PNG, PDF < 5MB)'),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Upload $_selectedDocType (JPG, PNG, PDF < 5MB)'),
+                  ),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -309,8 +318,17 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: GoogleFonts.inter(fontSize: 12.5, color: colors.textSecondary)),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(fontSize: 12.5, color: colors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: 8),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(value, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: colors.textPrimary)),
               const SizedBox(width: 6),

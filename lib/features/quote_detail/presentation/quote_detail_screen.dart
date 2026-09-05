@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/market_status_service.dart';
 import '../../../core/theme/trading_colors.dart';
+import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/mock/ticker_service.dart';
@@ -26,15 +27,54 @@ class QuoteDetailScreen extends ConsumerWidget {
     
     final instrument = SeedInstruments.findByToken(token) ??
         SeedInstruments.findBySymbol(token.replaceAll('_', ' ')) ??
-        Instrument(
-          token: token,
-          symbol: token.replaceAll('_', ' ').toUpperCase(),
-          name: token,
-          exchange: Exchange.MCX,
-          type: InstrumentType.FUT,
-          lotSize: 2500,
-          tickSize: 2,
-        );
+        SeedInstruments.findBySymbol(token);
+
+    if (instrument == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Quote', style: AppTypography.h1(color: colors.textPrimary)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.search_off_rounded, size: 64, color: colors.textSecondary.withValues(alpha: 0.5)),
+                const SizedBox(height: 16),
+                Text(
+                  'Instrument Unavailable',
+                  style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'The instrument contract "$token" was not found on active exchange feeds or has been delisted.',
+                  style: AppTypography.body(color: colors.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      context.go('/quotes');
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Return to Watchlist'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final quote = tickerService.getQuote(instrument.token);
     final isBull = quote.changePercent >= 0;
@@ -192,10 +232,12 @@ class QuoteDetailScreen extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 3),
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   ExchangeChip(exchange: instrument.exchange, type: instrument.type),
-                                  const SizedBox(width: 8),
                                   Text(
                                     'Lot: $contractSizeStr',
                                     style: GoogleFonts.inter(
@@ -245,38 +287,42 @@ class QuoteDetailScreen extends ConsumerWidget {
                     const SizedBox(height: 14),
 
                     // Price Hero Row
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          isCrypto
-                              ? '\$${NumberFormat('#,##0.00').format(quote.ltp)}'
-                              : CurrencyFormatter.format(quote.ltp),
-                          style: GoogleFonts.inter(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                            color: colors.textPrimary,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: priceColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            '$changePrefix${quote.change.toStringAsFixed(2)} ($changePrefix${quote.changePercent.toStringAsFixed(2)}%)',
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            isCrypto
+                                ? '\$${NumberFormat('#,##0.00').format(quote.ltp)}'
+                                : CurrencyFormatter.format(quote.ltp),
                             style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              color: priceColor,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w900,
+                              color: colors.textPrimary,
+                              letterSpacing: -0.5,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: priceColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '$changePrefix${quote.change.toStringAsFixed(2)} ($changePrefix${quote.changePercent.toStringAsFixed(2)}%)',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: priceColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 14),
 
@@ -404,14 +450,17 @@ class QuoteDetailScreen extends ConsumerWidget {
                         color: colors.surface,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildOhlcItem('Open', quote.open, colors),
-                          _buildOhlcItem('High', quote.high, colors),
-                          _buildOhlcItem('Low', quote.low, colors),
-                          _buildOhlcItem('Prev Close', quote.prevClose, colors),
-                        ],
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildOhlcItem('Open', quote.open, colors),
+                            _buildOhlcItem('High', quote.high, colors),
+                            _buildOhlcItem('Low', quote.low, colors),
+                            _buildOhlcItem('Prev Close', quote.prevClose, colors),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),

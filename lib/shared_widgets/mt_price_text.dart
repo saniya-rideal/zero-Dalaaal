@@ -64,45 +64,48 @@ class MtPriceText extends StatelessWidget {
       }
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        if (prefix.isNotEmpty)
-          Text(
-            prefix,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        Text(
-          core,
-          style: GoogleFonts.inter(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: textColor,
-            letterSpacing: -0.5,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-        if (superscript.isNotEmpty)
-          Transform.translate(
-            offset: const Offset(1, -6),
-            child: Text(
-              superscript,
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          if (prefix.isNotEmpty)
+            Text(
+              prefix,
               style: GoogleFonts.inter(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
                 color: textColor,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
+          Text(
+            core,
+            style: GoogleFonts.inter(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: textColor,
+              letterSpacing: -0.5,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
-      ],
+          if (superscript.isNotEmpty)
+            Transform.translate(
+              offset: const Offset(1, -6),
+              child: Text(
+                superscript,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -10,6 +10,11 @@ class Instrument {
   final double tickSize;
   final DateTime? expiry;
   final double? strike;
+  final int freezeQty;
+  final double leverageMultiplier;
+  final String? surveillanceTag;
+  final bool isSuspended;
+  final String? suspensionReason;
 
   const Instrument({
     required this.token,
@@ -21,7 +26,15 @@ class Instrument {
     this.tickSize = 0.05,
     this.expiry,
     this.strike,
+    this.freezeQty = 25000,
+    this.leverageMultiplier = 5.0,
+    this.surveillanceTag,
+    this.isSuspended = false,
+    this.suspensionReason,
   });
+
+  /// Contract multiplier for F&O / commodities (defaults to lotSize or 1.0)
+  double get contractMultiplier => lotSize > 0 ? lotSize : 1.0;
 
   Instrument copyWith({
     String? token,
@@ -33,6 +46,11 @@ class Instrument {
     double? tickSize,
     DateTime? expiry,
     double? strike,
+    int? freezeQty,
+    double? leverageMultiplier,
+    String? surveillanceTag,
+    bool? isSuspended,
+    String? suspensionReason,
   }) {
     return Instrument(
       token: token ?? this.token,
@@ -44,6 +62,11 @@ class Instrument {
       tickSize: tickSize ?? this.tickSize,
       expiry: expiry ?? this.expiry,
       strike: strike ?? this.strike,
+      freezeQty: freezeQty ?? this.freezeQty,
+      leverageMultiplier: leverageMultiplier ?? this.leverageMultiplier,
+      surveillanceTag: surveillanceTag ?? this.surveillanceTag,
+      isSuspended: isSuspended ?? this.isSuspended,
+      suspensionReason: suspensionReason ?? this.suspensionReason,
     );
   }
 
@@ -57,6 +80,11 @@ class Instrument {
     'tickSize': tickSize,
     'expiry': expiry?.toIso8601String(),
     'strike': strike,
+    'freezeQty': freezeQty,
+    'leverageMultiplier': leverageMultiplier,
+    'surveillanceTag': surveillanceTag,
+    'isSuspended': isSuspended,
+    'suspensionReason': suspensionReason,
   };
 
   factory Instrument.fromJson(Map<String, dynamic> json) => Instrument(
@@ -69,6 +97,11 @@ class Instrument {
     tickSize: (json['tickSize'] as num?)?.toDouble() ?? 0.05,
     expiry: json['expiry'] != null ? DateTime.parse(json['expiry'] as String) : null,
     strike: (json['strike'] as num?)?.toDouble(),
+    freezeQty: (json['freezeQty'] as num?)?.toInt() ?? 25000,
+    leverageMultiplier: (json['leverageMultiplier'] as num?)?.toDouble() ?? 5.0,
+    surveillanceTag: json['surveillanceTag'] as String?,
+    isSuspended: json['isSuspended'] as bool? ?? false,
+    suspensionReason: json['suspensionReason'] as String?,
   );
 
   @override

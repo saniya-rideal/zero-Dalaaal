@@ -131,6 +131,13 @@ class ZeroDrawer extends ConsumerWidget {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
+                    title: 'Orders',
+                    iconBuilder: (color) => Icon(Icons.receipt_long_outlined, color: color, size: 22),
+                    route: '/orders',
+                    colors: colors,
+                  ),
+                  _buildCustomDrawerItem(
+                    context: context,
                     title: 'Net Deals',
                     iconBuilder: (color) => ZeroNavIcons.netDealsIcon(color: color, size: 22),
                     route: '/net-deals',
@@ -195,9 +202,16 @@ class ZeroDrawer extends ConsumerWidget {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
-                    title: 'News',
+                    title: 'News & Insights',
                     iconBuilder: (color) => Icon(Icons.newspaper_outlined, color: color, size: 22),
                     route: '/news',
+                    colors: colors,
+                  ),
+                  _buildCustomDrawerItem(
+                    context: context,
+                    title: 'Trading Academy',
+                    iconBuilder: (color) => Icon(Icons.school_outlined, color: color, size: 22),
+                    route: '/learning',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
@@ -292,7 +306,9 @@ class ZeroDrawer extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Material(
-        color: isSelected ? const Color(0xFFFDE8ED) : Colors.transparent, // Soft Pink Pill
+        color: isSelected
+            ? colors.primary.withValues(alpha: 0.15)
+            : Colors.transparent, // Soft Pink Accent Pill
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

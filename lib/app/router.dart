@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/alerts/presentation/alerts_screen.dart';
@@ -20,14 +21,18 @@ import '../features/news/presentation/news_screen.dart';
 import '../features/news/presentation/news_feed_screen.dart';
 import '../features/notifications/presentation/mails_screen.dart';
 import '../features/notifications/presentation/notification_center_screen.dart';
+import '../features/notifications/presentation/notification_preferences_sheet.dart';
 import '../features/option_chain/presentation/option_chain_screen.dart';
 import '../features/orders/presentation/order_detail_screen.dart';
+import '../features/orders/presentation/orders_screen.dart';
 import '../features/profile_settings/presentation/about_screen.dart';
 import '../features/profile_settings/presentation/help_support_screen.dart';
+import '../features/profile_settings/presentation/live_chat_sheet.dart';
 import '../features/profile_settings/presentation/maintenance_screen.dart';
 import '../features/profile_settings/presentation/profile_screen.dart';
 import '../features/profile_settings/presentation/reports_screen.dart';
 import '../features/profile_settings/presentation/settings_screen.dart';
+import '../features/profile_settings/presentation/ticket_detail_screen.dart';
 import '../features/quote_detail/presentation/quote_detail_screen.dart';
 import '../features/quotes/presentation/add_script_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
@@ -126,6 +131,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/orders',
+        builder: (context, state) => const OrdersScreen(),
+      ),
+      GoRoute(
           path: '/add-script',
           builder: (context, state) => const AddScriptScreen()),
       GoRoute(
@@ -142,6 +151,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: (context, state) => const EconomicCalendarScreen()),
       GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
       GoRoute(
+          path: '/learning',
+          builder: (context, state) => const NewsScreen(initialTabIndex: 1)),
+      GoRoute(
           path: '/news-feed',
           builder: (context, state) => const NewsFeedScreen()),
       GoRoute(path: '/mails', builder: (context, state) => const MailsScreen()),
@@ -154,6 +166,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/notifications',
           builder: (context, state) => const NotificationCenterScreen()),
+      GoRoute(
+          path: '/notification-preferences',
+          builder: (context, state) => const NotificationPreferencesScreen()),
       GoRoute(
           path: '/option-chain',
           builder: (context, state) => const OptionChainScreen()),
@@ -168,6 +183,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/help',
           builder: (context, state) => const HelpSupportScreen()),
+      GoRoute(
+        path: '/help/tickets/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return TicketDetailScreen(ticketId: id);
+        },
+      ),
+      GoRoute(
+        path: '/live-chat',
+        builder: (context, state) => const Scaffold(
+          body: SafeArea(child: LiveChatSheet()),
+        ),
+      ),
       GoRoute(
           path: '/maintenance',
           builder: (context, state) => const MaintenanceScreen()),

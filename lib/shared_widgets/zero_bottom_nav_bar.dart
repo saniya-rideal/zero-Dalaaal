@@ -150,7 +150,7 @@ class ZeroBottomNavBar extends StatelessWidget {
     required TradingColors colors,
   }) {
     final activeColor = colors.primary;
-    const inactiveColor = Color(0xFF1E232A);
+    final inactiveColor = colors.textSecondary;
 
     return InkWell(
       onTap: () => onTabSelected(index),

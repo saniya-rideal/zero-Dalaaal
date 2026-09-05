@@ -11,6 +11,7 @@ class SeedInstruments {
       exchange: Exchange.NSE,
       type: InstrumentType.INDEX,
       tickSize: 0.05,
+      freezeQty: 1800,
     ),
     const Instrument(
       token: 'idx_niftybank',
@@ -19,6 +20,7 @@ class SeedInstruments {
       exchange: Exchange.NSE,
       type: InstrumentType.INDEX,
       tickSize: 0.05,
+      freezeQty: 900,
     ),
     const Instrument(
       token: 'idx_sensex',
@@ -27,6 +29,7 @@ class SeedInstruments {
       exchange: Exchange.BSE,
       type: InstrumentType.INDEX,
       tickSize: 0.05,
+      freezeQty: 1000,
     ),
     const Instrument(
       token: 'idx_niftyit',
@@ -35,6 +38,7 @@ class SeedInstruments {
       exchange: Exchange.NSE,
       type: InstrumentType.INDEX,
       tickSize: 0.05,
+      freezeQty: 1800,
     ),
     const Instrument(
       token: 'idx_finnifty',
@@ -43,6 +47,7 @@ class SeedInstruments {
       exchange: Exchange.NSE,
       type: InstrumentType.INDEX,
       tickSize: 0.05,
+      freezeQty: 1800,
     ),
   ];
 
@@ -103,6 +108,25 @@ class SeedInstruments {
     const Instrument(token: 'eq_paytm', symbol: 'PAYTM', name: 'One97 Communications Ltd', exchange: Exchange.NSE, type: InstrumentType.EQ),
     const Instrument(token: 'eq_jiofin', symbol: 'JIOFIN', name: 'Jio Financial Services Ltd', exchange: Exchange.NSE, type: InstrumentType.EQ),
     const Instrument(token: 'eq_irfc', symbol: 'IRFC', name: 'Indian Railway Finance Corp Ltd', exchange: Exchange.NSE, type: InstrumentType.EQ),
+    const Instrument(
+      token: 'eq_yesbank',
+      symbol: 'YESBANK',
+      name: 'Yes Bank Ltd',
+      exchange: Exchange.NSE,
+      type: InstrumentType.EQ,
+      surveillanceTag: 'ASM Stage 1',
+      freezeQty: 10000,
+    ),
+    const Instrument(
+      token: 'eq_dhfl',
+      symbol: 'DHFL',
+      name: 'Dewan Housing Finance Ltd',
+      exchange: Exchange.NSE,
+      type: InstrumentType.EQ,
+      isSuspended: true,
+      suspensionReason: 'Trading suspended by exchange due to corporate resolution',
+      freezeQty: 1000,
+    ),
     const Instrument(token: 'eq_rvnl', symbol: 'RVNL', name: 'Rail Vikas Nigam Ltd', exchange: Exchange.NSE, type: InstrumentType.EQ),
     const Instrument(token: 'eq_suzlon', symbol: 'SUZLON', name: 'Suzlon Energy Ltd', exchange: Exchange.NSE, type: InstrumentType.EQ),
     const Instrument(token: 'eq_trent', symbol: 'TRENT', name: 'Trent Ltd', exchange: Exchange.NSE, type: InstrumentType.EQ),

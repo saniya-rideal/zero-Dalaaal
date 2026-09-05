@@ -26,15 +26,19 @@ class ZeroBottomDock extends ConsumerWidget {
     }
 
     final balance = fmt(funds.openingBalance);
-    final floatingPl = isHidden ? '••••••' : '0.00';
+    final floatingPl = fmt(funds.unrealizedPnl);
     final usedMargin = fmt(funds.usedMargin);
     final assetsValue = isHidden ? '••••••' : '0.00';
     final totalValues = fmt(funds.availableMargin);
 
-    final freeMargin = fmt(funds.availableMargin);
-    final equity = fmt(funds.openingBalance - funds.usedMargin);
+    final freeMargin = fmt(funds.freeMargin);
+    final equity = fmt(funds.equity);
     final hldgMargin = isHidden ? '••••••' : '0.00';
-    final marginLevel = isHidden ? '••••••' : (showRealValues ? '100.00%' : '100.00%');
+    final marginLevel = isHidden
+        ? '••••••'
+        : (funds.usedMargin > 0
+            ? '${funds.marginLevel.toStringAsFixed(1)}%'
+            : 'N/A');
     const account = '159537';
 
     return Container(

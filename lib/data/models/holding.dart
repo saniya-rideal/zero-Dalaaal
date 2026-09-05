@@ -28,6 +28,10 @@ class Holding {
   double get dayPnlPercent => closePrice > 0 ? ((ltp - closePrice) / closePrice) * 100 : 0.0;
   int get daysHeld => DateTime.now().difference(firstBuyDate).inDays;
 
+  /// Percentage weight of this holding relative to the total portfolio current value
+  double allocationWeight(double totalPortfolioValue) =>
+      totalPortfolioValue > 0 ? (currentValue / totalPortfolioValue) * 100 : 0.0;
+
   Holding copyWith({
     Instrument? instrument,
     int? quantity,

@@ -144,30 +144,33 @@ class AboutScreen extends StatelessWidget {
                     const SizedBox(height: 28),
 
                     // Version & Build info
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Version 7.1.2160',
-                          style: AppTypography.body(
-                            color: colors.textSecondary,
-                            weight: FontWeight.w500,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Version 7.1.2160',
+                            style: AppTypography.body(
+                              color: colors.textSecondary,
+                              weight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 12),
-                          height: 14,
-                          width: 1,
-                          color: colors.divider,
-                        ),
-                        Text(
-                          'Build 2160',
-                          style: AppTypography.body(
-                            color: colors.textSecondary,
-                            weight: FontWeight.w500,
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 12),
+                            height: 14,
+                            width: 1,
+                            color: colors.divider,
                           ),
-                        ),
-                      ],
+                          Text(
+                            'Build 2160',
+                            style: AppTypography.body(
+                              color: colors.textSecondary,
+                              weight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

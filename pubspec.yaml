@@ -1,7 +1,7 @@
 name: zero_dalali
-description: "Zerodha Kite-clone trading app frontend"
+description: "ZeroDalali - High-speed, zero-brokerage trading and investing platform for equity, derivatives, and commodities"
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

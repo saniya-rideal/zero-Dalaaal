@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/mock/ticker_service.dart';
-import '../../../data/models/models.dart';
+import '../../../data/models/enums.dart';
+import '../../../data/models/holding.dart';
 import '../../../shared_widgets/empty_state_view.dart';
 import '../../../shared_widgets/exchange_chip.dart';
+import '../../../shared_widgets/margin_risk_banner.dart';
 import '../../../shared_widgets/section_card.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
+import 'portfolio_performance_chart.dart';
 
 class PortfolioScreen extends ConsumerWidget {
   const PortfolioScreen({super.key});
@@ -47,9 +51,12 @@ class PortfolioScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          // Margin Risk Alert Banner (High Margin, Margin Call, Forced Liquidation)
+          const MarginRiskBanner(segment: Segment.EQUITY),
+
           // Portfolio Summary Card
           SectionCard(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Column(
               children: [
                 Row(
@@ -113,28 +120,11 @@ class PortfolioScreen extends ConsumerWidget {
             ),
           ),
 
-          // Mock Corporate Action Banner
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
+          // Portfolio Performance History Equity Curve
+          if (updatedHoldings.isNotEmpty)
+            PortfolioPerformanceChart(
+              currentPortfolioValue: summary.currentValue,
             ),
-            child: Row(
-              children: [
-                Icon(Icons.campaign_outlined, color: colors.primary, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'INFY: Dividend of ₹18.00 per share announced (Ex-Date: 12 Sep)',
-                    style: AppTypography.caption(color: colors.primary, weight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
           // Holdings List
           Expanded(
@@ -152,37 +142,108 @@ class PortfolioScreen extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final holding = updatedHoldings[index];
                       final pnlColor = holding.totalPnl >= 0 ? colors.bullish : colors.bearish;
+                      final dayPnlColor = holding.dayPnl >= 0 ? colors.bullish : colors.bearish;
+                      final weight = holding.allocationWeight(summary.currentValue);
 
-                      return ListTile(
-                        onTap: () => _showHoldingActions(context, holding),
-                        title: Row(
-                          children: [
-                            Text(
-                              holding.instrument.symbol,
-                              style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w600),
-                            ),
-                            const SizedBox(width: 6),
-                            ExchangeChip(exchange: holding.instrument.exchange),
-                          ],
-                        ),
-                        subtitle: Text(
-                          'Qty: ${holding.totalQuantity} • Avg: ${CurrencyFormatter.format(holding.averagePrice)} • Inv: ${CurrencyFormatter.formatCompact(holding.investedValue)}',
-                          style: AppTypography.caption(color: colors.textSecondary, tabular: true),
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatSigned(holding.totalPnl),
-                              style: AppTypography.body(color: pnlColor, weight: FontWeight.w700, tabular: true),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '(${CurrencyFormatter.formatPercent(holding.totalPnlPercent)})',
-                              style: AppTypography.caption(color: pnlColor, weight: FontWeight.w600, tabular: true),
-                            ),
-                          ],
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          onTap: () => _showHoldingActions(context, holding),
+                          title: Row(
+                            children: [
+                              Text(
+                                holding.instrument.symbol,
+                                style: GoogleFonts.inter(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              ExchangeChip(exchange: holding.instrument.exchange),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: colors.surface,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  '${weight.toStringAsFixed(1)}% weight',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 3),
+                              Text(
+                                'Qty: ${holding.totalQuantity} • Avg: ${CurrencyFormatter.format(holding.averagePrice)}',
+                                style: GoogleFonts.inter(
+                                  color: colors.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Inv: ${CurrencyFormatter.format(holding.investedValue)} • Cur: ${CurrencyFormatter.format(holding.currentValue)}',
+                                style: GoogleFonts.inter(
+                                  color: colors.textSecondary.withValues(alpha: 0.85),
+                                  fontSize: 11,
+                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    CurrencyFormatter.formatSigned(holding.totalPnl),
+                                    style: GoogleFonts.inter(
+                                      color: pnlColor,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    '(${CurrencyFormatter.formatPercent(holding.totalPnlPercent)})',
+                                    style: GoogleFonts.inter(
+                                      color: pnlColor,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 10.5,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 1),
+                                  Text(
+                                    'Day: ${CurrencyFormatter.formatSigned(holding.dayPnl, showSymbol: false)} (${holding.dayPnlPercent >= 0 ? '+' : ''}${holding.dayPnlPercent.toStringAsFixed(1)}%)',
+                                    style: GoogleFonts.inter(
+                                      color: dayPnlColor,
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w600,
+                                      fontFeatures: const [FontFeature.tabularFigures()],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.chevron_right, color: colors.textSecondary, size: 18),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -260,10 +321,10 @@ class PortfolioScreen extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('View Fundamentals & Analytics'),
+              title: const Text('View Script Details & Fundamentals'),
               onTap: () {
                 Navigator.pop(context);
-                context.push('/quote/${holding.instrument.token}');
+                context.push('/quote-detail/${holding.instrument.token}');
               },
             ),
           ],
@@ -272,3 +333,4 @@ class PortfolioScreen extends ConsumerWidget {
     );
   }
 }
+

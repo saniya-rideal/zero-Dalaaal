@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
-import '../features/profile_settings/presentation/settings_screen.dart';
+import '../data/mock/settings_repository.dart';
 import 'router.dart';
 
 class ZeroApp extends ConsumerWidget {
@@ -11,7 +11,7 @@ class ZeroApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
-    final themeMode = ref.watch(themeModeProvider);
+    final themeMode = ref.watch(themeModeControllerProvider);
 
     return MaterialApp.router(
       title: AppConstants.appName,

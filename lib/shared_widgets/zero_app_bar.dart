@@ -24,6 +24,7 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showCalendarAction;
   final bool showFilterAction;
   final bool showSortAction;
+  final Widget? trailingAction;
 
   const ZeroAppBar({
     super.key,
@@ -36,6 +37,7 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showCalendarAction = true,
     this.showFilterAction = true,
     this.showSortAction = true,
+    this.trailingAction,
   });
 
   @override
@@ -143,6 +145,7 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
               );
             }).toList(),
           ),
+        if (trailingAction != null) trailingAction!,
         const SizedBox(width: 8),
       ],
     );

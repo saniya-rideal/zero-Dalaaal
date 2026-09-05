@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/mock/ticker_service.dart';
-import '../../../data/models/models.dart';
+import '../../../data/models/enums.dart';
 import '../../../shared_widgets/empty_state_view.dart';
 import '../../../shared_widgets/exchange_chip.dart';
-import '../../../shared_widgets/price_text.dart';
+import '../../../shared_widgets/margin_risk_banner.dart';
 import '../../../shared_widgets/section_card.dart';
-import '../../order_entry/presentation/order_entry_sheet.dart';
+import 'position_action_sheets.dart';
+
+enum PositionFilterType { all, profitable, losing }
 
 class PositionsScreen extends ConsumerStatefulWidget {
   const PositionsScreen({super.key});
@@ -22,6 +25,7 @@ class PositionsScreen extends ConsumerStatefulWidget {
 
 class _PositionsScreenState extends ConsumerState<PositionsScreen> {
   bool _isDayView = true;
+  PositionFilterType _statusFilter = PositionFilterType.all;
 
   @override
   Widget build(BuildContext context) {
@@ -32,18 +36,45 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
     final positionsAsync = ref.watch(positionsListProvider);
     final allPositions = positionsAsync.value ?? engine.positions;
 
-    final filteredPositions = _isDayView
+    final basePositions = _isDayView
         ? allPositions.where((p) => p.isDayPosition).toList()
         : allPositions;
 
-    // Compute live P&L
+    // Attach latest tick prices and compute PnL metrics
+    final positionsWithMeta = basePositions.map((p) {
+      final quote = tickerService.getQuote(p.instrument.token);
+      final posWithLtp = p.copyWith(ltp: quote.ltp);
+      final pnl = posWithLtp.realizedPnl + posWithLtp.unrealizedPnl;
+      return (position: posWithLtp, pnl: pnl);
+    }).toList();
+
     double totalPnl = 0.0;
-    for (final pos in filteredPositions) {
-      final quote = tickerService.getQuote(pos.instrument.token);
-      final currentPrice = quote.ltp;
-      final unrealized = pos.netQty * (currentPrice - (pos.buyAvg > 0 ? pos.buyAvg : pos.sellAvg));
-      totalPnl += pos.realizedPnl + unrealized;
+    int profitableCount = 0;
+    double profitablePnl = 0.0;
+    int losingCount = 0;
+    double losingPnl = 0.0;
+
+    for (final item in positionsWithMeta) {
+      totalPnl += item.pnl;
+      if (item.pnl > 0) {
+        profitableCount++;
+        profitablePnl += item.pnl;
+      } else if (item.pnl < 0) {
+        losingCount++;
+        losingPnl += item.pnl;
+      }
     }
+
+    final filteredPositions = positionsWithMeta.where((item) {
+      switch (_statusFilter) {
+        case PositionFilterType.all:
+          return true;
+        case PositionFilterType.profitable:
+          return item.pnl > 0;
+        case PositionFilterType.losing:
+          return item.pnl < 0;
+      }
+    }).toList();
 
     final pnlColor = totalPnl >= 0 ? colors.bullish : colors.bearish;
 
@@ -65,9 +96,12 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
       ),
       body: Column(
         children: [
+          // Margin Risk Alert Banner (High Margin, Margin Call, Forced Liquidation)
+          const MarginRiskBanner(segment: Segment.EQUITY),
+
           // Summary Header Card
           SectionCard(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -82,17 +116,83 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                     ),
                   ],
                 ),
-                Text(
-                  '${filteredPositions.length} Open Positions',
-                  style: AppTypography.caption(color: colors.textSecondary),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${basePositions.length} Open Positions',
+                      style: AppTypography.caption(color: colors.textSecondary),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$profitableCount in profit • $losingCount in loss',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: colors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
+          // Profitable vs Losing Filter Chips
+          if (basePositions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: Text(
+                      'All (${positionsWithMeta.length})',
+                      style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                    selected: _statusFilter == PositionFilterType.all,
+                    onSelected: (val) {
+                      if (val) setState(() => _statusFilter = PositionFilterType.all);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: Text(
+                      '🟢 $profitableCount In Profit (${CurrencyFormatter.formatSigned(profitablePnl)})',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _statusFilter == PositionFilterType.profitable ? colors.bullish : colors.textSecondary,
+                      ),
+                    ),
+                    selected: _statusFilter == PositionFilterType.profitable,
+                    selectedColor: colors.bullish.withValues(alpha: 0.18),
+                    onSelected: (val) {
+                      if (val) setState(() => _statusFilter = PositionFilterType.profitable);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: Text(
+                      '🔴 $losingCount In Loss (${CurrencyFormatter.formatSigned(losingPnl)})',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _statusFilter == PositionFilterType.losing ? colors.bearish : colors.textSecondary,
+                      ),
+                    ),
+                    selected: _statusFilter == PositionFilterType.losing,
+                    selectedColor: colors.bearish.withValues(alpha: 0.18),
+                    onSelected: (val) {
+                      if (val) setState(() => _statusFilter = PositionFilterType.losing);
+                    },
+                  ),
+                ],
+              ),
+            ),
+
           // Positions List
           Expanded(
-            child: filteredPositions.isEmpty
+            child: basePositions.isEmpty
                 ? EmptyStateView(
                     icon: Icons.layers_outlined,
                     title: 'No Open Positions',
@@ -100,60 +200,191 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                     buttonText: 'Trade Now',
                     onButtonPressed: () => context.go('/watchlist'),
                   )
-                : ListView.separated(
-                    itemCount: filteredPositions.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final pos = filteredPositions[index];
-                      final quote = tickerService.getQuote(pos.instrument.token);
-                      final currentPrice = quote.ltp;
-                      final unrealized = pos.netQty * (currentPrice - (pos.buyAvg > 0 ? pos.buyAvg : pos.sellAvg));
-                      final itemPnl = pos.realizedPnl + unrealized;
-                      final itemPnlColor = itemPnl >= 0 ? colors.bullish : colors.bearish;
+                : filteredPositions.isEmpty
+                    ? EmptyStateView(
+                        icon: _statusFilter == PositionFilterType.profitable
+                            ? Icons.trending_up
+                            : Icons.trending_down,
+                        title: _statusFilter == PositionFilterType.profitable
+                            ? 'No Profitable Positions'
+                            : 'No Losing Positions',
+                        subtitle: _statusFilter == PositionFilterType.profitable
+                            ? 'None of your open positions currently have an unrealized gain.'
+                            : 'None of your open positions currently have an unrealized loss.',
+                        buttonText: 'Show All Positions',
+                        onButtonPressed: () =>
+                            setState(() => _statusFilter = PositionFilterType.all),
+                      )
+                    : ListView.separated(
+                        itemCount: filteredPositions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final item = filteredPositions[index];
+                          final posWithLtp = item.position;
+                          final itemPnl = item.pnl;
+                          final itemPnlColor =
+                              itemPnl >= 0 ? colors.bullish : colors.bearish;
+                          final currentPrice = posWithLtp.ltp;
+                          final pos = posWithLtp;
 
-                      return ListTile(
-                        onTap: () => _showPositionActions(context, pos, currentPrice),
-                        title: Row(
-                          children: [
-                            Text(
-                              pos.instrument.symbol,
-                              style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w600),
-                            ),
-                            const SizedBox(width: 6),
-                            ExchangeChip(exchange: pos.instrument.exchange, type: pos.instrument.type),
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: colors.surface,
-                                borderRadius: BorderRadius.circular(3),
+                      return Material(
+                        color: Colors.transparent,
+                        child: ListTile(
+                          onTap: () => PositionActionSheets.showFullOptions(
+                            context,
+                            posWithLtp,
+                            engine,
+                            onRefresh: () => setState(() {}),
+                          ),
+                          title: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: (posWithLtp.isLong
+                                          ? colors.bullish
+                                          : colors.bearish)
+                                      .withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  posWithLtp.isLong ? 'LONG' : 'SHORT',
+                                  style: GoogleFonts.inter(
+                                    color: posWithLtp.isLong
+                                        ? colors.bullish
+                                        : colors.bearish,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 10,
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                pos.product.name,
-                                style: AppTypography.labelSmall(color: colors.textSecondary),
+                              const SizedBox(width: 6),
+                              Text(
+                                pos.instrument.symbol,
+                                style: GoogleFonts.inter(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          'Qty: ${pos.netQty} • Avg: ${CurrencyFormatter.format(pos.buyAvg > 0 ? pos.buyAvg : pos.sellAvg)}',
-                          style: AppTypography.caption(color: colors.textSecondary, tabular: true),
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              CurrencyFormatter.formatSigned(itemPnl),
-                              style: AppTypography.body(color: itemPnlColor, weight: FontWeight.w700, tabular: true),
-                            ),
-                            const SizedBox(height: 2),
-                            PriceText(
-                              value: currentPrice,
-                              change: quote.change,
-                              style: AppTypography.caption(tabular: true),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              ExchangeChip(
+                                  exchange: pos.instrument.exchange,
+                                  type: pos.instrument.type),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: colors.surface,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Text(
+                                  '${pos.leverage.toInt()}x ${pos.product.name}',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      color: colors.textSecondary,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 2),
+                              Text(
+                                'Qty: ${pos.netQty.abs()} • Entry: ${CurrencyFormatter.format(pos.entryPrice)} • LTP: ${CurrencyFormatter.format(currentPrice)}',
+                                style: GoogleFonts.inter(
+                                    color: colors.textSecondary,
+                                    fontSize: 11),
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Text(
+                                    pos.stopLoss != null
+                                        ? 'SL: ₹${pos.stopLoss!.toStringAsFixed(2)}'
+                                        : 'SL: --',
+                                    style: GoogleFonts.inter(
+                                        color: colors.textSecondary,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    pos.takeProfit != null
+                                        ? 'TP: ₹${pos.takeProfit!.toStringAsFixed(2)}'
+                                        : 'TP: --',
+                                    style: GoogleFonts.inter(
+                                        color: colors.textSecondary,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Margin: ${CurrencyFormatter.format(pos.usedMargin)}',
+                                    style: GoogleFonts.inter(
+                                        color: colors.textSecondary
+                                            .withValues(alpha: 0.8),
+                                        fontSize: 10.5),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    CurrencyFormatter.formatSigned(
+                                        itemPnl,
+                                        showSymbol: true),
+                                    style: GoogleFonts.inter(
+                                      color: itemPnlColor,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13.5,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: (posWithLtp.pnlPercent >= 0
+                                              ? colors.bullish
+                                              : colors.bearish)
+                                          .withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      '${posWithLtp.pnlPercent >= 0 ? '+' : ''}${posWithLtp.pnlPercent.toStringAsFixed(2)}%',
+                                      style: GoogleFonts.inter(
+                                        color: posWithLtp.pnlPercent >= 0
+                                            ? colors.bullish
+                                            : colors.bearish,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures()
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.chevron_right,
+                                  color: colors.textSecondary, size: 20),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -163,77 +394,5 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
       ),
     );
   }
-
-  void _showPositionActions(BuildContext context, Position pos, double currentPrice) {
-    final colors = context.tradingColors;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(pos.instrument.symbol, style: AppTypography.h1(color: colors.textPrimary)),
-            Text('${pos.product.name} • Net Qty: ${pos.netQty}', style: AppTypography.caption(color: colors.textSecondary)),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      // Exit position by placing opposite side market order
-                      final exitSide = pos.netQty > 0 ? TransactionType.SELL : TransactionType.BUY;
-                      OrderEntrySheet.show(
-                        context,
-                        instrument: pos.instrument,
-                        side: exitSide,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colors.bearish,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('EXIT POSITION', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      OrderEntrySheet.show(
-                        context,
-                        instrument: pos.instrument,
-                        side: TransactionType.BUY,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colors.bullish,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('ADD MORE', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              leading: const Icon(Icons.show_chart),
-              title: const Text('View Chart'),
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/chart-fullscreen/${pos.instrument.token}');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
+

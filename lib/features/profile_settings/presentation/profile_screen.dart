@@ -87,20 +87,30 @@ class ProfileScreen extends ConsumerWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Text(name,
+                                    Flexible(
+                                      child: Text(
+                                        name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: GoogleFonts.inter(
                                             color: colors.textPrimary,
                                             fontWeight: FontWeight.w800,
-                                            fontSize: 16)),
+                                            fontSize: 16),
+                                      ),
+                                    ),
                                     const SizedBox(width: 6),
                                     Icon(Icons.edit_outlined, size: 16, color: colors.primary),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
-                                Text('$userId • PAN: $pan',
-                                    style: GoogleFonts.inter(
-                                        color: colors.textSecondary,
-                                        fontSize: 12)),
+                                Text(
+                                  '$userId • PAN: $pan',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                      color: colors.textSecondary,
+                                      fontSize: 12),
+                                ),
                               ],
                             ),
                           ),
@@ -205,7 +215,7 @@ class ProfileScreen extends ConsumerWidget {
                     _MenuItem(
                         icon: Icons.settings_outlined,
                         title: 'Settings & Security',
-                        subtitle: 'Theme, Biometrics, PIN',
+                        subtitle: 'Theme, Security, PIN',
                         route: '/settings'),
                     _MenuItem(
                         icon: Icons.help_outline,
