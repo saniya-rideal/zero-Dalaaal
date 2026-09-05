@@ -266,12 +266,12 @@ void main() {
   group('Senior QA Audit: Batch 4 - Discovery, News & Communications', () {
     testWidgets('Audit 20: News screen mounts with Market Feeds and category chips', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      await tester.pumpWidget(_wrapScreen(const NewsScreen(initialTabIndex: 0)));
+      await tester.pumpWidget(_wrapScreen(const NewsScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TabBar), findsWidgets);
-      expect(find.textContaining('News, Insights'), findsWidgets);
-      expect(find.text('Market News'), findsWidgets);
+      expect(find.text('News & Insights'), findsWidgets);
+      expect(find.text('Real-time Market Feeds & Analysis'), findsWidgets);
+      expect(find.text('Equities'), findsWidgets);
     });
 
     testWidgets('Audit 21: News Feed screen mounts with curated FXStreet and macro articles', (tester) async {
@@ -283,13 +283,14 @@ void main() {
       expect(find.byType(ListView), findsWidgets);
     });
 
-    testWidgets('Audit 22: Learning & Academy screen mounts with trading modules and glossary', (tester) async {
+    testWidgets('Audit 22: News & Insights screen is focused on market feeds without Academy or Glossary', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      await tester.pumpWidget(_wrapScreen(const NewsScreen(initialTabIndex: 1)));
+      await tester.pumpWidget(_wrapScreen(const NewsScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.text('Academy'), findsWidgets);
-      expect(find.text('Glossary'), findsWidgets);
+      expect(find.text('Academy'), findsNothing);
+      expect(find.text('Glossary'), findsNothing);
+      expect(find.byType(CustomScrollView), findsWidgets);
     });
 
     testWidgets('Audit 23: Mails screen mounts with Zero internal announcements and search', (tester) async {

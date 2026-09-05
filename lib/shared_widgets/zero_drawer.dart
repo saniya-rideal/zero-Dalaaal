@@ -209,13 +209,6 @@ class ZeroDrawer extends ConsumerWidget {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
-                    title: 'Trading Academy',
-                    iconBuilder: (color) => Icon(Icons.school_outlined, color: color, size: 22),
-                    route: '/learning',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
                     title: 'Mails',
                     iconBuilder: (color) => Icon(Icons.mail_outline, color: color, size: 22),
                     route: '/mails',

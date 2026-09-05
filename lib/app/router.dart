@@ -152,7 +152,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
       GoRoute(
           path: '/learning',
-          builder: (context, state) => const NewsScreen(initialTabIndex: 1)),
+          builder: (context, state) => const NewsScreen()),
       GoRoute(
           path: '/news-feed',
           builder: (context, state) => const NewsFeedScreen()),
