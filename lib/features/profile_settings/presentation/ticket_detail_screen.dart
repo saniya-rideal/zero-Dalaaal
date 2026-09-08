@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/mock/support_repository.dart';
@@ -114,6 +115,16 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
         appBar: AppBar(
           backgroundColor: colors.background,
           elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+            onPressed: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                context.go('/help');
+              }
+            },
+          ),
           title: Text('Ticket Not Found', style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
         ),
         body: Center(

@@ -70,6 +70,7 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
   }
 
   Future<void> _handleProceed() async {
+    if (_isSubmitting) return;
     _validateAmount();
     if (_errorText != null) {
       setState(() {});

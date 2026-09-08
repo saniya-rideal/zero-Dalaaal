@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -45,7 +46,13 @@ class OrderDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
-                  onPressed: () => Navigator.of(context).canPop() ? Navigator.of(context).pop() : null,
+                  onPressed: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      context.go('/orders');
+                    }
+                  },
                   icon: const Icon(Icons.arrow_back),
                   label: const Text('Return to Order Book'),
                   style: ElevatedButton.styleFrom(

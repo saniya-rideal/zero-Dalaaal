@@ -178,8 +178,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           path: '/notification-preferences',
           builder: (context, state) => const NotificationPreferencesScreen()),
       GoRoute(
-          path: '/option-chain',
-          builder: (context, state) => const OptionChainScreen()),
+        path: '/option-chain',
+        builder: (context, state) {
+          final symbol = state.uri.queryParameters['symbol'] ?? 'NIFTY 50';
+          return OptionChainScreen(underlying: symbol);
+        },
+      ),
       GoRoute(
           path: '/profile', builder: (context, state) => const ProfileScreen()),
       GoRoute(

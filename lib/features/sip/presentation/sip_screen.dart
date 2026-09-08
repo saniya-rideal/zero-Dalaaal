@@ -230,6 +230,7 @@ class _SipScreenState extends State<SipScreen> {
   void _showCreateSipDialog() {
     final colors = context.tradingColors;
     final amountController = TextEditingController(text: '5000');
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
@@ -260,6 +261,8 @@ class _SipScreenState extends State<SipScreen> {
           ),
           ElevatedButton(
             onPressed: () {
+              if (isSubmitting) return;
+              isSubmitting = true;
               final amt = double.tryParse(amountController.text) ?? 5000.0;
               setState(() {
                 _sips.add(Sip(
@@ -274,6 +277,11 @@ class _SipScreenState extends State<SipScreen> {
                 ));
               });
               Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Monthly Stock SIP of ₹${amt.toInt()} started successfully!'),
+                ),
+              );
             },
             style: ElevatedButton.styleFrom(backgroundColor: colors.primary),
             child: const Text('Start SIP',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../data/mock/order_simulation_engine.dart';
@@ -19,6 +20,7 @@ class BasketsScreen extends ConsumerStatefulWidget {
 }
 
 class _BasketsScreenState extends ConsumerState<BasketsScreen> {
+  final Set<String> _executingBasketIds = {};
   final List<Basket> _baskets = [
     Basket(
       id: 'bsk_1',
@@ -220,7 +222,9 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: () => _executeBasket(basket),
+                                onPressed: _executingBasketIds.contains(basket.id)
+                                    ? null
+                                    : () => _executeBasket(basket),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: colors.primary,
                                   foregroundColor: Colors.white,
@@ -229,10 +233,18 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(6)),
                                 ),
-                                child: const Text('EXECUTE BASKET',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12.5)),
+                                child: _executingBasketIds.contains(basket.id)
+                                    ? const SizedBox(
+                                        height: 16,
+                                        width: 16,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white),
+                                      )
+                                    : const Text('EXECUTE BASKET',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12.5)),
                               ),
                             ),
                           ],
@@ -246,22 +258,37 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
     );
   }
 
-  void _executeBasket(Basket basket) {
-    final engine = ref.read(orderSimulationEngineProvider);
-    for (final leg in basket.legs) {
-      engine.placeOrder(leg);
+  void _executeBasket(Basket basket) async {
+    if (_executingBasketIds.contains(basket.id)) return;
+    setState(() => _executingBasketIds.add(basket.id));
+
+    try {
+      final engine = ref.read(orderSimulationEngineProvider);
+      for (final leg in basket.legs) {
+        await engine.placeOrder(leg);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Executed basket "${basket.name}" (${basket.legs.length} orders placed)'),
+          action: SnackBarAction(
+            label: 'VIEW ORDERS',
+            onPressed: () => context.go('/orders'),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _executingBasketIds.remove(basket.id));
+      }
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            'Executed basket "${basket.name}" (${basket.legs.length} orders placed)'),
-      ),
-    );
   }
 
   void _showCreateBasketDialog() {
     final colors = context.tradingColors;
     final nameController = TextEditingController();
+    bool isCreating = false;
 
     showDialog(
       context: context,
@@ -286,7 +313,9 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
           ),
           ElevatedButton(
             onPressed: () {
+              if (isCreating) return;
               if (nameController.text.isNotEmpty) {
+                isCreating = true;
                 setState(() {
                   _baskets.add(Basket(
                     id: 'bsk_${DateTime.now().millisecondsSinceEpoch}',

@@ -290,6 +290,21 @@ class SeedInstruments {
     ),
   ];
 
+  static final List<Instrument> additionalQuotes = [
+    const Instrument(token: 'copper_mcx', symbol: 'COPPER MCX Sep', name: 'Copper Futures', exchange: Exchange.MCX, type: InstrumentType.FUT, lotSize: 2500, tickSize: 0.05),
+    const Instrument(token: 'gold_mcx', symbol: 'GOLD MCX Oct', name: 'Gold Futures 1kg', exchange: Exchange.MCX, type: InstrumentType.FUT, lotSize: 100, tickSize: 1.0),
+    const Instrument(token: 'natgas_mcx', symbol: 'NATURALGAS MCX Sep', name: 'Natural Gas Futures', exchange: Exchange.MCX, type: InstrumentType.FUT, lotSize: 1250, tickSize: 0.10),
+    const Instrument(token: 'crude_mcx', symbol: 'CRUDEOIL MCX Oct', name: 'Crude Oil 100 BBL', exchange: Exchange.MCX, type: InstrumentType.FUT, lotSize: 100, tickSize: 1.0),
+    const Instrument(token: 'mankind_sep', symbol: 'MANKIND Sep', name: 'Mankind Pharma Futures', exchange: Exchange.NFO, type: InstrumentType.FUT, lotSize: 250, tickSize: 0.05),
+    const Instrument(token: 'mazdock_sep', symbol: 'MAZDOCK Sep', name: 'Mazagon Dock Futures', exchange: Exchange.NFO, type: InstrumentType.FUT, lotSize: 375, tickSize: 0.05),
+    const Instrument(token: 'ltc_spot', symbol: 'Litecoin Spot', name: 'Litecoin Spot', exchange: Exchange.CDS, type: InstrumentType.EQ, lotSize: 1, tickSize: 0.01),
+    const Instrument(token: 'silver_mcx', symbol: 'SILVER MCX Dec', name: 'Silver 30kg Futures', exchange: Exchange.MCX, type: InstrumentType.FUT, lotSize: 30, tickSize: 1.0),
+    const Instrument(token: 'nifty_50', symbol: 'NIFTY 50', name: 'NIFTY 50 Index', exchange: Exchange.NSE, type: InstrumentType.INDEX, tickSize: 0.05, freezeQty: 1800),
+    const Instrument(token: 'xau_usd', symbol: 'XAUUSD Spot', name: 'Gold Spot / US Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT, lotSize: 100, tickSize: 0.01),
+    const Instrument(token: 'us30_spot', symbol: 'US30 Cash', name: 'Wall Street 30 Index', exchange: Exchange.CDS, type: InstrumentType.INDEX, tickSize: 1.0),
+    const Instrument(token: 'nas100_spot', symbol: 'NAS100 Cash', name: 'US Tech 100 Index', exchange: Exchange.CDS, type: InstrumentType.INDEX, tickSize: 0.25),
+  ];
+
   static final List<Instrument> all = [
     ...commodities,
     ...indices,
@@ -297,11 +312,18 @@ class SeedInstruments {
     ...forex,
     ...crypto,
     ...equities,
+    ...additionalQuotes,
   ];
 
   static Instrument? findByToken(String token) {
     try {
-      return all.firstWhere((e) => e.token == token || e.token == token.toLowerCase() || e.token.replaceAll('mcx_', '') == token.toLowerCase().replaceAll('mcx_', ''));
+      final clean = token.toLowerCase().trim();
+      return all.firstWhere((e) =>
+          e.token == token ||
+          e.token.toLowerCase() == clean ||
+          e.token.replaceAll('mcx_', '').replaceAll('_mcx', '') == clean.replaceAll('mcx_', '').replaceAll('_mcx', '') ||
+          (clean == 'nifty_50' && e.token == 'idx_nifty50') ||
+          (clean == 'nifty50' && e.token == 'idx_nifty50'));
     } catch (_) {
       return null;
     }

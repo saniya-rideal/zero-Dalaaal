@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/services/market_status_service.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/mock/ticker_service.dart';
@@ -27,54 +26,15 @@ class QuoteDetailScreen extends ConsumerWidget {
     
     final instrument = SeedInstruments.findByToken(token) ??
         SeedInstruments.findBySymbol(token.replaceAll('_', ' ')) ??
-        SeedInstruments.findBySymbol(token);
+        SeedInstruments.findBySymbol(token) ??
+        Instrument(
+          token: token,
+          symbol: token.toUpperCase().replaceAll('_', ' '),
+          name: token.toUpperCase().replaceAll('_', ' '),
+          exchange: token.toLowerCase().contains('mcx') ? Exchange.MCX : Exchange.NSE,
+          type: token.toLowerCase().contains('sep') || token.toLowerCase().contains('oct') || token.toLowerCase().contains('mcx') ? InstrumentType.FUT : InstrumentType.EQ,
+        );
 
-    if (instrument == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Quote', style: AppTypography.h1(color: colors.textPrimary)),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.search_off_rounded, size: 64, color: colors.textSecondary.withValues(alpha: 0.5)),
-                const SizedBox(height: 16),
-                Text(
-                  'Instrument Unavailable',
-                  style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'The instrument contract "$token" was not found on active exchange feeds or has been delisted.',
-                  style: AppTypography.body(color: colors.textSecondary),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop();
-                    } else {
-                      context.go('/quotes');
-                    }
-                  },
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('Return to Watchlist'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     final quote = tickerService.getQuote(instrument.token);
     final isBull = quote.changePercent >= 0;

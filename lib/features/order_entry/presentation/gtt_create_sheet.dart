@@ -29,6 +29,7 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
   TransactionType _side = TransactionType.BUY;
   GttType _type = GttType.SINGLE;
   final int _quantity = 1;
+  bool _isSubmitting = false;
   late TextEditingController _triggerPriceController;
   late TextEditingController _orderPriceController;
   late TextEditingController _targetTriggerController;
@@ -192,26 +193,35 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
               const SizedBox(height: 24),
 
               ElevatedButton(
-                onPressed: () async {
-                  final engine = ref.read(orderSimulationEngineProvider);
-                  final triggerPrice = double.tryParse(_triggerPriceController.text) ?? 0.0;
-                  final orderPrice = double.tryParse(_orderPriceController.text) ?? 0.0;
+                onPressed: _isSubmitting ? null : () async {
+                  if (_isSubmitting) return;
+                  setState(() => _isSubmitting = true);
 
-                  await engine.createGtt(GttRequest(
-                    instrumentToken: _instrument.token,
-                    side: _side,
-                    type: _type,
-                    quantity: _quantity,
-                    triggerPrice: triggerPrice,
-                    orderPrice: orderPrice,
-                  ));
+                  try {
+                    final engine = ref.read(orderSimulationEngineProvider);
+                    final triggerPrice = double.tryParse(_triggerPriceController.text) ?? 0.0;
+                    final orderPrice = double.tryParse(_orderPriceController.text) ?? 0.0;
 
-                  if (mounted) {
-                    final messenger = ScaffoldMessenger.of(context);
-                    Navigator.pop(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('GTT Created Successfully!')),
-                    );
+                    await engine.createGtt(GttRequest(
+                      instrumentToken: _instrument.token,
+                      side: _side,
+                      type: _type,
+                      quantity: _quantity,
+                      triggerPrice: triggerPrice,
+                      orderPrice: orderPrice,
+                    ));
+
+                    if (mounted) {
+                      final messenger = ScaffoldMessenger.of(context);
+                      Navigator.pop(context);
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text('GTT Created Successfully!')),
+                      );
+                    }
+                  } finally {
+                    if (mounted) {
+                      setState(() => _isSubmitting = false);
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -221,7 +231,13 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   elevation: 0,
                 ),
-                child: const Text('CREATE GTT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('CREATE GTT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             ],
           ),

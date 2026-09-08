@@ -10,13 +10,20 @@ import '../features/funds/presentation/add_funds_sheet.dart';
 import '../features/funds/presentation/withdraw_funds_sheet.dart';
 import 'zero_nav_icons.dart';
 
-class ZeroDrawer extends ConsumerWidget {
+class ZeroDrawer extends ConsumerStatefulWidget {
   final String activeRoute;
 
   const ZeroDrawer({super.key, this.activeRoute = '/quotes'});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ZeroDrawer> createState() => _ZeroDrawerState();
+}
+
+class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
+  bool _isNavigating = false;
+
+  @override
+  Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final screenWidth = MediaQuery.of(context).size.width;
     final authState = ref.watch(authControllerProvider);
@@ -43,7 +50,10 @@ class ZeroDrawer extends ConsumerWidget {
           children: [
             // User Header
             InkWell(
-              onTap: () => _showAccountSwitchSheet(context),
+              onTap: () {
+                if (_isNavigating) return;
+                _showAccountSwitchSheet(context);
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                 decoration: BoxDecoration(
@@ -340,7 +350,7 @@ class ZeroDrawer extends ConsumerWidget {
     bool isLogout = false,
     required TradingColors colors,
   }) {
-    final isSelected = route != null && activeRoute == route;
+    final isSelected = route != null && widget.activeRoute == route;
     final itemColor = isLogout
         ? colors.primary
         : isSelected
@@ -356,13 +366,18 @@ class ZeroDrawer extends ConsumerWidget {
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onTap ??
-              () {
-                Navigator.pop(context);
-                if (route != null) {
-                  context.go(route);
-                }
-              },
+          onTap: () {
+            if (_isNavigating) return;
+            _isNavigating = true;
+            if (onTap != null) {
+              onTap();
+            } else {
+              Navigator.pop(context);
+              if (route != null && widget.activeRoute != route) {
+                context.go(route);
+              }
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
             child: Row(

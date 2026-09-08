@@ -61,6 +61,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
   }
 
   Future<void> _handleConfirmWithdrawal(double available) async {
+    if (_isSubmitting) return;
     _validateAmount(available);
     if (_errorText != null) {
       setState(() {});

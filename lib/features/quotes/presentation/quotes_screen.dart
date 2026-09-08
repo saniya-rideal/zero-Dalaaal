@@ -71,6 +71,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   bool _isProView = true;
   bool _isOneClickTrade = false;
   bool _isEditMode = false;
+  bool _isExecutingOneClick = false;
+  bool _isOpeningSheet = false;
   final Set<String> _selectedForDelete = {};
   String _query = '';
   Timer? _liveSimulationTimer;
@@ -1166,59 +1168,72 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   // Quote Tap Action Sheet (Matching WhatsApp Image 2026-09-02 at 10.20.31 AM.jpeg)
   void _handleQuoteTap(QuoteItemData item) async {
     if (_isOneClickTrade) {
-      final settings = ref.read(appSettingsProvider);
-      final lots = settings.defaultLots > 0 ? settings.defaultLots : 1.0;
-      final engine = ref.read(orderSimulationEngineProvider);
-      final isCommodity = item.category == 'COMMODITIES';
+      if (_isExecutingOneClick) return;
+      _isExecutingOneClick = true;
+      try {
+        final settings = ref.read(appSettingsProvider);
+        final lots = settings.defaultLots > 0 ? settings.defaultLots : 1.0;
+        final engine = ref.read(orderSimulationEngineProvider);
+        final isCommodity = item.category == 'COMMODITIES';
 
-      final seedInst = SeedInstruments.all.firstWhere(
-        (s) =>
-            s.symbol.toLowerCase() == item.symbol.toLowerCase() ||
-            s.token == item.id,
-        orElse: () =>
-            SeedInstruments.findByToken(item.id) ?? SeedInstruments.all.first,
-      );
+        final seedInst = SeedInstruments.all.firstWhere(
+          (s) =>
+              s.symbol.toLowerCase() == item.symbol.toLowerCase() ||
+              s.token == item.id,
+          orElse: () =>
+              SeedInstruments.findByToken(item.id) ?? SeedInstruments.all.first,
+        );
 
-      final idempotencyKey =
-          'oneclick_${DateTime.now().millisecondsSinceEpoch}_${seedInst.token}';
+        final idempotencyKey =
+            'oneclick_${DateTime.now().millisecondsSinceEpoch}_${seedInst.token}';
 
-      final request = OrderRequest(
-        idempotencyKey: idempotencyKey,
-        instrumentToken: seedInst.token,
-        side: TransactionType.BUY,
-        product: isCommodity ? ProductType.NRML : ProductType.MIS,
-        kind: OrderKind.MARKET,
-        quantity: (lots * (seedInst.lotSize > 0 ? seedInst.lotSize : 1))
-            .toInt()
-            .clamp(1, seedInst.freezeQty > 0 ? seedInst.freezeQty : 100000),
-        validity: Validity.DAY,
-      );
+        final request = OrderRequest(
+          idempotencyKey: idempotencyKey,
+          instrumentToken: seedInst.token,
+          side: TransactionType.BUY,
+          product: isCommodity ? ProductType.NRML : ProductType.MIS,
+          kind: OrderKind.MARKET,
+          quantity: (lots * (seedInst.lotSize > 0 ? seedInst.lotSize : 1))
+              .toInt()
+              .clamp(1, seedInst.freezeQty > 0 ? seedInst.freezeQty : 100000),
+          validity: Validity.DAY,
+        );
 
-      final placedOrder = await engine.placeOrder(request);
+        final placedOrder = await engine.placeOrder(request);
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            placedOrder.status == OrderStatus.REJECTED
-                ? 'One-Click Buy rejected: ${placedOrder.rejectionReason ?? "Insufficient Margin"}'
-                : 'Instant Market Buy executed: ${lots.toStringAsFixed(1)} lot(s) of ${item.symbol} @ ${item.ask > 0 ? item.ask.toStringAsFixed(2) : item.ltp.toStringAsFixed(2)}',
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              placedOrder.status == OrderStatus.REJECTED
+                  ? 'One-Click Buy rejected: ${placedOrder.rejectionReason ?? "Insufficient Margin"}'
+                  : 'Instant Market Buy executed: ${lots.toStringAsFixed(1)} lot(s) of ${item.symbol} @ ${item.ask > 0 ? item.ask.toStringAsFixed(2) : item.ltp.toStringAsFixed(2)}',
+            ),
+            backgroundColor: placedOrder.status == OrderStatus.REJECTED
+                ? const Color(0xFFD32F2F)
+                : const Color(0xFF00A854),
+            duration: const Duration(seconds: 4),
+            action: placedOrder.status == OrderStatus.COMPLETE
+                ? SnackBarAction(
+                    label: 'VIEW DEALS',
+                    textColor: Colors.white,
+                    onPressed: () => context.go('/deals'),
+                  )
+                : null,
           ),
-          backgroundColor: placedOrder.status == OrderStatus.REJECTED
-              ? const Color(0xFFD32F2F)
-              : const Color(0xFF00A854),
-          duration: const Duration(seconds: 4),
-          action: placedOrder.status == OrderStatus.COMPLETE
-              ? SnackBarAction(
-                  label: 'VIEW DEALS',
-                  textColor: Colors.white,
-                  onPressed: () => context.go('/deals'),
-                )
-              : null,
-        ),
-      );
+        );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isExecutingOneClick = false;
+          });
+        }
+      }
       return;
     }
+
+    if (_isOpeningSheet) return;
+    _isOpeningSheet = true;
 
     final colors = context.tradingColors;
     final targetInst = SeedInstruments.findByToken(item.id) ??
@@ -1231,216 +1246,224 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
           type: InstrumentType.FUT,
         );
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: colors.cardBackground,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (bottomSheetContext) => SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(top: 20.0, bottom: 12.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Sheet Header: Symbol Title (Bold Black, no divider below)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: Text(
-                  item.symbol,
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: colors.textPrimary,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // 1. Trade (Pink / Crimson #E82B57)
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    'Trade',
+    try {
+      await showModalBottomSheet(
+        context: context,
+        backgroundColor: colors.cardBackground,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (bottomSheetContext) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: 20.0, bottom: 12.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Sheet Header: Symbol Title (Bold Black, no divider below)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Text(
+                    item.symbol,
                     style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    OrderEntrySheet.show(context, instrument: targetInst);
-                  },
-                ),
-              ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
-
-              // 2. Add to watchlist
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    'Add to watchlist',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
                       color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    ref.read(watchlistControllerProvider.notifier).addInstrumentToActive(targetInst.token);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${item.symbol} added to active watchlist'),
-                        action: SnackBarAction(
-                          label: 'VIEW',
-                          textColor: colors.primary,
-                          onPressed: () => context.go('/watchlist'),
-                        ),
+                ),
+                const SizedBox(height: 12),
+
+                // 1. Trade (Pink / Crimson #E82B57)
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      'Trade',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.primary,
+                        fontWeight: FontWeight.w600,
                       ),
-                    );
-                  },
-                ),
-              ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
-
-              // 3. Add Alert
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    'Add Alert',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
                     ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      OrderEntrySheet.show(context, instrument: targetInst);
+                    },
                   ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    context.push('/alerts');
-                  },
                 ),
-              ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-              // 4. Option Chain
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    'Option Chain',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
+                // 2. Add to watchlist
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      'Add to watchlist',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      ref.read(watchlistControllerProvider.notifier).addInstrumentToActive(targetInst.token);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${item.symbol} added to active watchlist'),
+                          action: SnackBarAction(
+                            label: 'VIEW',
+                            textColor: colors.primary,
+                            onPressed: () => context.go('/watchlist'),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    context.push('/option-chain?symbol=${Uri.encodeComponent(targetInst.symbol)}');
-                  },
                 ),
-              ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-              // 5. Chart
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    'Chart',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
+                // 3. Add Alert
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      'Add Alert',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      context.push('/alerts');
+                    },
                   ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    context.push('/chart-fullscreen/${targetInst.token}');
-                  },
                 ),
-              ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-              // 6. Details
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    'Details',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
+                // 4. Option Chain
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      'Option Chain',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      context.push('/option-chain?symbol=${Uri.encodeComponent(targetInst.symbol)}');
+                    },
                   ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    context.push('/quote/${targetInst.token}');
-                  },
                 ),
-              ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-              // 6. Hide Extra Data / Show Extra Data
-              Material(
-                color: Colors.transparent,
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                  title: Text(
-                    _isProView ? 'Hide Extra Data' : 'Show Extra Data',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      color: colors.textPrimary,
-                      fontWeight: FontWeight.w500,
+                // 5. Chart
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      'Chart',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      context.push('/chart-fullscreen/${targetInst.token}');
+                    },
                   ),
-                  trailing: Icon(Icons.chevron_right,
-                      color: colors.textSecondary, size: 22),
-                  onTap: () {
-                    Navigator.pop(bottomSheetContext);
-                    setState(() => _isProView = !_isProView);
-                  },
                 ),
-              ),
-            ],
+                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+
+                // 6. Details
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      'Details',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      context.push('/quote/${targetInst.token}');
+                    },
+                  ),
+                ),
+                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+
+                // 6. Hide Extra Data / Show Extra Data
+                Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                    title: Text(
+                      _isProView ? 'Hide Extra Data' : 'Show Extra Data',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    trailing: Icon(Icons.chevron_right,
+                        color: colors.textSecondary, size: 22),
+                    onTap: () {
+                      Navigator.pop(bottomSheetContext);
+                      setState(() => _isProView = !_isProView);
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningSheet = false;
+        });
+      }
+    }
   }
 
   void _openSupportModal(BuildContext context) {

@@ -30,8 +30,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   HistoryDateFilter _selectedDateFilter = HistoryDateFilter.all;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
-  TransactionCategory? _selectedCategory;
-  String _selectedStatus = 'ALL'; // 'ALL', 'COMPLETE', 'PENDING', 'FAILED', 'CANCELLED'
+  final TransactionCategory? _selectedCategory = null;
+  final String _selectedStatus = 'ALL'; // 'ALL', 'COMPLETE', 'PENDING', 'FAILED', 'CANCELLED'
   String _sortBy = 'DATE_DESC'; // 'DATE_DESC', 'DATE_ASC', 'AMOUNT_DESC', 'AMOUNT_ASC', 'ALPHA_ASC', 'ALPHA_DESC'
   bool _isSortAscending = true;
 
@@ -92,6 +92,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   Future<void> _loadNextPage() async {
+    if (_isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
     await Future.delayed(const Duration(milliseconds: 300));
     final engine = ref.read(orderSimulationEngineProvider);
@@ -149,6 +150,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       } else if (filter == HistoryDateFilter.lastMonth) {
         _customStartDate = now.subtract(const Duration(days: 30));
         _customEndDate = now;
+      } else if (filter == HistoryDateFilter.custom) {
+        _pickCustomDateRange();
+        return;
       } else if (filter == HistoryDateFilter.all) {
         _customStartDate = null;
         _customEndDate = null;
@@ -221,7 +225,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       drawer: const ZeroDrawer(activeRoute: '/history'),
       appBar: ZeroAppBar(
         title: 'History & Reports',
-        showFilterAction: true,
+        showFilterAction: false,
         showSortAction: true,
         showCalendarAction: true,
         isSortAscending: _isSortAscending,
@@ -366,117 +370,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
-  // ─── Unified Transactions Tab View (with Filters, Sort, Pagination) ───────
+  // ─── Unified Transactions Tab View (with Pagination) ───────
   Widget _buildTransactionsView(TradingColors colors, OrderSimulationEngine engine) {
     return Column(
       children: [
-        // Filter Controls Bar
-        Container(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(
-            children: [
-              // Category Filter Chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    _buildCategoryChip(null, 'All Types', colors),
-                    const SizedBox(width: 6),
-                    _buildCategoryChip(TransactionCategory.TRADE, 'Trades', colors),
-                    const SizedBox(width: 6),
-                    _buildCategoryChip(TransactionCategory.DEPOSIT, 'Deposits', colors),
-                    const SizedBox(width: 6),
-                    _buildCategoryChip(TransactionCategory.WITHDRAWAL, 'Withdrawals', colors),
-                    const SizedBox(width: 6),
-                    _buildCategoryChip(TransactionCategory.FEE_CHARGE, 'Charges & Fees', colors),
-                    const SizedBox(width: 6),
-                    _buildCategoryChip(TransactionCategory.DIVIDEND, 'Dividends', colors),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-
-              // Secondary Filters: Status + Custom Date Range + Sort
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    // Status Dropdown / Chips
-                    _buildStatusChip('ALL', 'All Status', colors),
-                    const SizedBox(width: 6),
-                    _buildStatusChip('COMPLETE', 'Completed', colors),
-                    const SizedBox(width: 6),
-                    _buildStatusChip('PENDING', 'Pending', colors),
-                    const SizedBox(width: 6),
-                    _buildStatusChip('CANCELLED', 'Cancelled', colors),
-                    const SizedBox(width: 10),
-
-                    // Custom Date Picker Action Chip
-                    ActionChip(
-                      avatar: Icon(Icons.calendar_month_outlined, size: 14, color: colors.primary),
-                      label: Text(
-                        _selectedDateFilter == HistoryDateFilter.custom && _customStartDate != null
-                            ? '${DateFormatter.formatOrderDate(_customStartDate!)} - ${DateFormatter.formatOrderDate(_customEndDate!)}'
-                            : 'Custom Dates',
-                        style: GoogleFonts.inter(
-                          color: _selectedDateFilter == HistoryDateFilter.custom ? colors.primary : colors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                      onPressed: _pickCustomDateRange,
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Multi-criteria Sort Popup
-                    PopupMenuButton<String>(
-                      icon: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: colors.divider, width: 0.5),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.sort_rounded, size: 14, color: colors.primary),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Sort',
-                              style: GoogleFonts.inter(
-                                color: colors.textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 11.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      offset: const Offset(0, 36),
-                      color: colors.cardBackground,
-                      onSelected: (val) {
-                        setState(() => _sortBy = val);
-                        _resetAndLoadTransactions();
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(value: 'DATE_DESC', child: Text('Date: Newest First')),
-                        const PopupMenuItem(value: 'DATE_ASC', child: Text('Date: Oldest First')),
-                        const PopupMenuItem(value: 'AMOUNT_DESC', child: Text('Amount: High to Low')),
-                        const PopupMenuItem(value: 'AMOUNT_ASC', child: Text('Amount: Low to High')),
-                        const PopupMenuItem(value: 'ALPHA_ASC', child: Text('Alphabetical: A to Z')),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const Divider(height: 1),
+        // Infinite Scroll / Paginated List
 
         // Infinite Scroll / Paginated List
         Expanded(
@@ -688,42 +586,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildCategoryChip(TransactionCategory? cat, String label, TradingColors colors) {
-    final isSelected = _selectedCategory == cat;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: colors.primary.withValues(alpha: 0.15),
-      labelStyle: GoogleFonts.inter(
-        color: isSelected ? colors.primary : colors.textSecondary,
-        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        fontSize: 11.5,
-      ),
-      onSelected: (_) {
-        setState(() => _selectedCategory = cat);
-        _resetAndLoadTransactions();
-      },
-    );
-  }
-
-  Widget _buildStatusChip(String statusKey, String label, TradingColors colors) {
-    final isSelected = _selectedStatus == statusKey;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: colors.primary.withValues(alpha: 0.15),
-      labelStyle: GoogleFonts.inter(
-        color: isSelected ? colors.primary : colors.textSecondary,
-        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        fontSize: 11,
-      ),
-      onSelected: (_) {
-        setState(() => _selectedStatus = statusKey);
-        _resetAndLoadTransactions();
-      },
     );
   }
 

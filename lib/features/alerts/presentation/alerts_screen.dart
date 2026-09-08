@@ -81,6 +81,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
         : TradingColors.light;
     final scriptController = TextEditingController(text: 'COPPER MCX Sep');
     final priceController = TextEditingController(text: '1370.00');
+    bool isCreating = false;
 
     showModalBottomSheet(
       context: context,
@@ -128,8 +129,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () {
+                if (isCreating) return;
                 final target = double.tryParse(priceController.text) ?? 0.0;
                 if (priceController.text.isNotEmpty && target > 0) {
+                  isCreating = true;
                   setState(() {
                     _alerts.insert(
                       0,

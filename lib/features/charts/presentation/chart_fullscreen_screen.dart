@@ -50,6 +50,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
   double _prevAsk = 0.0;
   Color _sellColor = const Color(0xFF2196F3); // Dynamic Blue for Bullish / Up tick
   Color _buyColor = const Color(0xFFE82B57); // Dynamic Red for Bearish / Down tick
+  bool _isExecutingQuickTrade = false;
 
   late Timer _utcTimer;
   String _currentUtcTime = '';
@@ -821,7 +822,9 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                 child: Material(
                   color: _sellColor,
                   child: InkWell(
-                    onTap: () => _executeQuickTrade(TransactionType.SELL, bid, instrument),
+                    onTap: _isExecutingQuickTrade
+                        ? null
+                        : () => _executeQuickTrade(TransactionType.SELL, bid, instrument),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
                       child: Column(
@@ -863,7 +866,9 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                 child: Material(
                   color: _buyColor,
                   child: InkWell(
-                    onTap: () => _executeQuickTrade(TransactionType.BUY, ask, instrument),
+                    onTap: _isExecutingQuickTrade
+                        ? null
+                        : () => _executeQuickTrade(TransactionType.BUY, ask, instrument),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 6.0),
                       child: Column(
@@ -978,29 +983,42 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
     );
   }
 
-  void _executeQuickTrade(TransactionType side, double price, Instrument instrument) {
-    final engine = ref.read(orderSimulationEngineProvider);
-    final request = OrderRequest(
-      instrumentToken: instrument.token,
-      side: side,
-      product: ProductType.NRML,
-      kind: OrderKind.MARKET,
-      quantity: (_tradeLots * 100).toInt().clamp(1, 10000),
-      price: price,
-    );
-    engine.placeOrder(request);
+  void _executeQuickTrade(TransactionType side, double price, Instrument instrument) async {
+    if (_isExecutingQuickTrade) return;
+    setState(() => _isExecutingQuickTrade = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Instant ${side.name} order executed for ${_tradeLots.toStringAsFixed(2)} lots of ${instrument.symbol} at ${price.toStringAsFixed(2)}',
+    try {
+      final engine = ref.read(orderSimulationEngineProvider);
+      final idempotencyKey =
+          'chart_quick_${DateTime.now().millisecondsSinceEpoch}_${instrument.token}';
+      final request = OrderRequest(
+        idempotencyKey: idempotencyKey,
+        instrumentToken: instrument.token,
+        side: side,
+        product: ProductType.NRML,
+        kind: OrderKind.MARKET,
+        quantity: (_tradeLots * 100).toInt().clamp(1, 10000),
+        price: price,
+      );
+      await engine.placeOrder(request);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Instant ${side.name} order executed for ${_tradeLots.toStringAsFixed(2)} lots of ${instrument.symbol} at ${price.toStringAsFixed(2)}',
+          ),
+          backgroundColor: side == TransactionType.BUY
+              ? const Color(0xFF1E2B60)
+              : const Color(0xFFE82B57),
+          duration: const Duration(seconds: 1),
         ),
-        backgroundColor: side == TransactionType.BUY
-            ? const Color(0xFF1E2B60)
-            : const Color(0xFFE82B57),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExecutingQuickTrade = false);
+      }
+    }
   }
 
   void _showCustomLotDialog(BuildContext context) {

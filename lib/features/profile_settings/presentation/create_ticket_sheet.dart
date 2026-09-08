@@ -59,6 +59,7 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
   }
 
   Future<void> _submitTicket() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
