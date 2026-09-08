@@ -16,7 +16,7 @@ class MarketStatusStrip extends StatelessWidget {
       onTap: () => _showSessionScheduleSheet(context, colors),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-        color: colors.surface.withValues(alpha: 0.5),
+        color: colors.background,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(

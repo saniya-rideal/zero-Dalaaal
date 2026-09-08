@@ -158,7 +158,7 @@ class AppTheme {
         ),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: tradingColors.surface,
+        backgroundColor: tradingColors.background,
         selectedItemColor: tradingColors.primary,
         unselectedItemColor: tradingColors.textSecondary,
         elevation: 8,

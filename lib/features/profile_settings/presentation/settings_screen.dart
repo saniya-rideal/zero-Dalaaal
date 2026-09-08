@@ -293,22 +293,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           DropdownButtonHideUnderline(
             child: DropdownButton<AppLanguage>(
-              value: currentLanguage,
+              value: currentLanguage == AppLanguage.english
+                  ? currentLanguage
+                  : AppLanguage.english,
               dropdownColor: colors.cardBackground,
               icon: Icon(Icons.arrow_drop_down, color: colors.textPrimary, size: 20),
-              items: AppLanguage.values.map((lang) {
-                return DropdownMenuItem(
-                  value: lang,
+              items: [
+                DropdownMenuItem(
+                  value: AppLanguage.english,
                   child: Text(
-                    lang.displayName.split(' ').first,
+                    'English',
                     style: GoogleFonts.inter(
                       color: colors.textPrimary,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+              ],
               onChanged: (val) {
                 if (val != null) onLanguageChanged(val);
               },

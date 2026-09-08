@@ -70,20 +70,20 @@ class TradingColors extends ThemeExtension<TradingColors> {
     primary: Color(0xFFE82B57),
     secondary: Color(0xFF3B82F6),
     marginValue: Color(0xFF3E99D6),
-    background: Color(0xFF0B0E14), // Deep OLED Black
-    surface: Color(0xFF141923),
-    cardBackground: Color(0xFF1A202C),
-    dockBackground: Color(0xFF141923),
-    scriptBarBackground: Color(0xFF1E2636),
+    background: Color(0xFF000000), // Pure OLED Black
+    surface: Color(0xFF121212), // Neutral Dark Surface (No blue tint)
+    cardBackground: Color(0xFF181818), // Neutral Dark Card (No blue tint)
+    dockBackground: Color(0xFF121212), // Neutral Dark Dock (No blue tint)
+    scriptBarBackground: Color(0xFF181818), // Neutral Dark Script Bar (No blue tint)
     bullish: Color(0xFF26A69A),
     bearish: Color(0xFFFF4D6D),
     neutral: Color(0xFF8B949E),
     warning: Color(0xFFF5A623),
-    chartGrid: Color(0xFF1E2636),
-    chartBackground: Color(0xFF0B0E14),
-    divider: Color(0xFF2D3748),
-    textPrimary: Color(0xFFF8FAFC),
-    textSecondary: Color(0xFF94A3B8),
+    chartGrid: Color(0xFF222222), // Neutral Dark Grid (No blue tint)
+    chartBackground: Color(0xFF000000), // Pure Black Chart Background
+    divider: Color(0xFF262626), // Neutral Dark Divider (No blue tint)
+    textPrimary: Color(0xFFF5F5F5), // High-contrast Crisp White
+    textSecondary: Color(0xFF9E9E9E), // Neutral Silver Gray
     flashGreen: Color(0x3326A69A),
     flashRed: Color(0x33FF4D6D),
   );

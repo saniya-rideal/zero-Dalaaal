@@ -371,6 +371,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final settings = ref.watch(appSettingsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final filteredQuotes = _query.isEmpty
         ? _quotes
@@ -494,8 +495,13 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
 
               // Scrollable Quotes & Actions Area
               Expanded(
-                child: CustomScrollView(
-                  slivers: [
+                child: Container(
+                  color: isDark ? Colors.black : colors.background,
+                  child: ClipRect(
+                    clipBehavior: Clip.hardEdge,
+                    child: CustomScrollView(
+                      clipBehavior: Clip.hardEdge,
+                      slivers: [
                     // Collapsible Header Section (Deposit/Withdraw, Toggles, Search)
                     SliverToBoxAdapter(
                       child: Column(
@@ -744,25 +750,41 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         ),
                         SliverList.separated(
                           itemCount: entry.value.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          separatorBuilder: (_, __) => Divider(
+                              height: 1,
+                              color: isDark
+                                  ? const Color(0xFF141414)
+                                  : colors.divider),
                           itemBuilder: (context, index) {
                             final item = entry.value[index];
-                            return _buildQuoteRow(item, colors);
+                            return Container(
+                              color: isDark ? Colors.black : colors.background,
+                              child: _buildQuoteRow(item, colors),
+                            );
                           },
                         ),
                       ])
                     else
                       SliverList.separated(
                         itemCount: filteredQuotes.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, __) => Divider(
+                            height: 1,
+                            color: isDark
+                                ? const Color(0xFF141414)
+                                : colors.divider),
                         itemBuilder: (context, index) {
                           final item = filteredQuotes[index];
-                          return _buildQuoteRow(item, colors);
+                          return Container(
+                            color: isDark ? Colors.black : colors.background,
+                            child: _buildQuoteRow(item, colors),
+                          );
                         },
                       ),
                   ],
                 ),
               ),
+            ),
+          ),
             ],
           ),
 
@@ -821,7 +843,10 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
             _handleQuoteTap(item);
           }
         },
-        child: Padding(
+        child: Container(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.black
+              : Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
           child: Row(
             children: [
@@ -921,7 +946,10 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
           _handleQuoteTap(item);
         }
       },
-      child: Padding(
+      child: Container(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.black
+            : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: Row(
           children: [
@@ -1450,7 +1478,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
       String category, int count, TradingColors colors) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: colors.surface.withValues(alpha: 0.75),
+      color: Colors.black,
       child: Row(
         children: [
           Icon(Icons.label_outline, size: 16, color: colors.primary),
@@ -1725,10 +1753,21 @@ class _QuotesTableHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 32,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: colors.dockBackground.withValues(alpha: 0.95),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF212121) : colors.dockBackground,
+        border: isDark
+            ? null
+            : Border(
+                bottom: BorderSide(
+                  color: colors.divider,
+                  width: 0.5,
+                ),
+              ),
+      ),
       child: Row(
         children: [
           Expanded(

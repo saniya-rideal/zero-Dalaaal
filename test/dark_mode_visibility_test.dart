@@ -13,16 +13,16 @@ void main() {
       const darkColors = TradingColors.dark;
 
       // Dark background is deep OLED black
-      expect(darkColors.background, const Color(0xFF0B0E14));
+      expect(darkColors.background, const Color(0xFF000000));
 
-      // TextPrimary must be bright high-contrast (#F8FAFC)
-      expect(darkColors.textPrimary, const Color(0xFFF8FAFC));
+      // TextPrimary must be bright high-contrast (#F5F5F5)
+      expect(darkColors.textPrimary, const Color(0xFFF5F5F5));
 
-      // TextSecondary must be clear readable slate (#94A3B8)
-      expect(darkColors.textSecondary, const Color(0xFF94A3B8));
+      // TextSecondary must be clear readable neutral gray (#9E9E9E)
+      expect(darkColors.textSecondary, const Color(0xFF9E9E9E));
 
-      // Divider must be subtle but distinct (#2D3748)
-      expect(darkColors.divider, const Color(0xFF2D3748));
+      // Divider must be subtle but distinct (#262626)
+      expect(darkColors.divider, const Color(0xFF262626));
     });
 
     testWidgets('ZeroBottomNavBar in Dark Mode renders readable labels with textSecondary',

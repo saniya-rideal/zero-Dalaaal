@@ -46,7 +46,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader> with SingleTickerProvid
     final colors = context.tradingColors;
     final baseColor = colors.surface;
     final highlightColor = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF2A2E39)
+        ? const Color(0xFF262626)
         : const Color(0xFFE8E8E8);
 
     return AnimatedBuilder(

@@ -253,7 +253,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   value: _selectedLanguage,
                   dropdownColor: colors.cardBackground,
                   icon: Icon(Icons.language, color: colors.primary, size: 20),
-                  items: ['English', 'हिंदी', 'ગુજરાતી', 'मराठी'].map((lang) {
+                  items: ['English'].map((lang) {
                     return DropdownMenuItem(
                       value: lang,
                       child: Text(
