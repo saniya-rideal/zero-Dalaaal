@@ -49,10 +49,21 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
         scrolledUnderElevation: 0,
         centerTitle: true,
         leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+          builder: (ctx) {
+            final canPop = Navigator.of(ctx).canPop();
+            if (canPop) {
+              return IconButton(
+                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                onPressed: () => Navigator.of(ctx).pop(),
+                tooltip: 'Back',
+              );
+            }
+            return IconButton(
+              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+              tooltip: 'Menu',
+            );
+          },
         ),
         title: Text(
           'Profit Calculator',

@@ -25,6 +25,8 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showFilterAction;
   final bool showSortAction;
   final Widget? trailingAction;
+  final Widget? leading;
+  final bool? showBackButton;
 
   const ZeroAppBar({
     super.key,
@@ -38,6 +40,8 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showFilterAction = true,
     this.showSortAction = true,
     this.trailingAction,
+    this.leading,
+    this.showBackButton,
   });
 
   @override
@@ -51,20 +55,32 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: colors.background,
       elevation: 0,
       scrolledUnderElevation: 0,
-      leading: Builder(
-        builder: (innerContext) => IconButton(
-          icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-          onPressed: () {
-            final rootScaffold = innerContext.findRootAncestorStateOfType<ScaffoldState>();
-            if (rootScaffold != null && rootScaffold.hasDrawer) {
-              rootScaffold.openDrawer();
-            } else {
-              Scaffold.of(innerContext).openDrawer();
-            }
-          },
-          tooltip: 'Menu',
-        ),
-      ),
+      leading: leading ??
+          Builder(
+            builder: (innerContext) {
+              final canPop = Navigator.of(innerContext).canPop();
+              final shouldShowBack = showBackButton ?? canPop;
+              if (shouldShowBack) {
+                return IconButton(
+                  icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                  onPressed: () => Navigator.of(innerContext).pop(),
+                  tooltip: 'Back',
+                );
+              }
+              return IconButton(
+                icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+                onPressed: () {
+                  final rootScaffold = innerContext.findRootAncestorStateOfType<ScaffoldState>();
+                  if (rootScaffold != null && rootScaffold.hasDrawer) {
+                    rootScaffold.openDrawer();
+                  } else {
+                    Scaffold.of(innerContext).openDrawer();
+                  }
+                },
+                tooltip: 'Menu',
+              );
+            },
+          ),
       centerTitle: true,
       title: Text(
         title,

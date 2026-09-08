@@ -9,6 +9,7 @@ import '../../../data/models/models.dart';
 import '../../../shared_widgets/empty_state_view.dart';
 import '../../../shared_widgets/instrument_row.dart';
 import '../../../shared_widgets/skeleton_loader.dart';
+import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'watchlist_controller.dart';
 import 'watchlist_row_actions.dart';
@@ -68,8 +69,8 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final state = ref.watch(watchlistControllerProvider);
-    final tickerService = ref.watch(tickerServiceProvider);
     final activeGroup = state.activeWatchlist;
+    final tickerService = ref.watch(tickerServiceProvider);
 
     // Subscribe visible tokens to ticker
     if (activeGroup != null && activeGroup.instrumentTokens.isNotEmpty) {
@@ -81,7 +82,25 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
     final quotesMap = quotesAsync.value ?? tickerService.getAllQuotes();
 
     return Scaffold(
+      drawer: const ZeroDrawer(activeRoute: '/watchlist'),
       appBar: AppBar(
+        leading: Builder(
+          builder: (innerContext) {
+            final canPop = Navigator.of(innerContext).canPop();
+            if (canPop) {
+              return IconButton(
+                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                onPressed: () => Navigator.of(innerContext).pop(),
+                tooltip: 'Back',
+              );
+            }
+            return IconButton(
+              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              onPressed: () => Scaffold.of(innerContext).openDrawer(),
+              tooltip: 'Menu',
+            );
+          },
+        ),
         title: Text(
           'Marketwatch',
           style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700),

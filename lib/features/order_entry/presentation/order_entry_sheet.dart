@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/charges_config.dart';
 import '../../../core/services/connectivity_service.dart';
@@ -1667,7 +1668,12 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
           backgroundColor: side == TransactionType.BUY
               ? const Color(0xFF1E2B60)
               : const Color(0xFFE82B57),
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'VIEW DEALS',
+            textColor: Colors.white,
+            onPressed: () => context.go('/deals'),
+          ),
         ),
       );
     } finally {

@@ -1207,20 +1207,29 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
           backgroundColor: placedOrder.status == OrderStatus.REJECTED
               ? const Color(0xFFD32F2F)
               : const Color(0xFF00A854),
-          duration: const Duration(seconds: 2),
+          duration: const Duration(seconds: 4),
+          action: placedOrder.status == OrderStatus.COMPLETE
+              ? SnackBarAction(
+                  label: 'VIEW DEALS',
+                  textColor: Colors.white,
+                  onPressed: () => context.go('/deals'),
+                )
+              : null,
         ),
       );
       return;
     }
 
     final colors = context.tradingColors;
-    final dummyInst = Instrument(
-      token: item.id,
-      symbol: item.symbol,
-      name: item.symbol,
-      exchange: Exchange.MCX,
-      type: InstrumentType.FUT,
-    );
+    final targetInst = SeedInstruments.findByToken(item.id) ??
+        SeedInstruments.all.where((i) => i.symbol.toLowerCase() == item.symbol.toLowerCase()).firstOrNull ??
+        Instrument(
+          token: item.id,
+          symbol: item.symbol,
+          name: item.symbol,
+          exchange: Exchange.MCX,
+          type: InstrumentType.FUT,
+        );
 
     showModalBottomSheet(
       context: context,
@@ -1269,7 +1278,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
-                    OrderEntrySheet.show(context, instrument: dummyInst);
+                    OrderEntrySheet.show(context, instrument: targetInst);
                   },
                 ),
               ),
@@ -1293,8 +1302,16 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
+                    ref.read(watchlistControllerProvider.notifier).addInstrumentToActive(targetInst.token);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('${item.symbol} added to watchlist')),
+                      SnackBar(
+                        content: Text('${item.symbol} added to active watchlist'),
+                        action: SnackBarAction(
+                          label: 'VIEW',
+                          textColor: colors.primary,
+                          onPressed: () => context.go('/watchlist'),
+                        ),
+                      ),
                     );
                   },
                 ),
@@ -1325,7 +1342,31 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
               ),
               Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-              // 4. Chart
+              // 4. Option Chain
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
+                  title: Text(
+                    'Option Chain',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: colors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: Icon(Icons.chevron_right,
+                      color: colors.textSecondary, size: 22),
+                  onTap: () {
+                    Navigator.pop(bottomSheetContext);
+                    context.push('/option-chain?symbol=${Uri.encodeComponent(targetInst.symbol)}');
+                  },
+                ),
+              ),
+              Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
+
+              // 5. Chart
               Material(
                 color: Colors.transparent,
                 child: ListTile(
@@ -1343,13 +1384,13 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
-                    context.push('/chart-fullscreen/${dummyInst.token}');
+                    context.push('/chart-fullscreen/${targetInst.token}');
                   },
                 ),
               ),
               Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-              // 5. Details
+              // 6. Details
               Material(
                 color: Colors.transparent,
                 child: ListTile(
@@ -1367,7 +1408,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       color: colors.textSecondary, size: 22),
                   onTap: () {
                     Navigator.pop(bottomSheetContext);
-                    context.push('/quote/${dummyInst.token}');
+                    context.push('/quote/${targetInst.token}');
                   },
                 ),
               ),

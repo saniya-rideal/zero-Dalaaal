@@ -8,6 +8,9 @@ import 'package:zero_dalali/data/mock/settings_repository.dart';
 import 'package:zero_dalali/features/order_entry/presentation/order_entry_sheet.dart';
 import 'package:zero_dalali/features/quotes/presentation/quotes_screen.dart';
 import 'package:zero_dalali/shared_widgets/script_selector_bar.dart';
+import 'package:zero_dalali/shared_widgets/zero_app_bar.dart';
+import 'package:zero_dalali/shared_widgets/zero_bottom_dock.dart';
+import 'package:zero_dalali/shared_widgets/zero_drawer.dart';
 
 void main() {
   group('End-to-End Flow Integration Tests', () {
@@ -174,6 +177,153 @@ void main() {
 
         // The pre-filled lot in OrderEntrySheet should be 3.5
         expect(find.text('3.50'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        container.dispose();
+      }
+    });
+
+    testWidgets('ZeroDrawer renders all 18+ navigation items and opens Share sheet',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 1800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      final container = ProviderContainer();
+      try {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(
+              home: Scaffold(
+                drawer: ZeroDrawer(activeRoute: '/quotes'),
+                body: Center(child: Text('Home')),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Open drawer
+        final scaffoldState = tester.state<ScaffoldState>(find.byType(Scaffold));
+        scaffoldState.openDrawer();
+        await tester.pumpAndSettle();
+
+        // Verify key navigation items exist in drawer
+        expect(find.text('Holdings & Portfolio'), findsOneWidget);
+        expect(find.text('Option Chain'), findsOneWidget);
+        expect(find.text('IPO Central'), findsOneWidget);
+        expect(find.text('Baskets'), findsOneWidget);
+        expect(find.text('SIP Investment'), findsOneWidget);
+        expect(find.text('Funds & Margin'), findsOneWidget);
+        expect(find.text('Reports & Tax P&L'), findsOneWidget);
+        expect(find.text('Share'), findsOneWidget);
+
+        // Ensure visible & tap Share item
+        await tester.ensureVisible(find.text('Share'));
+        await tester.tap(find.text('Share'));
+        await tester.pumpAndSettle();
+
+        // Verify Share sheet opened
+        expect(find.text('Share Zero Trading'), findsOneWidget);
+        expect(find.textContaining('https://zero.trade/invite/ANURAG159537'), findsOneWidget);
+        expect(find.text('Copy'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        container.dispose();
+      }
+    });
+
+    testWidgets('Adaptive AppBar shows back button when screen can pop',
+        (tester) async {
+      final container = ProviderContainer();
+      try {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              home: Builder(
+                builder: (context) => Scaffold(
+                  body: ElevatedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const Scaffold(
+                            appBar: ZeroAppBar(title: 'Pushed Subscreen'),
+                            body: Center(child: Text('Subscreen Body')),
+                          ),
+                        ),
+                      );
+                    },
+                    child: const Text('Push'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Tap push
+        await tester.tap(find.text('Push'));
+        await tester.pumpAndSettle();
+
+        // Verify pushed subscreen has Back button (arrow_back)
+        expect(find.text('Pushed Subscreen'), findsOneWidget);
+        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+
+        // Tap back button
+        await tester.tap(find.byIcon(Icons.arrow_back));
+        await tester.pumpAndSettle();
+
+        // Returned to home
+        expect(find.text('Push'), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        container.dispose();
+      }
+    });
+
+    testWidgets('ZeroBottomDock renders metrics grid and eye privacy toggle',
+        (tester) async {
+      final container = ProviderContainer();
+      try {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(
+              home: Scaffold(
+                bottomNavigationBar: ZeroBottomDock(),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Verify account tag
+        expect(find.text('Acc: 159537 (Primary)'), findsOneWidget);
+
+        // Verify metric labels
+        expect(find.text('Balance:'), findsOneWidget);
+        expect(find.text('Floating PL:'), findsOneWidget);
+        expect(find.text('Free Margin:'), findsOneWidget);
+        expect(find.text('Equity:'), findsOneWidget);
+
+        // Tap eye privacy toggle
+        final eyeFinder = find.byIcon(Icons.visibility_outlined);
+        expect(eyeFinder, findsOneWidget);
+        await tester.tap(eyeFinder);
+        await tester.pump();
+
+        // Balance should now be masked with dots
+        expect(find.text('••••••'), findsWidgets);
 
         await tester.pumpWidget(const SizedBox.shrink());
       } finally {

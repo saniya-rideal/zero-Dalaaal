@@ -25,6 +25,7 @@ import '../features/notifications/presentation/notification_preferences_sheet.da
 import '../features/option_chain/presentation/option_chain_screen.dart';
 import '../features/orders/presentation/order_detail_screen.dart';
 import '../features/orders/presentation/orders_screen.dart';
+import '../features/portfolio/presentation/portfolio_screen.dart';
 import '../features/profile_settings/presentation/about_screen.dart';
 import '../features/profile_settings/presentation/help_support_screen.dart';
 import '../features/profile_settings/presentation/live_chat_sheet.dart';
@@ -38,6 +39,7 @@ import '../features/quotes/presentation/add_script_screen.dart';
 import '../features/quotes/presentation/quotes_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/sip/presentation/sip_screen.dart';
+import '../features/watchlist/presentation/watchlist_screen.dart';
 import '../shared_widgets/zero_shell_scaffold.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -140,6 +142,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/search', builder: (context, state) => const SearchScreen()),
       GoRoute(path: '/funds', builder: (context, state) => const FundsScreen()),
+      GoRoute(
+          path: '/portfolio',
+          builder: (context, state) => const PortfolioScreen()),
+      GoRoute(
+          path: '/watchlist',
+          builder: (context, state) => const WatchlistScreen()),
       GoRoute(
           path: '/baskets', builder: (context, state) => const BasketsScreen()),
       GoRoute(path: '/sip', builder: (context, state) => const SipScreen()),

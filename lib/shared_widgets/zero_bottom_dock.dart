@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/services/balance_privacy_service.dart';
 import '../core/theme/trading_colors.dart';
@@ -114,15 +115,15 @@ class ZeroBottomDock extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildRow('Balance:', balance, colors),
+                    _buildRow('Balance:', balance, colors, onTap: () => context.push('/funds')),
                     const SizedBox(height: 3),
-                    _buildRow('Floating PL:', floatingPl, colors),
+                    _buildRow('Floating PL:', floatingPl, colors, onTap: () => context.go('/deals')),
                     const SizedBox(height: 3),
-                    _buildRow('Used Margin:', usedMargin, colors),
+                    _buildRow('Used Margin:', usedMargin, colors, onTap: () => context.push('/funds')),
                     const SizedBox(height: 3),
                     _buildRow('Assets Value:', assetsValue, colors),
                     const SizedBox(height: 3),
-                    _buildRow('Total Values:', totalValues, colors),
+                    _buildRow('Total Values:', totalValues, colors, onTap: () => context.push('/funds')),
                   ],
                 ),
               ),
@@ -133,9 +134,9 @@ class ZeroBottomDock extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildRow('Free Margin:', freeMargin, colors),
+                    _buildRow('Free Margin:', freeMargin, colors, onTap: () => context.push('/funds')),
                     const SizedBox(height: 3),
-                    _buildRow('Equity:', equity, colors),
+                    _buildRow('Equity:', equity, colors, onTap: () => context.push('/funds')),
                     const SizedBox(height: 3),
                     _buildRow('Holding Margin:', hldgMargin, colors),
                     const SizedBox(height: 3),
@@ -152,8 +153,8 @@ class ZeroBottomDock extends ConsumerWidget {
     );
   }
 
-  Widget _buildRow(String label, String value, TradingColors colors) {
-    return Row(
+  Widget _buildRow(String label, String value, TradingColors colors, {VoidCallback? onTap}) {
+    final rowContent = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
@@ -172,6 +173,17 @@ class ZeroBottomDock extends ConsumerWidget {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) return rowContent;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1.0),
+        child: rowContent,
+      ),
     );
   }
 

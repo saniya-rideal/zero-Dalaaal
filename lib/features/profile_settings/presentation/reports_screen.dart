@@ -35,10 +35,21 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: Builder(
-          builder: (innerContext) => IconButton(
-            icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-            onPressed: () => Scaffold.of(innerContext).openDrawer(),
-          ),
+          builder: (innerContext) {
+            final canPop = Navigator.of(innerContext).canPop();
+            if (canPop) {
+              return IconButton(
+                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                onPressed: () => Navigator.of(innerContext).pop(),
+                tooltip: 'Back',
+              );
+            }
+            return IconButton(
+              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              onPressed: () => Scaffold.of(innerContext).openDrawer(),
+              tooltip: 'Menu',
+            );
+          },
         ),
         centerTitle: true,
         title: Text('Tax P&L & Analytics',

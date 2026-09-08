@@ -13,6 +13,7 @@ import '../../../shared_widgets/empty_state_view.dart';
 import '../../../shared_widgets/exchange_chip.dart';
 import '../../../shared_widgets/margin_risk_banner.dart';
 import '../../../shared_widgets/section_card.dart';
+import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'portfolio_performance_chart.dart';
 
@@ -39,7 +40,25 @@ class PortfolioScreen extends ConsumerWidget {
     final todayPnlColor = summary.todayPnl >= 0 ? colors.bullish : colors.bearish;
 
     return Scaffold(
+      drawer: const ZeroDrawer(activeRoute: '/portfolio'),
       appBar: AppBar(
+        leading: Builder(
+          builder: (innerContext) {
+            final canPop = Navigator.of(innerContext).canPop();
+            if (canPop) {
+              return IconButton(
+                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                onPressed: () => Navigator.of(innerContext).pop(),
+                tooltip: 'Back',
+              );
+            }
+            return IconButton(
+              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              onPressed: () => Scaffold.of(innerContext).openDrawer(),
+              tooltip: 'Menu',
+            );
+          },
+        ),
         title: Text('Holdings (${holdings.length})', style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700)),
         actions: [
           IconButton(
