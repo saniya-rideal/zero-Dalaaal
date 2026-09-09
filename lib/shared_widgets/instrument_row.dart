@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../core/utils/currency_formatter.dart';
@@ -144,7 +145,7 @@ class InstrumentRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: const Row(
           children: [
-            Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 24),
+            Icon(LucideIcons.shoppingBag, color: Colors.white, size: 22),
             SizedBox(width: 8),
             Text('BUY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
           ],
@@ -159,7 +160,7 @@ class InstrumentRow extends StatelessWidget {
           children: [
             Text('SELL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
             SizedBox(width: 8),
-            Icon(Icons.sell_outlined, color: Colors.white, size: 24),
+            Icon(LucideIcons.tag, color: Colors.white, size: 22),
           ],
         ),
       ),

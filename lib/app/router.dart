@@ -14,6 +14,7 @@ import '../features/calculator/presentation/profit_calculator_screen.dart';
 import '../features/charts/presentation/chart_fullscreen_screen.dart';
 import '../features/deals/presentation/deals_screen.dart';
 import '../features/funds/presentation/funds_screen.dart';
+import '../features/heatmap/presentation/sector_heatmap_screen.dart';
 import '../features/history/presentation/history_screen.dart';
 import '../features/ipo/presentation/ipo_list_screen.dart';
 import '../features/net_deals/presentation/net_deals_screen.dart';
@@ -157,6 +158,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/economic-calendar',
           builder: (context, state) => const EconomicCalendarScreen()),
+      GoRoute(
+          path: '/heatmap',
+          builder: (context, state) => const SectorHeatmapScreen()),
       GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
       GoRoute(
           path: '/learning',

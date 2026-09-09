@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -9,8 +10,7 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/empty_state_view.dart';
-import '../../../shared_widgets/exchange_chip.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/gtt_create_sheet.dart';
@@ -244,13 +244,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
           builder: (innerContext) {
             if (Navigator.canPop(innerContext)) {
               return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => Navigator.pop(innerContext),
                 tooltip: 'Back',
               );
             }
             return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 22),
               onPressed: () {
                 final rootScaffold =
                     innerContext.findRootAncestorStateOfType<ScaffoldState>();
@@ -285,7 +285,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _isSortNewestFirst ? Icons.arrow_downward : Icons.arrow_upward,
+                    _isSortNewestFirst ? LucideIcons.arrowDown : LucideIcons.arrowUp,
                     size: 13,
                     color: colors.primary,
                   ),
@@ -307,84 +307,50 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
           PopupMenuButton<String>(
             icon: Icon(
               _selectedDateFilter != HistoryDateFilter.all || _customDateRange != null
-                  ? Icons.event_available
-                  : Icons.event_note_outlined,
+                  ? LucideIcons.calendarCheck
+                  : LucideIcons.calendar,
               color: _selectedDateFilter != HistoryDateFilter.all ||
                       _customDateRange != null
                   ? colors.primary
                   : colors.textPrimary,
-              size: 22,
+              size: 20,
             ),
             tooltip: 'Filter by Date',
             color: colors.cardBackground,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             onSelected: (val) {
-              if (val == 'CUSTOM') {
+              if (val == 'custom') {
                 _pickCustomDateRange();
-              } else if (val == 'ALL') {
+              } else {
                 setState(() {
-                  _selectedDateFilter = HistoryDateFilter.all;
                   _customDateRange = null;
-                });
-              } else if (val == 'TODAY') {
-                setState(() {
-                  _selectedDateFilter = HistoryDateFilter.lastDay;
-                  _customDateRange = null;
-                });
-              } else if (val == 'WEEK') {
-                setState(() {
-                  _selectedDateFilter = HistoryDateFilter.lastWeek;
-                  _customDateRange = null;
-                });
-              } else if (val == 'MONTH') {
-                setState(() {
-                  _selectedDateFilter = HistoryDateFilter.lastMonth;
-                  _customDateRange = null;
+                  _selectedDateFilter = HistoryDateFilter.values
+                      .firstWhere((e) => e.name == val);
                 });
               }
             },
             itemBuilder: (ctx) => [
-              _buildDateMenuItem(
-                'ALL',
-                'All Time',
-                _selectedDateFilter == HistoryDateFilter.all &&
-                    _customDateRange == null,
-                colors,
-              ),
-              _buildDateMenuItem(
-                'TODAY',
-                'Today',
-                _selectedDateFilter == HistoryDateFilter.lastDay,
-                colors,
-              ),
-              _buildDateMenuItem(
-                'WEEK',
-                'This Week (7 Days)',
-                _selectedDateFilter == HistoryDateFilter.lastWeek,
-                colors,
-              ),
-              _buildDateMenuItem(
-                'MONTH',
-                'This Month (30 Days)',
-                _selectedDateFilter == HistoryDateFilter.lastMonth,
-                colors,
-              ),
-              const PopupMenuDivider(height: 1),
-              _buildDateMenuItem(
-                'CUSTOM',
-                _customDateRange != null
-                    ? 'Custom: ${_getDateFilterLabel()}'
-                    : 'Custom Range...',
-                _customDateRange != null,
-                colors,
-              ),
+              _buildDateMenuItem('all', 'All Dates',
+                  _selectedDateFilter == HistoryDateFilter.all && _customDateRange == null, colors),
+              _buildDateMenuItem('lastDay', 'Last Day',
+                  _selectedDateFilter == HistoryDateFilter.lastDay, colors),
+              _buildDateMenuItem('lastWeek', 'Last Week',
+                  _selectedDateFilter == HistoryDateFilter.lastWeek, colors),
+              _buildDateMenuItem('lastMonth', 'Last Month',
+                  _selectedDateFilter == HistoryDateFilter.lastMonth, colors),
+              _buildDateMenuItem('custom',
+                  _customDateRange != null
+                      ? 'Custom Range (Active)'
+                      : 'Custom Date Range...',
+                  _customDateRange != null,
+                  colors),
             ],
           ),
 
           // Reset all filters button if active
           if (_hasActiveFilters)
             IconButton(
-              icon: Icon(Icons.filter_alt_off_outlined,
+              icon: Icon(LucideIcons.filterX,
                   color: colors.bearish, size: 20),
               tooltip: 'Reset Filters',
               onPressed: _resetFilters,
@@ -425,10 +391,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
                   hintText: 'Search orders by instrument or ID...',
                   hintStyle: AppTypography.caption(color: colors.textSecondary),
                   prefixIcon:
-                      Icon(Icons.search, color: colors.textSecondary, size: 18),
+                      Icon(LucideIcons.search, color: colors.textSecondary, size: 16),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear,
+                          icon: Icon(LucideIcons.x,
                               color: colors.textSecondary, size: 16),
                           onPressed: () {
                             _searchController.clear();
@@ -653,7 +619,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         backgroundColor: colors.primary,
         foregroundColor: Colors.white,
         tooltip: 'Create GTT',
-        child: const Icon(Icons.add_alarm),
+        child: const Icon(LucideIcons.alarmClockPlus, size: 22),
       ),
     );
   }
@@ -678,7 +644,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
             ),
           ),
           if (isSelected)
-            Icon(Icons.check, size: 16, color: colors.primary),
+            Icon(LucideIcons.check, size: 16, color: colors.primary),
         ],
       ),
     );
@@ -695,7 +661,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.event, size: 12, color: colors.primary),
+          Icon(LucideIcons.calendar, size: 12, color: colors.primary),
           const SizedBox(width: 4),
           Text(
             _getDateFilterLabel(),
@@ -711,7 +677,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
               _selectedDateFilter = HistoryDateFilter.all;
               _customDateRange = null;
             }),
-            child: Icon(Icons.close, size: 12, color: colors.primary),
+            child: Icon(LucideIcons.x, size: 12, color: colors.primary),
           ),
         ],
       ),
@@ -760,7 +726,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     if (orders.isEmpty) {
       if (_hasActiveFilters) {
         return EmptyStateView(
-          icon: Icons.filter_list_off,
+          icon: LucideIcons.filterX,
           title: 'No Matching Pending Orders',
           subtitle:
               'No orders match your active search, side, status, or date filters.',
@@ -769,7 +735,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         );
       }
       return EmptyStateView(
-        icon: Icons.hourglass_empty,
+        icon: LucideIcons.hourglass,
         title: 'No Pending Orders',
         subtitle:
             'You do not have any open or trigger-pending orders at the moment.',
@@ -783,24 +749,12 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final order = orders[index];
-        final isBuy = order.request.side == TransactionType.BUY;
 
         return ListTile(
           onTap: () => context.push('/order-detail/${order.orderId}'),
           title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isBuy ? colors.bullish : colors.bearish,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  order.request.side.name,
-                  style: AppTypography.labelSmall(
-                      color: Colors.white, weight: FontWeight.bold),
-                ),
-              ),
+              TransactionSideBadge(side: order.request.side),
               const SizedBox(width: 8),
               Text(
                 order.instrument.symbol,
@@ -852,7 +806,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     if (orders.isEmpty) {
       if (_hasActiveFilters) {
         return EmptyStateView(
-          icon: Icons.filter_list_off,
+          icon: LucideIcons.filterX,
           title: 'No Matching Executed Orders',
           subtitle:
               'No orders match your active search, side, status, or date filters.',
@@ -861,7 +815,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         );
       }
       return EmptyStateView(
-        icon: Icons.receipt_long_outlined,
+        icon: LucideIcons.receipt,
         title: 'No Executed Orders',
         subtitle: 'Placed orders will appear here once executed or cancelled.',
         buttonText: 'Place an Order',
@@ -874,7 +828,6 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final order = orders[index];
-        final isBuy = order.request.side == TransactionType.BUY;
         final isComplete = order.status == OrderStatus.COMPLETE;
         final isCancelled = order.status == OrderStatus.CANCELLED ||
             order.status == OrderStatus.REJECTED ||
@@ -891,18 +844,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
           onTap: () => context.push('/order-detail/${order.orderId}'),
           title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isBuy ? colors.bullish : colors.bearish,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  order.request.side.name,
-                  style: AppTypography.labelSmall(
-                      color: Colors.white, weight: FontWeight.bold),
-                ),
-              ),
+              TransactionSideBadge(side: order.request.side),
               const SizedBox(width: 8),
               Text(
                 order.instrument.symbol,
@@ -954,7 +896,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
     if (gtts.isEmpty) {
       if (_hasActiveFilters) {
         return EmptyStateView(
-          icon: Icons.filter_list_off,
+          icon: LucideIcons.filterX,
           title: 'No Matching GTT Orders',
           subtitle:
               'No GTT orders match your search or side filter criteria.',
@@ -963,7 +905,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         );
       }
       return EmptyStateView(
-        icon: Icons.alarm_outlined,
+        icon: LucideIcons.alarmClock,
         title: 'No Active GTTs',
         subtitle:
             'Create Good-Till-Triggered orders to automate stoploss and target entries.',
@@ -977,23 +919,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final gtt = gtts[index];
-        final isBuy = gtt.request.side == TransactionType.BUY;
 
         return ListTile(
           title: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isBuy ? colors.bullish : colors.bearish,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  gtt.request.side.name,
-                  style: AppTypography.labelSmall(
-                      color: Colors.white, weight: FontWeight.bold),
-                ),
-              ),
+              TransactionSideBadge(side: gtt.request.side),
               const SizedBox(width: 8),
               Text(
                 gtt.instrument.symbol,
@@ -1007,7 +937,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
             style: AppTypography.caption(color: colors.textSecondary),
           ),
           trailing: IconButton(
-            icon: const Icon(Icons.delete_outline, size: 20),
+            icon: const Icon(LucideIcons.trash2, size: 18),
             onPressed: () =>
                 ref.read(orderSimulationEngineProvider).deleteGtt(gtt.id),
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../domain/indicator.dart';
@@ -172,7 +173,7 @@ class _IndicatorPickerSheetState extends State<IndicatorPickerSheet> {
                   style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(LucideIcons.x, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -186,7 +187,7 @@ class _IndicatorPickerSheetState extends State<IndicatorPickerSheet> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search indicators (SMA, RSI, MACD, Stoch, ATR...)',
-                prefixIcon: const Icon(Icons.search, size: 20),
+                prefixIcon: const Icon(LucideIcons.search, size: 18),
                 filled: true,
                 fillColor: colors.surface,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -232,7 +233,7 @@ class _IndicatorPickerSheetState extends State<IndicatorPickerSheet> {
                   ),
                   trailing: isEnabled
                       ? IconButton(
-                          icon: Icon(Icons.tune, size: 20, color: colors.primary),
+                          icon: Icon(LucideIcons.slidersHorizontal, size: 18, color: colors.primary),
                           onPressed: () => _showSettingsDialog(type, colors),
                           tooltip: 'Edit Parameters',
                         )

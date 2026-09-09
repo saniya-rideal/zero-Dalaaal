@@ -5,6 +5,7 @@ import '../../../core/theme/typography.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/models.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class GttCreateSheet extends ConsumerStatefulWidget {
   final Instrument? prefilledInstrument;
@@ -74,16 +75,7 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
               Text('Create GTT (Good Till Triggered)', style: AppTypography.h1(color: colors.textPrimary)),

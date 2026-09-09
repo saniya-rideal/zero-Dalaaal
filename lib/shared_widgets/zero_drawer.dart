@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../features/auth/presentation/auth_controller.dart';
@@ -108,7 +109,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                         ],
                       ),
                     ),
-                    Icon(Icons.arrow_drop_down, color: colors.textPrimary, size: 24),
+                    Icon(LucideIcons.chevronDown, color: colors.textPrimary, size: 20),
                   ],
                 ),
               ),
@@ -122,121 +123,119 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Quotes',
-                    iconBuilder: (color) => ZeroNavIcons.quotesIcon(color: color, size: 22),
+                    iconBuilder: (color) => ZeroNavIcons.quotesIcon(color: color, size: 20),
                     route: '/quotes',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Chart',
-                    iconBuilder: (color) => CustomPaint(size: const Size(22, 22), painter: _ChartLineIconPainter(color: color)),
+                    iconBuilder: (color) => Icon(LucideIcons.lineChart, color: color, size: 20),
                     route: '/chart-fullscreen/copper_mcx',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Deals',
-                    iconBuilder: (color) => ZeroNavIcons.dealsIcon(color: color, size: 22),
+                    iconBuilder: (color) => ZeroNavIcons.dealsIcon(color: color, size: 20),
                     route: '/deals',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Orders',
-                    iconBuilder: (color) => Icon(Icons.receipt_long_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.clipboardList, color: color, size: 20),
                     route: '/orders',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Net Deals',
-                    iconBuilder: (color) => ZeroNavIcons.netDealsIcon(color: color, size: 22),
+                    iconBuilder: (color) => ZeroNavIcons.netDealsIcon(color: color, size: 20),
                     route: '/net-deals',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'History',
-                    iconBuilder: (color) => ZeroNavIcons.historyIcon(color: color, size: 22),
+                    iconBuilder: (color) => ZeroNavIcons.historyIcon(color: color, size: 20),
                     route: '/history',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Holdings & Portfolio',
-                    iconBuilder: (color) => Icon(Icons.pie_chart_outline, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.pieChart, color: color, size: 20),
                     route: '/portfolio',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Option Chain',
-                    iconBuilder: (color) => Icon(Icons.link_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.gitFork, color: color, size: 20),
                     route: '/option-chain',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'IPO Central',
-                    iconBuilder: (color) => Icon(Icons.rocket_launch_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.rocket, color: color, size: 20),
                     route: '/ipo',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Baskets',
-                    iconBuilder: (color) => Icon(Icons.shopping_bag_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.shoppingBag, color: color, size: 20),
                     route: '/baskets',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'SIP Investment',
-                    iconBuilder: (color) => Icon(Icons.repeat, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.repeat, color: color, size: 20),
                     route: '/sip',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Alerts',
-                    iconBuilder: (color) => Icon(Icons.notifications_none_outlined, color: color, size: 23),
+                    iconBuilder: (color) => Icon(LucideIcons.bell, color: color, size: 20),
                     route: '/alerts',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Economic Calendar',
-                    iconBuilder: (color) => Icon(Icons.calendar_month_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.calendar, color: color, size: 20),
                     route: '/economic-calendar',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
+                    title: 'Market Heatmap',
+                    iconBuilder: (color) => Icon(LucideIcons.layoutGrid, color: color, size: 20),
+                    route: '/heatmap',
+                    colors: colors,
+                  ),
+                  _buildCustomDrawerItem(
+                    context: context,
                     title: 'Accounts',
-                    iconBuilder: (color) => Icon(Icons.people_outline, color: color, size: 23),
+                    iconBuilder: (color) => Icon(LucideIcons.users, color: color, size: 20),
                     onTap: () => _showAccountSwitchSheet(context),
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Funds & Margin',
-                    iconBuilder: (color) => Icon(Icons.account_balance_wallet_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.wallet, color: color, size: 20),
                     route: '/funds',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Deposit Fund',
-                    iconBuilder: (color) => Center(
-                      child: Text(
-                        r'$',
-                        style: GoogleFonts.inter(
-                          color: color,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
+                    iconBuilder: (color) => Icon(LucideIcons.arrowDownLeft, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
                       AddFundsSheet.show(context);
@@ -246,7 +245,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Withdraw Fund',
-                    iconBuilder: (color) => CustomPaint(size: const Size(22, 22), painter: _WithdrawIconPainter(color: color)),
+                    iconBuilder: (color) => Icon(LucideIcons.arrowUpRight, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
                       WithdrawFundsSheet.show(context);
@@ -256,63 +255,63 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'News & Insights',
-                    iconBuilder: (color) => Icon(Icons.newspaper_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.newspaper, color: color, size: 20),
                     route: '/news',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Mails',
-                    iconBuilder: (color) => Icon(Icons.mail_outline, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.mail, color: color, size: 20),
                     route: '/mails',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Profit Calculator',
-                    iconBuilder: (color) => Icon(Icons.calculate_outlined, color: color, size: 23),
+                    iconBuilder: (color) => Icon(LucideIcons.calculator, color: color, size: 20),
                     route: '/profit-calculator',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Margin Calculator',
-                    iconBuilder: (color) => Icon(Icons.calculate_outlined, color: color, size: 23),
+                    iconBuilder: (color) => Icon(LucideIcons.percent, color: color, size: 20),
                     route: '/margin-calculator',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Reports & Tax P&L',
-                    iconBuilder: (color) => Icon(Icons.assessment_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.fileSpreadsheet, color: color, size: 20),
                     route: '/reports',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Support',
-                    iconBuilder: (color) => Icon(Icons.support_agent_outlined, color: color, size: 23),
+                    iconBuilder: (color) => Icon(LucideIcons.headphones, color: color, size: 20),
                     route: '/help',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Settings',
-                    iconBuilder: (color) => Icon(Icons.settings_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.settings, color: color, size: 20),
                     route: '/settings',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'About',
-                    iconBuilder: (color) => CustomPaint(size: const Size(22, 22), painter: _AboutBubbleIconPainter(color: color)),
+                    iconBuilder: (color) => Icon(LucideIcons.info, color: color, size: 20),
                     route: '/about',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Share',
-                    iconBuilder: (color) => Icon(Icons.share_outlined, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.share2, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
                       _showShareAppSheet(context, colors);
@@ -322,7 +321,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Log out',
-                    iconBuilder: (color) => Icon(Icons.logout, color: color, size: 22),
+                    iconBuilder: (color) => Icon(LucideIcons.logOut, color: color, size: 20),
                     isLogout: true,
                     onTap: () async {
                       await ref.read(authControllerProvider.notifier).logout();
@@ -362,7 +361,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
       child: Material(
         color: isSelected
             ? colors.primary.withValues(alpha: 0.15)
-            : Colors.transparent, // Soft Pink Accent Pill
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -425,7 +424,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
             Material(
               color: Colors.transparent,
               child: ListTile(
-                leading: const Icon(Icons.check_circle, color: Color(0xFF00A854)),
+                leading: const Icon(LucideIcons.checkCircle2, color: Color(0xFF00A854), size: 22),
                 title: Text('159537: Anurag Singh (LIVE)', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
                 subtitle: Text('Balance: 0.00 USD • Margin Level: 100.00%', style: TextStyle(color: colors.textSecondary)),
                 onTap: () {
@@ -443,7 +442,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
             Material(
               color: Colors.transparent,
               child: ListTile(
-                leading: Icon(Icons.account_circle_outlined, color: colors.textSecondary),
+                leading: Icon(LucideIcons.user, color: colors.textSecondary, size: 22),
                 title: Text('248901: Demo Trading Account', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
                 subtitle: Text('Balance: 10,000.00 USD (Virtual)', style: TextStyle(color: colors.textSecondary)),
                 onTap: () {
@@ -479,12 +478,12 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
           children: [
             Row(
               children: [
-                Icon(Icons.share_outlined, color: colors.primary, size: 24),
+                Icon(LucideIcons.share2, color: colors.primary, size: 22),
                 const SizedBox(width: 12),
                 Text('Share Zero Trading', style: AppTypography.h2(weight: FontWeight.w700).copyWith(color: colors.textPrimary)),
                 const Spacer(),
                 IconButton(
-                  icon: Icon(Icons.close, color: colors.textSecondary),
+                  icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                   onPressed: () => Navigator.pop(sheetContext),
                 ),
               ],
@@ -527,7 +526,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.copy, size: 16, color: colors.primary),
+                        Icon(LucideIcons.copy, size: 16, color: colors.primary),
                         const SizedBox(width: 4),
                         Text('Copy', style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
                       ],
@@ -546,7 +545,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                icon: const Icon(Icons.send_rounded, size: 18),
+                icon: const Icon(LucideIcons.send, size: 18),
                 label: const Text('Share Link', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: () {
                   Clipboard.setData(const ClipboardData(text: 'https://zero.trade/invite/ANURAG159537'));
@@ -567,131 +566,4 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
       ),
     );
   }
-}
-
-/// Custom Chart Line with Nodes Painter matching screenshot
-class _ChartLineIconPainter extends CustomPainter {
-  final Color color;
-  const _ChartLineIconPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = size.width / 24.0;
-    canvas.save();
-    canvas.scale(scale, scale);
-
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.8
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final dotPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8;
-
-    final path = Path()
-      ..moveTo(2, 18)
-      ..lineTo(7, 14)
-      ..lineTo(13, 16)
-      ..lineTo(20, 6);
-
-    canvas.drawPath(path, paint);
-
-    // 4 Nodes
-    canvas.drawCircle(const Offset(2, 18), 1.5, dotPaint);
-    canvas.drawCircle(const Offset(7, 14), 1.5, dotPaint);
-    canvas.drawCircle(const Offset(13, 16), 1.5, dotPaint);
-    canvas.drawCircle(const Offset(20, 6), 1.5, dotPaint);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _ChartLineIconPainter oldDelegate) => oldDelegate.color != color;
-}
-
-/// Custom Withdraw Hand with Down Arrow Painter matching screenshot
-class _WithdrawIconPainter extends CustomPainter {
-  final Color color;
-  const _WithdrawIconPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = size.width / 24.0;
-    canvas.save();
-    canvas.scale(scale, scale);
-
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.8
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // Open hand palm
-    final handPath = Path()
-      ..moveTo(2, 15)
-      ..lineTo(6, 19)
-      ..lineTo(17, 19)
-      ..lineTo(21, 14);
-
-    canvas.drawPath(handPath, paint);
-
-    // Down arrow into hand
-    canvas.drawLine(const Offset(11.5, 3), const Offset(11.5, 13), paint);
-    canvas.drawLine(const Offset(7.5, 9), const Offset(11.5, 13), paint);
-    canvas.drawLine(const Offset(15.5, 9), const Offset(11.5, 13), paint);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _WithdrawIconPainter oldDelegate) => oldDelegate.color != color;
-}
-
-/// Custom Speech Bubble with 'i' Painter matching screenshot
-class _AboutBubbleIconPainter extends CustomPainter {
-  final Color color;
-  const _AboutBubbleIconPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final scale = size.width / 24.0;
-    canvas.save();
-    canvas.scale(scale, scale);
-
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1.8
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    // Chat bubble
-    final rrect = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(2, 2, 18, 15),
-      const Radius.circular(5),
-    );
-    canvas.drawRRect(rrect, paint);
-
-    // Small speech tail
-    final tailPath = Path()
-      ..moveTo(5, 17)
-      ..lineTo(3, 21)
-      ..lineTo(8, 17);
-    canvas.drawPath(tailPath, paint);
-
-    // Letter 'i' (dot + line)
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(const Offset(11, 6), 1.0, fillPaint);
-    canvas.drawLine(const Offset(11, 8.5), const Offset(11, 13), paint..strokeWidth = 1.6);
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _AboutBubbleIconPainter oldDelegate) => oldDelegate.color != color;
 }

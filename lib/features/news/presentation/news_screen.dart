@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../data/mock/news_repository.dart';
 import '../../../data/mock/seed_instruments.dart';
@@ -51,13 +52,13 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
             final canPop = Navigator.of(ctx).canPop();
             if (canPop) {
               return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => Navigator.of(ctx).pop(),
                 tooltip: 'Back',
               );
             }
             return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 22),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               tooltip: 'Menu',
             );
@@ -131,10 +132,10 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search news by headline, symbol, or source...',
                     hintStyle: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13),
-                    prefixIcon: Icon(Icons.search, size: 20, color: colors.textSecondary),
+                    prefixIcon: Icon(LucideIcons.search, size: 18, color: colors.textSecondary),
                     suffixIcon: _newsSearchController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
+                            icon: const Icon(LucideIcons.x, size: 18),
                             onPressed: () {
                               _newsSearchController.clear();
                               setState(() => _newsPage = 1);
@@ -181,7 +182,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 14, color: colors.textSecondary),
+                    Icon(LucideIcons.info, size: 14, color: colors.textSecondary),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -209,7 +210,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.search_off, size: 48, color: colors.textSecondary),
+                      Icon(LucideIcons.searchX, size: 48, color: colors.textSecondary),
                       const SizedBox(height: 12),
                       Text(
                         'No matching news articles found',
@@ -234,7 +235,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                             _newsPage = 1;
                           });
                         },
-                        icon: const Icon(Icons.refresh, size: 16),
+                        icon: const Icon(LucideIcons.rotateCcw, size: 16),
                         label: const Text('Reset Filters'),
                       ),
                     ],
@@ -273,7 +274,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.arrow_downward, size: 16),
+                      const Icon(LucideIcons.arrowDown, size: 16),
                       const SizedBox(width: 8),
                       Text(
                         'Load More Articles (${result.totalCount - result.items.length} remaining)',
@@ -449,7 +450,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.show_chart, size: 12, color: Color(0xFF1E88E5)),
+                                  const Icon(LucideIcons.lineChart, size: 12, color: Color(0xFF1E88E5)),
                                   const SizedBox(width: 3),
                                   Text(
                                     sym,
@@ -479,7 +480,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                         ),
                         const SizedBox(width: 8),
                         IconButton(
-                          icon: Icon(Icons.share_outlined, size: 18, color: colors.textSecondary),
+                          icon: Icon(LucideIcons.share2, size: 18, color: colors.textSecondary),
                           onPressed: () => _promptShareArticle(article),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
@@ -560,11 +561,11 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                         ),
                         const SizedBox(width: 12),
                         IconButton(
-                          icon: Icon(Icons.share_outlined, size: 20, color: colors.textPrimary),
+                          icon: Icon(LucideIcons.share2, size: 20, color: colors.textPrimary),
                           onPressed: () => _promptShareArticle(article),
                         ),
                         IconButton(
-                          icon: Icon(Icons.close, size: 22, color: colors.textPrimary),
+                          icon: Icon(LucideIcons.x, size: 20, color: colors.textPrimary),
                           onPressed: () => Navigator.pop(sheetContext),
                         ),
                       ],
@@ -600,7 +601,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                       ),
                       ...article.relatedSymbols.map((sym) {
                         return ActionChip(
-                          avatar: const Icon(Icons.trending_up, size: 14, color: Color(0xFF1E88E5)),
+                          avatar: const Icon(LucideIcons.trendingUp, size: 14, color: Color(0xFF1E88E5)),
                           label: Text(sym, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                           onPressed: () {
                             Navigator.pop(sheetContext);
@@ -629,7 +630,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.lightbulb_outline, color: Color(0xFF1E88E5), size: 16),
+                            const Icon(LucideIcons.lightbulb, color: Color(0xFF1E88E5), size: 16),
                             const SizedBox(width: 6),
                             Text(
                               'Key Market Takeaways',
@@ -693,7 +694,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.gavel_outlined, size: 16, color: colors.textSecondary),
+                          Icon(LucideIcons.scale, size: 16, color: colors.textSecondary),
                           const SizedBox(width: 6),
                           Text(
                             'Third-Party Sourced Content & Risk Disclaimer',
@@ -725,7 +726,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.share_outlined, size: 16),
+                        icon: const Icon(LucideIcons.share2, size: 16),
                         label: const Text('Share'),
                         onPressed: () => _promptShareArticle(article),
                         style: OutlinedButton.styleFrom(
@@ -802,7 +803,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                   width: double.infinity,
                   height: 44,
                   child: ElevatedButton.icon(
-                    icon: const Icon(Icons.copy, size: 18),
+                    icon: const Icon(LucideIcons.copy, size: 18),
                     label: const Text('Copy to Clipboard', style: TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: shareText));

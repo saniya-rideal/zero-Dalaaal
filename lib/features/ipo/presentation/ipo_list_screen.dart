@@ -5,9 +5,7 @@ import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
-import '../../../shared_widgets/section_card.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 
 class IpoListScreen extends StatefulWidget {
@@ -89,23 +87,7 @@ class _IpoListScreenState extends State<IpoListScreen>
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Text('Initial Public Offerings',
             style: GoogleFonts.inter(
@@ -129,11 +111,8 @@ class _IpoListScreenState extends State<IpoListScreen>
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Body
           Expanded(

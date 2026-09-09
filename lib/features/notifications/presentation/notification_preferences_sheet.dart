@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/models/models.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class NotificationPreferencesSheet extends ConsumerStatefulWidget {
   const NotificationPreferencesSheet({super.key});
@@ -142,17 +144,7 @@ class _NotificationPreferencesSheetState
       child: Column(
         children: [
           // Drag Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
+          const ZeroDragHandle(padding: EdgeInsets.only(top: 12, bottom: 8)),
 
           // Header
           Padding(
@@ -205,7 +197,7 @@ class _NotificationPreferencesSheetState
                 _buildToggleCard(
                   title: 'Orders & Executions',
                   subtitle: 'Order submitted, filled, partial fills, cancellations & rejections',
-                  icon: Icons.receipt_long_outlined,
+                  icon: LucideIcons.receipt,
                   value: _orders,
                   activeColor: colors.bullish,
                   onChanged: (v) => setState(() => _orders = v),
@@ -215,7 +207,7 @@ class _NotificationPreferencesSheetState
                 _buildToggleCard(
                   title: 'Funds & Banking',
                   subtitle: 'Deposit confirmations, pending transfers & withdrawal status',
-                  icon: Icons.account_balance_wallet_outlined,
+                  icon: LucideIcons.wallet,
                   value: _funds,
                   activeColor: colors.primary,
                   onChanged: (v) => setState(() => _funds = v),
@@ -225,7 +217,7 @@ class _NotificationPreferencesSheetState
                 _buildToggleCard(
                   title: 'Risk & Margin Warnings',
                   subtitle: 'High margin utilization (>80%), margin calls & RMS liquidation',
-                  icon: Icons.warning_amber_rounded,
+                  icon: LucideIcons.alertTriangle,
                   value: _riskMargin,
                   activeColor: colors.bearish,
                   onChanged: (v) => setState(() => _riskMargin = v),
@@ -235,7 +227,7 @@ class _NotificationPreferencesSheetState
                 _buildToggleCard(
                   title: 'Price Alerts & Triggers',
                   subtitle: 'Pre-set price conditions, target triggers and volume spikes',
-                  icon: Icons.notifications_active_outlined,
+                  icon: LucideIcons.bellRing,
                   value: _priceAlerts,
                   activeColor: colors.warning,
                   onChanged: (v) => setState(() => _priceAlerts = v),
@@ -245,7 +237,7 @@ class _NotificationPreferencesSheetState
                 _buildToggleCard(
                   title: 'Market News & Insights',
                   subtitle: 'Breaking headlines, macroeconomic releases & RBI policy updates',
-                  icon: Icons.newspaper_outlined,
+                  icon: LucideIcons.newspaper,
                   value: _news,
                   activeColor: colors.primary,
                   onChanged: (v) => setState(() => _news = v),
@@ -255,7 +247,7 @@ class _NotificationPreferencesSheetState
                 _buildToggleCard(
                   title: 'Security & Account Notices',
                   subtitle: 'New device sign-ins, password updates, KYC status & corporate actions',
-                  icon: Icons.shield_outlined,
+                  icon: LucideIcons.shield,
                   value: _security,
                   activeColor: Colors.purpleAccent,
                   onChanged: (v) => setState(() => _security = v),
@@ -285,7 +277,7 @@ class _NotificationPreferencesSheetState
                           Expanded(
                             child: Row(
                               children: [
-                                Icon(Icons.bedtime_outlined, color: colors.warning, size: 22),
+                                Icon(LucideIcons.moon, color: colors.warning, size: 22),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(

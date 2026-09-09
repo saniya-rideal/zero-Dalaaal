@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../data/mock/support_repository.dart';
 import '../../../data/models/models.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class CreateTicketSheet extends ConsumerStatefulWidget {
   const CreateTicketSheet({super.key});
@@ -110,17 +112,7 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
       child: Column(
         children: [
           // Drag Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
+          const ZeroDragHandle(padding: EdgeInsets.only(top: 12, bottom: 8)),
 
           // Header
           Padding(
@@ -149,7 +141,7 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: colors.textSecondary),
+                  icon: Icon(LucideIcons.x, color: colors.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -287,12 +279,12 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
                         spacing: 4,
                         children: [
                           TextButton.icon(
-                            icon: const Icon(Icons.image_outlined, size: 16),
+                            icon: const Icon(LucideIcons.image, size: 16),
                             label: Text('Add Image', style: AppTypography.caption(color: colors.primary, weight: FontWeight.w600)),
                             onPressed: () => _addSimulatedAttachment(isPdf: false),
                           ),
                           TextButton.icon(
-                            icon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                            icon: const Icon(LucideIcons.fileText, size: 16),
                             label: Text('Add PDF', style: AppTypography.caption(color: colors.primary, weight: FontWeight.w600)),
                             onPressed: () => _addSimulatedAttachment(isPdf: true),
                           ),
@@ -308,8 +300,8 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
                       children: _attachments.map((att) {
                         return Chip(
                           avatar: Icon(
-                            att.fileType == 'pdf' ? Icons.picture_as_pdf : Icons.image,
-                            size: 16,
+                            att.fileType == 'pdf' ? LucideIcons.fileText : LucideIcons.image,
+                            size: 14,
                             color: colors.primary,
                           ),
                           label: Text(
@@ -317,7 +309,7 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
                             style: AppTypography.labelSmall(color: colors.textPrimary),
                           ),
                           backgroundColor: colors.surface,
-                          deleteIcon: const Icon(Icons.close, size: 16),
+                          deleteIcon: const Icon(LucideIcons.x, size: 14),
                           onDeleted: () {
                             setState(() => _attachments.remove(att));
                           },

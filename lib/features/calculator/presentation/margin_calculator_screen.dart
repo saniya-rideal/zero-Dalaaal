@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/instrument.dart';
@@ -49,13 +50,13 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
             final canPop = Navigator.of(ctx).canPop();
             if (canPop) {
               return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => Navigator.of(ctx).pop(),
                 tooltip: 'Back',
               );
             }
             return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 24),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               tooltip: 'Menu',
             );
@@ -111,8 +112,8 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                                 color: colors.textPrimary,
                               ),
                             ),
-                            Icon(Icons.arrow_drop_down,
-                                size: 22, color: colors.textPrimary),
+                            Icon(LucideIcons.chevronDown,
+                                size: 18, color: colors.textPrimary),
                           ],
                         ),
                       ),
@@ -146,8 +147,8 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                                 color: colors.textPrimary,
                               ),
                             ),
-                            Icon(Icons.arrow_drop_down,
-                                size: 22, color: colors.textPrimary),
+                            Icon(LucideIcons.chevronDown,
+                                size: 18, color: colors.textPrimary),
                           ],
                         ),
                       ),
@@ -178,8 +179,8 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                               color: Color(0xFFE82B57),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.remove,
-                                size: 16, color: Colors.white),
+                            child: const Icon(LucideIcons.minus,
+                                size: 14, color: Colors.white),
                           ),
                         ),
 
@@ -209,8 +210,8 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                               color: Color(0xFF1E88E5),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.add,
-                                size: 16, color: Colors.white),
+                            child: const Icon(LucideIcons.plus,
+                                size: 14, color: Colors.white),
                           ),
                         ),
                       ],
@@ -314,8 +315,8 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                   );
                 },
                 child: const Icon(
-                  Icons.info_outline,
-                  size: 18,
+                  LucideIcons.info,
+                  size: 16,
                   color: Color(0xFF1E88E5),
                 ),
               ),
@@ -397,7 +398,7 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                     subtitle: Text('${inst.exchange.name} • ${inst.type.name}',
                         style: GoogleFonts.inter(color: colors.textSecondary)),
                     trailing: isSelected
-                        ? const Icon(Icons.check, color: Color(0xFF1E88E5))
+                        ? const Icon(LucideIcons.check, color: Color(0xFF1E88E5), size: 18)
                         : null,
                     onTap: () {
                       Navigator.pop(ctx);
@@ -440,7 +441,7 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                   style: GoogleFonts.inter(
                       fontSize: 15, fontWeight: FontWeight.w700, color: colors.textPrimary)),
               trailing: _side == 'Buy'
-                  ? const Icon(Icons.check, color: Color(0xFF1E88E5))
+                  ? const Icon(LucideIcons.check, color: Color(0xFF1E88E5), size: 18)
                   : null,
               onTap: () {
                 setState(() => _side = 'Buy');
@@ -453,7 +454,7 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
                   style: GoogleFonts.inter(
                       fontSize: 15, fontWeight: FontWeight.w700, color: colors.textPrimary)),
               trailing: _side == 'Sell'
-                  ? const Icon(Icons.check, color: Color(0xFF1E88E5))
+                  ? const Icon(LucideIcons.check, color: Color(0xFF1E88E5), size: 18)
                   : null,
               onTap: () {
                 setState(() => _side = 'Sell');

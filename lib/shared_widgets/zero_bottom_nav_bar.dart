@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import 'zero_nav_icons.dart';
 
@@ -128,9 +129,9 @@ class ZeroBottomNavBar extends StatelessWidget {
                     turns: isExpanded ? 0.0 : 0.5,
                     duration: const Duration(milliseconds: 250),
                     child: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
+                      LucideIcons.chevronDown,
                       color: Colors.white,
-                      size: 24,
+                      size: 22,
                     ),
                   ),
                 ),

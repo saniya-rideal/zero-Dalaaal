@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/exchange_chip.dart';
-import '../../../shared_widgets/section_card.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class OrderDetailScreen extends ConsumerWidget {
   final String orderId;
@@ -32,7 +32,7 @@ class OrderDetailScreen extends ConsumerWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.receipt_long_outlined, size: 64, color: colors.textSecondary.withValues(alpha: 0.5)),
+                Icon(LucideIcons.receipt, size: 56, color: colors.textSecondary.withValues(alpha: 0.5)),
                 const SizedBox(height: 16),
                 Text(
                   'Order Not Found',
@@ -53,7 +53,7 @@ class OrderDetailScreen extends ConsumerWidget {
                       context.go('/orders');
                     }
                   },
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(LucideIcons.arrowLeft, size: 18),
                   label: const Text('Return to Order Book'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.primary,
@@ -68,7 +68,6 @@ class OrderDetailScreen extends ConsumerWidget {
       );
     }
 
-    final isBuy = order.request.side == TransactionType.BUY;
     final statusColor = switch (order.status) {
       OrderStatus.COMPLETE                  => colors.bullish,
       OrderStatus.CANCELLED                 => colors.bearish,
@@ -101,16 +100,11 @@ class OrderDetailScreen extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          Container(
+                          TransactionSideBadge(
+                            side: order.request.side,
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isBuy ? colors.bullish : colors.bearish,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              order.request.side.name,
-                              style: AppTypography.caption(color: Colors.white, weight: FontWeight.w700),
-                            ),
+                            fontSize: 11,
+                            borderRadius: 4,
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -254,7 +248,7 @@ class OrderDetailScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
                 child: OutlinedButton.icon(
-                  icon: const Icon(Icons.cancel_outlined, size: 18),
+                  icon: const Icon(LucideIcons.xCircle, size: 18),
                   label: const Text('CANCEL ORDER', style: TextStyle(fontWeight: FontWeight.bold)),
                   onPressed: () async {
                     final confirmed = await showDialog<bool>(

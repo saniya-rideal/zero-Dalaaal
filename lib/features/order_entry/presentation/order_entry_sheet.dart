@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/constants/charges_config.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/edge_case_service.dart';
@@ -181,8 +182,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Icon(Icons.arrow_drop_down,
-                              size: 22, color: colors.textPrimary),
+                          Icon(LucideIcons.chevronDown,
+                              size: 20, color: colors.textPrimary),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -199,9 +200,16 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                 color: const Color(0xFFC62828),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
-                                '🚫 SUSPENDED',
-                                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(LucideIcons.ban, size: 10, color: Colors.white),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'SUSPENDED',
+                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                                  ),
+                                ],
                               ),
                             ),
                           if (_currentInstrument.surveillanceTag != null)
@@ -211,9 +219,16 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                 color: const Color(0xFFF57C00),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: Text(
-                                '⚠️ ${_currentInstrument.surveillanceTag}',
-                                style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(LucideIcons.alertTriangle, size: 10, color: Colors.white),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${_currentInstrument.surveillanceTag}',
+                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                                  ),
+                                ],
                               ),
                             ),
                           Container(
@@ -223,9 +238,16 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(color: colors.divider),
                             ),
-                            child: Text(
-                              '⚡ ${leverage.toStringAsFixed(0)}x Leverage',
-                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(LucideIcons.zap, size: 10, color: Color(0xFF1E88E5)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${leverage.toStringAsFixed(0)}x Leverage',
+                                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
+                                ),
+                              ],
                             ),
                           ),
                           Container(
@@ -265,7 +287,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.school_outlined, size: 12, color: Color(0xFF1E88E5)),
+                                  const Icon(LucideIcons.graduationCap, size: 12, color: Color(0xFF1E88E5)),
                                   const SizedBox(width: 3),
                                   Text(
                                     'Risk Guide',
@@ -342,7 +364,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     const SizedBox(width: 8),
                     Tooltip(
                       message: 'DAY: Order stays open till end of trading day.\nIOC: Order must fill immediately or is cancelled.',
-                      child: Icon(Icons.info_outline, size: 14, color: colors.textSecondary),
+                      child: Icon(LucideIcons.info, size: 14, color: colors.textSecondary),
                     ),
                   ],
                 ),
@@ -447,7 +469,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.notifications_active_outlined,
+                          Icon(LucideIcons.bellRing,
                               size: 15, color: colors.warning),
                           const SizedBox(width: 4),
                           Text(
@@ -493,7 +515,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                   color: Color(0xFFE82B57),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.remove, size: 16, color: Colors.white),
+                                child: const Icon(LucideIcons.minus, size: 14, color: Colors.white),
                               ),
                             ),
                             Text(
@@ -516,7 +538,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                   color: Color(0xFF1E88E5),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.add, size: 16, color: Colors.white),
+                                child: const Icon(LucideIcons.plus, size: 14, color: Colors.white),
                               ),
                             ),
                           ],
@@ -568,7 +590,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                   color: Color(0xFFE82B57),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.remove, size: 16, color: Colors.white),
+                                child: const Icon(LucideIcons.minus, size: 14, color: Colors.white),
                               ),
                             ),
                             Text(
@@ -591,7 +613,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                   color: Color(0xFF1E88E5),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.add, size: 16, color: Colors.white),
+                                child: const Icon(LucideIcons.plus, size: 14, color: Colors.white),
                               ),
                             ),
                           ],
@@ -628,7 +650,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.info_outline,
+                            const Icon(LucideIcons.info,
                                 size: 16, color: Color(0xFF2D88C8)),
                           ],
                         ),
@@ -675,8 +697,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                 color: Color(0xFFE82B57),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.remove,
-                                  size: 16, color: Colors.white),
+                              child: const Icon(LucideIcons.minus,
+                                  size: 14, color: Colors.white),
                             ),
                           ),
 
@@ -702,8 +724,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                 color: Color(0xFF1E88E5),
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(Icons.add,
-                                  size: 16, color: Colors.white),
+                              child: const Icon(LucideIcons.plus,
+                                  size: 14, color: Colors.white),
                             ),
                           ),
                         ],
@@ -749,7 +771,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                               ),
                             ),
                             const SizedBox(width: 4),
-                            const Icon(Icons.info_outline,
+                            const Icon(LucideIcons.info,
                                 size: 16, color: Color(0xFF2D88C8)),
                           ],
                         ),
@@ -811,8 +833,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                           color: Color(0xFFE82B57),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.remove,
-                                            size: 16, color: Colors.white),
+                                        child: const Icon(LucideIcons.minus,
+                                            size: 14, color: Colors.white),
                                       ),
                                     ),
                                     Text(
@@ -836,8 +858,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                           color: Color(0xFF1E88E5),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.add,
-                                            size: 16, color: Colors.white),
+                                        child: const Icon(LucideIcons.plus,
+                                            size: 14, color: Colors.white),
                                       ),
                                     ),
                                   ],
@@ -887,8 +909,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                           color: Color(0xFFE82B57),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.remove,
-                                            size: 16, color: Colors.white),
+                                        child: const Icon(LucideIcons.minus,
+                                            size: 14, color: Colors.white),
                                       ),
                                     ),
                                     Text(
@@ -912,8 +934,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                           color: Color(0xFF1E88E5),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.add,
-                                            size: 16, color: Colors.white),
+                                        child: const Icon(LucideIcons.plus,
+                                            size: 14, color: Colors.white),
                                       ),
                                     ),
                                   ],
@@ -941,7 +963,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                             if (targetProfit != null)
                               Row(
                                 children: [
-                                  const Icon(Icons.trending_up, size: 14, color: Color(0xFF00A854)),
+                                  const Icon(LucideIcons.trendingUp, size: 14, color: Color(0xFF00A854)),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Est. Profit: +${CurrencyFormatter.format(targetProfit)}',
@@ -956,7 +978,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                             if (maxRisk != null)
                               Row(
                                 children: [
-                                  const Icon(Icons.trending_down, size: 14, color: Color(0xFFE82B57)),
+                                  const Icon(LucideIcons.trendingDown, size: 14, color: Color(0xFFE82B57)),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Max Risk: -${CurrencyFormatter.format(maxRisk)}',
@@ -1057,7 +1079,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.warning_amber_rounded, color: Color(0xFFE82B57), size: 20),
+                        const Icon(LucideIcons.alertTriangle, color: Color(0xFFE82B57), size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -1111,7 +1133,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, color: Color(0xFFF57C00), size: 18),
+                        const Icon(LucideIcons.info, color: Color(0xFFF57C00), size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -1430,9 +1452,18 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFC62828)),
                   ),
-                  child: Text(
-                    '⛔ SUSPENDED: Trading in ${_currentInstrument.symbol} is suspended (${_currentInstrument.suspensionReason ?? "Regulatory action"}). Order will be rejected.',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFC62828)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(LucideIcons.ban, size: 14, color: Color(0xFFC62828)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'SUSPENDED: Trading in ${_currentInstrument.symbol} is suspended (${_currentInstrument.suspensionReason ?? "Regulatory action"}). Order will be rejected.',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFC62828)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ] else if (_currentInstrument.surveillanceTag != null) ...[
@@ -1444,9 +1475,18 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: const Color(0xFFF57C00)),
                   ),
-                  child: Text(
-                    '⚠️ SURVEILLANCE MEASURE: ${_currentInstrument.symbol} is under ${_currentInstrument.surveillanceTag}. 100% margin required; intraday leverage restricted.',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF57C00)),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(LucideIcons.alertTriangle, size: 14, color: Color(0xFFF57C00)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'SURVEILLANCE MEASURE: ${_currentInstrument.symbol} is under ${_currentInstrument.surveillanceTag}. 100% margin required; intraday leverage restricted.',
+                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF57C00)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1462,7 +1502,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFE82B57)),
+                      const Icon(LucideIcons.alertTriangle, size: 16, color: Color(0xFFE82B57)),
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
@@ -1643,7 +1683,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.cancel_outlined, color: Colors.white, size: 20),
+                const Icon(LucideIcons.xCircle, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1735,7 +1775,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                         style: TextStyle(color: colors.textSecondary),
                       ),
                       trailing: isSelected
-                          ? const Icon(Icons.check, color: Color(0xFFE82B57))
+                          ? const Icon(LucideIcons.check, color: Color(0xFFE82B57), size: 20)
                           : null,
                       onTap: () {
                         Navigator.pop(context);

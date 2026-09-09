@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/funds.dart';
 import 'payment_gateway_dialog.dart';
 import 'transaction_receipt_dialog.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class AddFundsSheet extends ConsumerStatefulWidget {
   const AddFundsSheet({super.key});
@@ -153,16 +155,7 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
               // Title & Currency Badge
@@ -250,19 +243,19 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
                 PaymentMethod.UPI,
                 'UPI Instant (Google Pay, PhonePe, UPI ID)',
                 'Instant credit • Max ₹2 Lakh per txn • Zero Charges',
-                Icons.account_balance_wallet_outlined,
+                LucideIcons.wallet,
               ),
               _buildPaymentOption(
                 PaymentMethod.NET_BANKING,
                 'Net Banking (40+ Supported Banks)',
                 'Instant credit • Max ₹10 Lakh per txn • Zero Charges',
-                Icons.account_balance_outlined,
+                LucideIcons.landmark,
               ),
               _buildPaymentOption(
                 PaymentMethod.CARD,
                 'Payment Gateway / Debit Card',
                 'Instant transfer via Visa / Mastercard / RuPay',
-                Icons.credit_card_outlined,
+                LucideIcons.creditCard,
               ),
 
               const SizedBox(height: 16),
@@ -344,7 +337,7 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.lock_outline_rounded, size: 18, color: colors.bullish),
+                    Icon(LucideIcons.lock, size: 16, color: colors.bullish),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

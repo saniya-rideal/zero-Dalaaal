@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../data/mock/support_repository.dart';
 import '../../../data/models/models.dart';
 
@@ -116,7 +117,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
           backgroundColor: colors.background,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+            icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary),
             onPressed: () {
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
@@ -157,7 +158,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
         actions: [
           if (ticket.status != TicketStatus.resolved && ticket.status != TicketStatus.closed)
             TextButton.icon(
-              icon: Icon(Icons.check_circle_outline, color: colors.bullish, size: 18),
+              icon: Icon(LucideIcons.checkCircle2, color: colors.bullish, size: 18),
               label: Text('Resolve', style: AppTypography.caption(color: colors.bullish, weight: FontWeight.w700)),
               onPressed: () {
                 repo.updateTicketStatus(ticket.id, TicketStatus.resolved);
@@ -168,7 +169,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
             )
           else
             TextButton.icon(
-              icon: Icon(Icons.replay_rounded, color: colors.primary, size: 18),
+              icon: Icon(LucideIcons.rotateCcw, color: colors.primary, size: 18),
               label: Text('Reopen', style: AppTypography.caption(color: colors.primary, weight: FontWeight.w700)),
               onPressed: () {
                 repo.updateTicketStatus(ticket.id, TicketStatus.open);
@@ -281,10 +282,10 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
                       spacing: 8,
                       children: _pendingAttachments.map((att) {
                         return Chip(
-                          avatar: Icon(att.fileType == 'pdf' ? Icons.picture_as_pdf : Icons.image, size: 14, color: colors.primary),
+                          avatar: Icon(att.fileType == 'pdf' ? LucideIcons.fileText : LucideIcons.image, size: 14, color: colors.primary),
                           label: Text(att.fileName, style: AppTypography.labelSmall(color: colors.textPrimary)),
                           backgroundColor: colors.cardBackground,
-                          deleteIcon: const Icon(Icons.close, size: 14),
+                          deleteIcon: const Icon(LucideIcons.x, size: 14),
                           onDeleted: () => setState(() => _pendingAttachments.remove(att)),
                         );
                       }).toList(),
@@ -310,7 +311,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
               children: [
                 // Add attachment menu
                 PopupMenuButton<String>(
-                  icon: Icon(Icons.attach_file, color: colors.textSecondary),
+                  icon: Icon(LucideIcons.paperclip, color: colors.textSecondary),
                   tooltip: 'Attach proof or screenshot',
                   onSelected: (val) {
                     if (val == 'image') _addSimulatedAttachment(isPdf: false);
@@ -344,7 +345,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
                   backgroundColor: colors.primary,
                   radius: 20,
                   child: IconButton(
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                    icon: const Icon(LucideIcons.send, color: Colors.white, size: 18),
                     onPressed: _sendReply,
                   ),
                 ),
@@ -401,7 +402,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
               runSpacing: 2,
               children: [
                 if (!isClient) ...[
-                  Icon(Icons.support_agent, size: 16, color: colors.primary),
+                  Icon(LucideIcons.headset, size: 16, color: colors.primary),
                   const SizedBox(width: 4),
                 ],
                 Text(
@@ -436,7 +437,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(att.fileType == 'pdf' ? Icons.picture_as_pdf : Icons.image, size: 16, color: colors.primary),
+                      Icon(att.fileType == 'pdf' ? LucideIcons.fileText : LucideIcons.image, size: 16, color: colors.primary),
                       const SizedBox(width: 6),
                       Text(
                         '${att.fileName} (${att.formattedSize})',

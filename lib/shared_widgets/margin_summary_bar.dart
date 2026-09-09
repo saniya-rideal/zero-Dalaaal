@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../core/utils/currency_formatter.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class MarginSummaryBar extends StatelessWidget {
   final double requiredMargin;
@@ -94,7 +95,7 @@ class MarginSummaryBar extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Icon(
-                        Icons.info_outline,
+                        LucideIcons.info,
                         size: 12,
                         color: colors.primary,
                       ),

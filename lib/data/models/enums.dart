@@ -2,7 +2,13 @@ enum Exchange { NSE, BSE, NFO, MCX, CDS }
 
 enum InstrumentType { EQ, FUT, CE, PE, INDEX }
 
-enum TransactionType { BUY, SELL }
+enum TransactionType {
+  BUY,
+  SELL;
+
+  bool get isBuy => this == TransactionType.BUY;
+  bool get isSell => this == TransactionType.SELL;
+}
 
 enum ProductType { CNC, MIS, NRML }
 

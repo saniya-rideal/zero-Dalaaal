@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/mock/seed_instruments.dart';
@@ -115,7 +116,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+          icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
           onPressed: () {
             if (_openedFolder != null) {
               setState(() => _openedFolder = null);
@@ -149,10 +150,10 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search by Script Name',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
-                  prefixIcon: Icon(Icons.search, color: colors.textSecondary.withValues(alpha: 0.7), size: 20),
+                  prefixIcon: Icon(LucideIcons.search, color: colors.textSecondary.withValues(alpha: 0.7), size: 18),
                   suffixIcon: _query.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 18),
+                          icon: const Icon(LucideIcons.x, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _query = '');
@@ -198,9 +199,9 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
               children: [
                 // Yellow / Golden Folder Icon
                 const Icon(
-                  Icons.folder,
+                  LucideIcons.folder,
                   color: Color(0xFFF5A623), // Golden Yellow folder
-                  size: 26,
+                  size: 24,
                 ),
                 const SizedBox(width: 14),
                 Text(
@@ -242,9 +243,9 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
           subtitle: Text(script.name, style: AppTypography.caption(color: colors.textSecondary)),
           trailing: IconButton(
             icon: Icon(
-              isSelected ? Icons.check_circle : Icons.add_circle_outline,
+              isSelected ? LucideIcons.checkCircle2 : LucideIcons.plusCircle,
               color: isSelected ? colors.primary : colors.secondary,
-              size: 24,
+              size: 22,
             ),
             onPressed: () => _toggleScript(script.token),
           ),
@@ -286,9 +287,9 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
           subtitle: Text('${script.name} • ${script.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
           trailing: IconButton(
             icon: Icon(
-              isSelected ? Icons.check_circle : Icons.add_circle_outline,
+              isSelected ? LucideIcons.checkCircle2 : LucideIcons.plusCircle,
               color: isSelected ? colors.primary : colors.secondary,
-              size: 24,
+              size: 22,
             ),
             onPressed: () => _toggleScript(script.token),
           ),

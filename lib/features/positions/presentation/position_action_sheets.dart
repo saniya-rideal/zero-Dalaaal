@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -170,7 +171,7 @@ class PositionActionSheets {
 
               // Action 1: Modify SL / TP
               ListTile(
-                leading: Icon(Icons.shield_outlined, color: colors.primary),
+                leading: Icon(LucideIcons.shield, color: colors.primary, size: 20),
                 title: Text('Modify Stop-Loss / Take-Profit',
                     style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600, color: colors.textPrimary)),
@@ -186,7 +187,7 @@ class PositionActionSheets {
               // Action 2: Partial Close / Scale Out
               ListTile(
                 leading:
-                    const Icon(Icons.call_split_outlined, color: Color(0xFFF57C00)),
+                    const Icon(LucideIcons.gitFork, color: Color(0xFFF57C00), size: 20),
                 title: Text('Partial Close / Scale Out',
                     style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600, color: colors.textPrimary)),
@@ -201,7 +202,7 @@ class PositionActionSheets {
 
               // Action 3: Full Square Off / Exit Position
               ListTile(
-                leading: Icon(Icons.close_fullscreen, color: colors.bearish),
+                leading: Icon(LucideIcons.minimize2, color: colors.bearish, size: 20),
                 title: Text('Full Close Position (Square Off)',
                     style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600, color: colors.bearish)),
@@ -213,33 +214,42 @@ class PositionActionSheets {
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Confirm Square Off'),
+                      title: const Text('Square Off Position?'),
                       content: Text(
-                        'Square off full position of ${pos.netQty.abs()} lots of ${pos.instrument.symbol} at market price?',
-                      ),
+                          'Are you sure you want to exit ${pos.netQty.abs()} lots of ${pos.instrument.symbol} at current market LTP (₹${pos.ltp.toStringAsFixed(2)})?'),
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
-                        ),
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel')),
                         ElevatedButton(
                           onPressed: () => Navigator.pop(ctx, true),
                           style: ElevatedButton.styleFrom(
-                              backgroundColor: colors.bearish),
-                          child: const Text('Confirm Square Off',
-                              style: TextStyle(color: Colors.white)),
+                              backgroundColor: colors.bearish,
+                              foregroundColor: Colors.white),
+                          child: const Text('Confirm Exit'),
                         ),
                       ],
                     ),
                   );
 
                   if (confirmed == true && context.mounted) {
-                    await engine.closePosition(pos.id);
+                    final exitSide =
+                        pos.isLong ? TransactionType.SELL : TransactionType.BUY;
+                    engine.placeOrder(
+                      OrderRequest(
+                        instrumentToken: pos.instrument.token,
+                        side: exitSide,
+                        product: pos.product,
+                        kind: OrderKind.MARKET,
+                        quantity: pos.netQty.abs(),
+                        price: pos.ltp,
+                      ),
+                    );
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                            'Position for ${pos.instrument.symbol} squared off successfully'),
-                        backgroundColor: colors.primary,
+                            'Executed Square Off for ${pos.instrument.symbol}'),
+                        backgroundColor: colors.bearish,
                       ),
                     );
                     onRefresh?.call();
@@ -249,8 +259,8 @@ class PositionActionSheets {
 
               // Action 4: Open Fullscreen Chart
               ListTile(
-                leading: const Icon(Icons.candlestick_chart,
-                    color: Color(0xFF1E88E5)),
+                leading: const Icon(LucideIcons.candlestickChart,
+                    color: Color(0xFF1E88E5), size: 20),
                 title: Text('Open Fullscreen Chart',
                     style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600, color: colors.textPrimary)),
@@ -262,7 +272,7 @@ class PositionActionSheets {
 
               // Action 5: View Script Specifications
               ListTile(
-                leading: Icon(Icons.info_outline, color: colors.textSecondary),
+                leading: Icon(LucideIcons.info, color: colors.textSecondary, size: 20),
                 title: Text('View Script Specifications',
                     style: GoogleFonts.inter(
                         fontWeight: FontWeight.w600, color: colors.textPrimary)),
@@ -341,7 +351,7 @@ class PositionActionSheets {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: colors.textSecondary),
+                      icon: Icon(LucideIcons.x, color: colors.textSecondary),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -372,10 +382,10 @@ class PositionActionSheets {
                     hintStyle:
                         AppTypography.caption(color: colors.textSecondary),
                     prefixIcon:
-                        Icon(Icons.shield, color: colors.bearish, size: 18),
+                        Icon(LucideIcons.shieldAlert, color: colors.bearish, size: 18),
                     suffixIcon: slController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
+                            icon: const Icon(LucideIcons.x, size: 16),
                             onPressed: () {
                               slController.clear();
                               setStateModal(() {});
@@ -421,10 +431,10 @@ class PositionActionSheets {
                     hintStyle:
                         AppTypography.caption(color: colors.textSecondary),
                     prefixIcon:
-                        Icon(Icons.flag, color: colors.bullish, size: 18),
+                        Icon(LucideIcons.flag, color: colors.bullish, size: 18),
                     suffixIcon: tpController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
+                            icon: const Icon(LucideIcons.x, size: 16),
                             onPressed: () {
                               tpController.clear();
                               setStateModal(() {});
@@ -559,7 +569,7 @@ class PositionActionSheets {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: colors.textSecondary),
+                      icon: Icon(LucideIcons.x, color: colors.textSecondary),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -643,7 +653,7 @@ class PositionActionSheets {
                       Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.remove_circle_outline),
+                            icon: const Icon(LucideIcons.minusCircle, size: 22),
                             color: colors.primary,
                             onPressed: closeQty > 1
                                 ? () => setStateModal(() => closeQty--)
@@ -658,7 +668,7 @@ class PositionActionSheets {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
+                            icon: const Icon(LucideIcons.plusCircle, size: 22),
                             color: colors.primary,
                             onPressed: closeQty < totalQty
                                 ? () => setStateModal(() => closeQty++)

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 
 class MailItem {
@@ -172,23 +172,7 @@ class _MailsScreenState extends State<MailsScreen> {
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Text('Mails',
             style: GoogleFonts.inter(
@@ -198,11 +182,8 @@ class _MailsScreenState extends State<MailsScreen> {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Search Bar
           Padding(
@@ -224,10 +205,10 @@ class _MailsScreenState extends State<MailsScreen> {
                   hintText: 'Search by Sender or Subject',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
                   prefixIcon:
-                      Icon(Icons.search, color: colors.textSecondary, size: 20),
+                      Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear,
+                          icon: Icon(LucideIcons.x,
                               color: colors.textSecondary, size: 18),
                           onPressed: () {
                             _searchController.clear();
@@ -250,7 +231,7 @@ class _MailsScreenState extends State<MailsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.mark_email_read_outlined,
+                        Icon(LucideIcons.mailCheck,
                             size: 42,
                             color: colors.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 8),
@@ -282,12 +263,12 @@ class _MailsScreenState extends State<MailsScreen> {
                                 : colors.primary.withValues(alpha: 0.15),
                             child: Icon(
                               item.isRead
-                                  ? Icons.mail_outline
-                                  : Icons.mark_email_unread,
+                                  ? LucideIcons.mailOpen
+                                  : LucideIcons.mail,
                               color: item.isRead
                                   ? colors.textSecondary
                                   : colors.primary,
-                              size: 20,
+                              size: 18,
                             ),
                           ),
                           title: Row(
@@ -326,8 +307,8 @@ class _MailsScreenState extends State<MailsScreen> {
                                     : FontWeight.w600,
                                 fontSize: 13),
                           ),
-                          trailing: Icon(Icons.chevron_right,
-                              color: colors.textSecondary, size: 20),
+                          trailing: Icon(LucideIcons.chevronRight,
+                              color: colors.textSecondary, size: 18),
                         ),
                       );
                     },

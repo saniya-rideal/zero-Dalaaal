@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/empty_state_view.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
-import '../../../shared_widgets/section_card.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 
 class SipScreen extends StatefulWidget {
@@ -52,23 +50,7 @@ class _SipScreenState extends State<SipScreen> {
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Text('Stock SIPs',
             style: GoogleFonts.inter(
@@ -77,7 +59,7 @@ class _SipScreenState extends State<SipScreen> {
                 fontSize: 18)),
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: colors.primary, size: 26),
+            icon: Icon(LucideIcons.plus, color: colors.primary, size: 22),
             onPressed: _showCreateSipDialog,
             tooltip: 'Create SIP',
           ),
@@ -86,17 +68,14 @@ class _SipScreenState extends State<SipScreen> {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Body
           Expanded(
             child: _sips.isEmpty
                 ? EmptyStateView(
-                    icon: Icons.calendar_today_outlined,
+                    icon: LucideIcons.calendar,
                     title: 'No Active SIPs',
                     subtitle:
                         'Automate recurring investments in high quality stocks with Systematic Investment Plans.',
@@ -204,8 +183,8 @@ class _SipScreenState extends State<SipScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 IconButton(
-                                  icon: Icon(Icons.delete_outline,
-                                      color: colors.bearish, size: 20),
+                                  icon: Icon(LucideIcons.trash2,
+                                      color: colors.bearish, size: 18),
                                   onPressed: () {
                                     setState(() => _sips.removeAt(index));
                                     ScaffoldMessenger.of(context).showSnackBar(

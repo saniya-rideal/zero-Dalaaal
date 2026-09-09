@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../auth/presentation/auth_controller.dart';
 
@@ -98,7 +99,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -135,7 +136,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
                         ),
                         // Status Switcher (For testing states)
                         PopupMenuButton<String>(
-                          icon: Icon(Icons.tune, size: 18, color: _getStatusTextColor(colors)),
+                          icon: Icon(LucideIcons.slidersHorizontal, size: 18, color: _getStatusTextColor(colors)),
                           onSelected: (val) => setState(() => _kycStatus = val),
                           itemBuilder: (_) => ['VERIFIED', 'PENDING', 'REJECTED'].map((s) {
                             return PopupMenuItem(value: s, child: Text(s));
@@ -217,7 +218,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
                           color: colors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Icon(Icons.description, color: colors.primary, size: 24),
+                        child: Icon(LucideIcons.fileText, color: colors.primary, size: 22),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -238,7 +239,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
                         ),
                       ),
                       TextButton.icon(
-                        icon: const Icon(Icons.refresh, size: 16),
+                        icon: const Icon(LucideIcons.rotateCw, size: 16),
                         label: const Text('Replace', style: TextStyle(fontSize: 12)),
                         onPressed: _simulateUpload,
                       ),
@@ -266,7 +267,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
                 ),
               ] else ...[
                 OutlinedButton.icon(
-                  icon: const Icon(Icons.cloud_upload_outlined),
+                  icon: const Icon(LucideIcons.uploadCloud),
                   label: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text('Upload $_selectedDocType (JPG, PNG, PDF < 5MB)'),
@@ -332,7 +333,7 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
             children: [
               Text(value, style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w700, color: colors.textPrimary)),
               const SizedBox(width: 6),
-              const Icon(Icons.check_circle, size: 14, color: Color(0xFF00A854)),
+              const Icon(LucideIcons.checkCircle2, size: 14, color: Color(0xFF00A854)),
             ],
           ),
         ],
@@ -382,13 +383,13 @@ class _KycManagementSheetState extends ConsumerState<KycManagementSheet> {
   IconData _getStatusIcon() {
     switch (_kycStatus) {
       case 'VERIFIED':
-        return Icons.verified_user;
+        return LucideIcons.shieldCheck;
       case 'PENDING':
-        return Icons.pending_actions;
+        return LucideIcons.clock;
       case 'REJECTED':
-        return Icons.error_outline;
+        return LucideIcons.alertCircle;
       default:
-        return Icons.help_outline;
+        return LucideIcons.helpCircle;
     }
   }
 

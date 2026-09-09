@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 
@@ -65,7 +66,7 @@ class _LeverageEducationDialogState extends State<LeverageEducationDialog> {
                           color: colors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(Icons.tune_rounded, color: colors.primary, size: 22),
+                        child: Icon(LucideIcons.sliders, color: colors.primary, size: 20),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -98,7 +99,7 @@ class _LeverageEducationDialogState extends State<LeverageEducationDialog> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close_rounded, color: colors.textSecondary, size: 20),
+                  icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -124,7 +125,7 @@ class _LeverageEducationDialogState extends State<LeverageEducationDialog> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.lightbulb_outline_rounded, color: Colors.amber, size: 18),
+                              const Icon(LucideIcons.lightbulb, color: Colors.amber, size: 18),
                               const SizedBox(width: 6),
                               Text(
                                 'What is Leverage?',
@@ -294,7 +295,7 @@ class _LeverageEducationDialogState extends State<LeverageEducationDialog> {
                     ),
                     const SizedBox(height: 8),
                     _buildGuardrailItem(
-                      icon: Icons.warning_amber_rounded,
+                      icon: LucideIcons.alertTriangle,
                       color: Colors.amber,
                       title: 'Margin Call (90% Utilization)',
                       description: 'Triggered when used margin reaches 90% of total funds. Placing new leveraged positions is prohibited until funds are deposited or open positions are squared off.',
@@ -302,7 +303,7 @@ class _LeverageEducationDialogState extends State<LeverageEducationDialog> {
                     ),
                     const SizedBox(height: 8),
                     _buildGuardrailItem(
-                      icon: Icons.dangerous_outlined,
+                      icon: LucideIcons.alertOctagon,
                       color: colors.bearish,
                       title: 'RMS Forced Liquidation (100% / Margin Deficit)',
                       description: 'Triggered when equity falls below required margin. Risk Management Systems (RMS) automatically square off open positions to prevent negative balance debt.',
@@ -310,7 +311,7 @@ class _LeverageEducationDialogState extends State<LeverageEducationDialog> {
                     ),
                     const SizedBox(height: 8),
                     _buildGuardrailItem(
-                      icon: Icons.shield_outlined,
+                      icon: LucideIcons.shield,
                       color: colors.bullish,
                       title: 'Stop-Loss Protection',
                       description: 'Always define a stop-loss price on leveraged trades to cap downside risk and avoid margin calls.',

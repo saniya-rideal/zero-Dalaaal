@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../core/utils/currency_formatter.dart';
@@ -80,14 +81,11 @@ class _PriceTextState extends State<PriceText> with SingleTickerProviderStateMix
     
     // Determine color based on change or value
     Color textColor = colors.textPrimary;
-    String glyph = '';
     if (widget.change != null) {
       if (widget.change! > 0) {
         textColor = colors.bullish;
-        glyph = '▲ ';
       } else if (widget.change! < 0) {
         textColor = colors.bearish;
-        glyph = '▼ ';
       } else {
         textColor = colors.neutral;
       }
@@ -110,10 +108,27 @@ class _PriceTextState extends State<PriceText> with SingleTickerProviderStateMix
       fontFeatures: AppTypography.tabularFontFeatures,
     );
 
-    final textWidget = Text(
-      '${widget.showDirectionGlyph ? glyph : ''}$formattedPrice',
-      style: textStyle,
-    );
+    final Widget textWidget;
+    if (widget.showDirectionGlyph && widget.change != null && widget.change != 0) {
+      final iconSize = (widget.style?.fontSize ?? 14.0) * 0.85;
+      textWidget = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            widget.change! > 0 ? LucideIcons.arrowUp : LucideIcons.arrowDown,
+            size: iconSize,
+            color: textColor,
+          ),
+          const SizedBox(width: 2),
+          Text(formattedPrice, style: textStyle),
+        ],
+      );
+    } else {
+      textWidget = Text(
+        formattedPrice,
+        style: textStyle,
+      );
+    }
 
     if (_isFlashing) {
       return AnimatedBuilder(

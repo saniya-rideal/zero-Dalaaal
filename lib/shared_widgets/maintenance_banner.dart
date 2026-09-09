@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/services/maintenance_service.dart';
 
 class MaintenanceBanner extends ConsumerWidget {
@@ -24,7 +25,7 @@ class MaintenanceBanner extends ConsumerWidget {
           child: Row(
             children: [
               const Icon(
-                Icons.warning_amber_rounded,
+                LucideIcons.alertTriangle,
                 color: Colors.white,
                 size: 18,
               ),

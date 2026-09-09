@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -112,10 +113,10 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search Deals by script',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
-                  prefixIcon: Icon(Icons.search, color: colors.textSecondary, size: 20),
+                  prefixIcon: Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, color: colors.textSecondary, size: 18),
+                          icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -208,13 +209,27 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                             ),
                             const SizedBox(width: 8),
                             ChoiceChip(
-                              label: Text(
-                                '🟢 $profitableDealsCount Profitable',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: _dealProfitFilter == DealProfitFilter.profitable ? colors.bullish : colors.textSecondary,
-                                ),
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: colors.bullish,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '$profitableDealsCount Profitable',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _dealProfitFilter == DealProfitFilter.profitable ? colors.bullish : colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                               selected: _dealProfitFilter == DealProfitFilter.profitable,
                               selectedColor: colors.bullish.withValues(alpha: 0.18),
@@ -224,13 +239,27 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                             ),
                             const SizedBox(width: 8),
                             ChoiceChip(
-                              label: Text(
-                                '🔴 $losingDealsCount Losing',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: _dealProfitFilter == DealProfitFilter.losing ? colors.bearish : colors.textSecondary,
-                                ),
+                              label: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      color: colors.bearish,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    '$losingDealsCount Losing',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _dealProfitFilter == DealProfitFilter.losing ? colors.bearish : colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                               selected: _dealProfitFilter == DealProfitFilter.losing,
                               selectedColor: colors.bearish.withValues(alpha: 0.18),
@@ -438,8 +467,8 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                                   ],
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(Icons.chevron_right,
-                                    color: colors.textSecondary, size: 20),
+                                Icon(LucideIcons.chevronRight,
+                                    color: colors.textSecondary, size: 18),
                               ],
                             ),
                           ),
@@ -607,7 +636,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
               const SizedBox(height: 10),
               Divider(height: 1, color: colors.divider),
               ListTile(
-                leading: Icon(Icons.cancel_outlined, color: colors.bearish),
+                leading: Icon(LucideIcons.xCircle, color: colors.bearish, size: 20),
                 title: Text('Cancel Order',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.bearish)),
                 onTap: () async {
@@ -644,7 +673,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.candlestick_chart, color: Color(0xFF1E88E5)),
+                leading: const Icon(LucideIcons.candlestickChart, color: Color(0xFF1E88E5), size: 20),
                 title: Text('Open Fullscreen Chart',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                 onTap: () {

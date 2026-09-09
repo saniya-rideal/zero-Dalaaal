@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../data/models/transaction_record.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class TransactionDetailSheet extends StatelessWidget {
   final TransactionRecord transaction;
@@ -41,17 +43,17 @@ class TransactionDetailSheet extends StatelessWidget {
   IconData _getCategoryIcon(TransactionCategory category) {
     switch (category) {
       case TransactionCategory.TRADE:
-        return Icons.candlestick_chart_rounded;
+        return LucideIcons.candlestickChart;
       case TransactionCategory.DEPOSIT:
-        return Icons.south_west_rounded;
+        return LucideIcons.arrowDownLeft;
       case TransactionCategory.WITHDRAWAL:
-        return Icons.north_east_rounded;
+        return LucideIcons.arrowUpRight;
       case TransactionCategory.FEE_CHARGE:
-        return Icons.receipt_long_rounded;
+        return LucideIcons.receipt;
       case TransactionCategory.DIVIDEND:
-        return Icons.stars_rounded;
+        return LucideIcons.sparkles;
       case TransactionCategory.TRANSFER:
-        return Icons.swap_horiz_rounded;
+        return LucideIcons.arrowLeftRight;
     }
   }
 
@@ -77,16 +79,7 @@ class TransactionDetailSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
               // Category & Status Header
@@ -393,7 +386,7 @@ class TransactionDetailSheet extends StatelessWidget {
               const SizedBox(width: 4),
               InkWell(
                 onTap: onCopy,
-                child: Icon(Icons.copy_rounded, size: 14, color: colors.primary),
+                child: Icon(LucideIcons.copy, size: 14, color: colors.primary),
               ),
             ],
           ],

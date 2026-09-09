@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -123,9 +124,9 @@ class _CandlestickChartViewState extends State<CandlestickChartView> {
           child: Row(
             children: [
               // Chart Type Selector
-              _buildChartTypeIcon(Icons.candlestick_chart, ChartType.candle),
-              _buildChartTypeIcon(Icons.show_chart, ChartType.line),
-              _buildChartTypeIcon(Icons.bar_chart, ChartType.bar),
+              _buildChartTypeIcon(LucideIcons.candlestickChart, ChartType.candle),
+              _buildChartTypeIcon(LucideIcons.lineChart, ChartType.line),
+              _buildChartTypeIcon(LucideIcons.barChart2, ChartType.bar),
 
               const SizedBox(width: 8),
               Container(width: 1, height: 20, color: colors.divider),
@@ -173,9 +174,9 @@ class _CandlestickChartViewState extends State<CandlestickChartView> {
                 const SizedBox(width: 4),
                 IconButton(
                   icon: Icon(
-                    widget.isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                    widget.isFullscreen ? LucideIcons.minimize : LucideIcons.maximize,
                     color: colors.textPrimary,
-                    size: 22,
+                    size: 20,
                   ),
                   onPressed: widget.onFullscreenToggle,
                   padding: EdgeInsets.zero,

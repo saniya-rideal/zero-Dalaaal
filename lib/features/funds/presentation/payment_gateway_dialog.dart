@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/funds.dart';
@@ -120,7 +121,7 @@ class _PaymentGatewayDialogState extends State<PaymentGatewayDialog> {
                               color: colors.primary.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.security_rounded, color: colors.primary, size: 20),
+                            child: Icon(LucideIcons.shieldCheck, color: colors.primary, size: 20),
                           ),
                           const SizedBox(width: 10),
                           Column(
@@ -146,7 +147,7 @@ class _PaymentGatewayDialogState extends State<PaymentGatewayDialog> {
                         ],
                       ),
                       IconButton(
-                        icon: Icon(Icons.close, color: colors.textSecondary, size: 20),
+                        icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                         onPressed: () => _simulateOutcome(WalletTransactionStatus.CANCELLED, 'Cancelling transaction...'),
                       ),
                     ],
@@ -258,7 +259,7 @@ class _PaymentGatewayDialogState extends State<PaymentGatewayDialog> {
                   // Success Button
                   ElevatedButton.icon(
                     onPressed: () => _simulateOutcome(WalletTransactionStatus.SUCCESS, 'Authorizing & Crediting Margin...'),
-                    icon: const Icon(Icons.check_circle_rounded, size: 18),
+                    icon: const Icon(LucideIcons.checkCircle2, size: 18),
                     label: const Text('Simulate Successful Payment'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.bullish,
@@ -274,7 +275,7 @@ class _PaymentGatewayDialogState extends State<PaymentGatewayDialog> {
                   // Pending Button
                   OutlinedButton.icon(
                     onPressed: () => _simulateOutcome(WalletTransactionStatus.PENDING, 'Marking Payment as Pending...'),
-                    icon: Icon(Icons.hourglass_top_rounded, size: 18, color: colors.warning),
+                    icon: Icon(LucideIcons.clock, size: 18, color: colors.warning),
                     label: Text(
                       'Simulate Pending / Delayed Response',
                       style: TextStyle(color: colors.warning),
@@ -291,7 +292,7 @@ class _PaymentGatewayDialogState extends State<PaymentGatewayDialog> {
                   // Failed Button
                   OutlinedButton.icon(
                     onPressed: () => _simulateOutcome(WalletTransactionStatus.FAILED, 'Processing Bank Decline...'),
-                    icon: Icon(Icons.cancel_rounded, size: 18, color: colors.bearish),
+                    icon: Icon(LucideIcons.xCircle, size: 18, color: colors.bearish),
                     label: Text(
                       'Simulate Bank Decline / Failure',
                       style: TextStyle(color: colors.bearish),

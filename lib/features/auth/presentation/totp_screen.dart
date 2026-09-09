@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/security_privacy_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../shared_widgets/pin_input_pad.dart';
@@ -105,7 +106,7 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(LucideIcons.arrowLeft, size: 22),
           onPressed: () => context.pop(),
         ),
       ),
@@ -126,7 +127,7 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.lock_clock, color: colors.bearish, size: 20),
+                      Icon(LucideIcons.clock, color: colors.bearish, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         'OTP Locked. Try again in $_lockoutSeconds s',

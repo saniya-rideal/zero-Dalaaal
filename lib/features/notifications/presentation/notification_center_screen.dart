@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -95,45 +96,45 @@ class _NotificationCenterScreenState
   IconData _getTypeIcon(NotificationType type) {
     switch (type) {
       case NotificationType.orderSubmitted:
-        return Icons.send_outlined;
+        return LucideIcons.send;
       case NotificationType.orderFilled:
-        return Icons.check_circle_outline;
+        return LucideIcons.checkCircle2;
       case NotificationType.orderPartiallyFilled:
-        return Icons.pie_chart_outline;
+        return LucideIcons.pieChart;
       case NotificationType.orderRejected:
-        return Icons.cancel_outlined;
+        return LucideIcons.xCircle;
       case NotificationType.orderCancelled:
-        return Icons.close;
+        return LucideIcons.x;
       case NotificationType.depositSuccess:
-        return Icons.arrow_downward_rounded;
+        return LucideIcons.arrowDown;
       case NotificationType.depositPending:
-        return Icons.hourglass_top_outlined;
+        return LucideIcons.hourglass;
       case NotificationType.depositFailed:
-        return Icons.error_outline;
+        return LucideIcons.alertCircle;
       case NotificationType.withdrawalInitiated:
-        return Icons.arrow_upward_rounded;
+        return LucideIcons.arrowUp;
       case NotificationType.withdrawalCompleted:
-        return Icons.done_all_rounded;
+        return LucideIcons.checkCheck;
       case NotificationType.withdrawalFailed:
-        return Icons.replay_rounded;
+        return LucideIcons.rotateCcw;
       case NotificationType.marginWarning:
-        return Icons.warning_amber_rounded;
+        return LucideIcons.alertTriangle;
       case NotificationType.liquidationWarning:
-        return Icons.gavel_rounded;
+        return LucideIcons.scale;
       case NotificationType.priceAlert:
-        return Icons.notifications_active_outlined;
+        return LucideIcons.bellRing;
       case NotificationType.newsAlert:
-        return Icons.newspaper_outlined;
+        return LucideIcons.newspaper;
       case NotificationType.securityAlert:
-        return Icons.security_outlined;
+        return LucideIcons.shieldAlert;
       case NotificationType.loginNewDevice:
-        return Icons.devices_outlined;
+        return LucideIcons.laptop;
       case NotificationType.passwordChanged:
-        return Icons.lock_reset_outlined;
+        return LucideIcons.keyRound;
       case NotificationType.kycStatusChanged:
-        return Icons.verified_user_outlined;
+        return LucideIcons.shieldCheck;
       case NotificationType.accountNotice:
-        return Icons.campaign_outlined;
+        return LucideIcons.megaphone;
     }
   }
 
@@ -216,7 +217,7 @@ class _NotificationCenterScreenState
         actions: [
           // Mark all as read button
           IconButton(
-            icon: const Icon(Icons.done_all_rounded),
+            icon: const Icon(LucideIcons.checkCheck, size: 20),
             tooltip: 'Mark all as read',
             onPressed: unreadCount > 0
                 ? () {
@@ -232,7 +233,7 @@ class _NotificationCenterScreenState
           ),
           // Clear all button
           IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
+            icon: const Icon(LucideIcons.trash2, size: 20),
             tooltip: 'Clear all',
             onPressed: notifService.allNotifications.isNotEmpty
                 ? _showClearAllConfirmDialog
@@ -240,7 +241,7 @@ class _NotificationCenterScreenState
           ),
           // Preferences button
           IconButton(
-            icon: const Icon(Icons.tune_rounded),
+            icon: const Icon(LucideIcons.slidersHorizontal, size: 20),
             tooltip: 'Notification Preferences',
             onPressed: () => NotificationPreferencesSheet.show(context),
           ),
@@ -259,10 +260,10 @@ class _NotificationCenterScreenState
               decoration: InputDecoration(
                 hintText: 'Search orders, funds, alerts, symbols...',
                 hintStyle: AppTypography.body(color: colors.textSecondary),
-                prefixIcon: Icon(Icons.search, color: colors.textSecondary),
+                prefixIcon: Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(Icons.clear, color: colors.textSecondary),
+                        icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 18),
                         onPressed: () {
                           _searchController.clear();
                           setState(() {});
@@ -304,42 +305,42 @@ class _NotificationCenterScreenState
                 _buildCategoryChip(
                   label: 'Orders',
                   isSelected: _selectedCategory == NotificationCategory.orders,
-                  icon: Icons.receipt_long_outlined,
+                  icon: LucideIcons.receipt,
                   onTap: () => setState(() => _selectedCategory = NotificationCategory.orders),
                   colors: colors,
                 ),
                 _buildCategoryChip(
                   label: 'Funds',
                   isSelected: _selectedCategory == NotificationCategory.funds,
-                  icon: Icons.account_balance_wallet_outlined,
+                  icon: LucideIcons.wallet,
                   onTap: () => setState(() => _selectedCategory = NotificationCategory.funds),
                   colors: colors,
                 ),
                 _buildCategoryChip(
                   label: 'Risk & Margin',
                   isSelected: _selectedCategory == NotificationCategory.riskMargin,
-                  icon: Icons.warning_amber_rounded,
+                  icon: LucideIcons.alertTriangle,
                   onTap: () => setState(() => _selectedCategory = NotificationCategory.riskMargin),
                   colors: colors,
                 ),
                 _buildCategoryChip(
                   label: 'Price Alerts',
                   isSelected: _selectedCategory == NotificationCategory.priceAlerts,
-                  icon: Icons.notifications_active_outlined,
+                  icon: LucideIcons.bellRing,
                   onTap: () => setState(() => _selectedCategory = NotificationCategory.priceAlerts),
                   colors: colors,
                 ),
                 _buildCategoryChip(
                   label: 'News',
                   isSelected: _selectedCategory == NotificationCategory.news,
-                  icon: Icons.newspaper_outlined,
+                  icon: LucideIcons.newspaper,
                   onTap: () => setState(() => _selectedCategory = NotificationCategory.news),
                   colors: colors,
                 ),
                 _buildCategoryChip(
                   label: 'Security',
                   isSelected: _selectedCategory == NotificationCategory.security,
-                  icon: Icons.shield_outlined,
+                  icon: LucideIcons.shield,
                   onTap: () => setState(() => _selectedCategory = NotificationCategory.security),
                   colors: colors,
                 ),
@@ -433,7 +434,7 @@ class _NotificationCenterScreenState
           color: colors.bearish,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
+        child: const Icon(LucideIcons.trash2, color: Colors.white, size: 22),
       ),
       onDismissed: (_) {
         ref.read(notificationServiceProvider).deleteNotification(item.id);
@@ -548,7 +549,7 @@ class _NotificationCenterScreenState
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.priority_high, size: 12, color: colors.bearish),
+                                Icon(LucideIcons.alertCircle, size: 12, color: colors.bearish),
                                 const SizedBox(width: 2),
                                 Text(
                                   'CRITICAL',
@@ -581,7 +582,7 @@ class _NotificationCenterScreenState
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(Icons.arrow_forward_ios_rounded, size: 10, color: colors.primary),
+                                Icon(LucideIcons.chevronRight, size: 12, color: colors.primary),
                               ],
                             ),
                           ),
@@ -608,7 +609,7 @@ class _NotificationCenterScreenState
             CircleAvatar(
               radius: 36,
               backgroundColor: colors.cardBackground,
-              child: Icon(Icons.notifications_off_outlined, size: 36, color: colors.textSecondary),
+              child: Icon(LucideIcons.bellOff, size: 36, color: colors.textSecondary),
             ),
             const SizedBox(height: 16),
             Text(
@@ -626,7 +627,7 @@ class _NotificationCenterScreenState
             const SizedBox(height: 20),
             if (_searchController.text.isNotEmpty || _selectedCategory != null || _unreadOnly)
               OutlinedButton.icon(
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(LucideIcons.rotateCcw, size: 16),
                 label: const Text('Reset Filters'),
                 onPressed: () {
                   setState(() {
@@ -638,7 +639,7 @@ class _NotificationCenterScreenState
               )
             else
               OutlinedButton.icon(
-                icon: const Icon(Icons.tune),
+                icon: const Icon(LucideIcons.slidersHorizontal, size: 16),
                 label: const Text('Notification Preferences'),
                 onPressed: () => NotificationPreferencesSheet.show(context),
               ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import 'auth_controller.dart';
@@ -225,7 +226,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: colors.textPrimary),
+          icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
           onPressed: () {
             if (_currentStep == 2) {
               setState(() => _currentStep = 1);
@@ -252,7 +253,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: DropdownButton<String>(
                   value: _selectedLanguage,
                   dropdownColor: colors.cardBackground,
-                  icon: Icon(Icons.language, color: colors.primary, size: 20),
+                  icon: Icon(LucideIcons.globe, color: colors.primary, size: 18),
                   items: ['English'].map((lang) {
                     return DropdownMenuItem(
                       value: lang,
@@ -319,7 +320,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             decoration: InputDecoration(
               labelText: 'Full Name (as per PAN)',
               labelStyle: TextStyle(color: colors.textSecondary),
-              prefixIcon: Icon(Icons.person_outline, color: colors.primary),
+              prefixIcon: Icon(LucideIcons.user, color: colors.primary, size: 18),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
             onChanged: (_) => setState(() {}),
@@ -370,7 +371,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   decoration: InputDecoration(
                     labelText: 'Mobile Number',
                     labelStyle: TextStyle(color: colors.textSecondary),
-                    prefixIcon: Icon(Icons.phone_android, color: colors.primary),
+                    prefixIcon: Icon(LucideIcons.smartphone, color: colors.primary, size: 18),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -388,11 +389,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             decoration: InputDecoration(
               labelText: 'Password',
               labelStyle: TextStyle(color: colors.textSecondary),
-              prefixIcon: Icon(Icons.lock_outline, color: colors.primary),
+              prefixIcon: Icon(LucideIcons.lock, color: colors.primary, size: 18),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
                   color: colors.textSecondary,
+                  size: 18,
                 ),
                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
@@ -443,11 +445,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             decoration: InputDecoration(
               labelText: 'Confirm Password',
               labelStyle: TextStyle(color: colors.textSecondary),
-              prefixIcon: Icon(Icons.lock_reset, color: colors.primary),
+              prefixIcon: Icon(LucideIcons.keyRound, color: colors.primary, size: 18),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                  _obscureConfirmPassword ? LucideIcons.eye : LucideIcons.eyeOff,
                   color: colors.textSecondary,
+                  size: 18,
                 ),
                 onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
               ),
@@ -565,7 +568,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               color: colors.primary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.sms_outlined, size: 36, color: colors.primary),
+            child: Icon(LucideIcons.messageSquare, size: 36, color: colors.primary),
           ),
         ),
         const SizedBox(height: 20),
@@ -709,11 +712,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             color: Color(0xFF00A854),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check, size: 48, color: Colors.white),
+          child: const Icon(LucideIcons.check, size: 48, color: Colors.white),
         ),
         const SizedBox(height: 24),
         Text(
-          'Registration Complete! 🎉',
+          'Registration Complete!',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
             fontSize: 22,
@@ -853,7 +856,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.info_outline, size: 16, color: colors.textSecondary),
+            icon: Icon(LucideIcons.info, size: 16, color: colors.textSecondary),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onPressed: onInfoTap,

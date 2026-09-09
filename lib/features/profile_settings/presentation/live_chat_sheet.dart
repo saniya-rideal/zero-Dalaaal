@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../data/mock/support_repository.dart';
 import '../../../data/models/models.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class LiveChatSheet extends ConsumerStatefulWidget {
   const LiveChatSheet({super.key});
@@ -86,17 +88,7 @@ class _LiveChatSheetState extends ConsumerState<LiveChatSheet> {
       child: Column(
         children: [
           // Drag Handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colors.textSecondary.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
+          const ZeroDragHandle(padding: EdgeInsets.only(top: 12, bottom: 8)),
 
           // Header
           Padding(
@@ -108,7 +100,7 @@ class _LiveChatSheetState extends ConsumerState<LiveChatSheet> {
                     CircleAvatar(
                       backgroundColor: colors.primary.withValues(alpha: 0.15),
                       radius: 20,
-                      child: Icon(Icons.support_agent, color: colors.primary, size: 24),
+                      child: Icon(LucideIcons.headset, color: colors.primary, size: 22),
                     ),
                     Positioned(
                       bottom: 0,
@@ -156,7 +148,7 @@ class _LiveChatSheetState extends ConsumerState<LiveChatSheet> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: colors.textSecondary),
+                  icon: Icon(LucideIcons.x, color: colors.textSecondary),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -300,7 +292,7 @@ class _LiveChatSheetState extends ConsumerState<LiveChatSheet> {
                   backgroundColor: colors.primary,
                   radius: 20,
                   child: IconButton(
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                    icon: const Icon(LucideIcons.send, color: Colors.white, size: 18),
                     onPressed: () => _sendMessage(),
                   ),
                 ),

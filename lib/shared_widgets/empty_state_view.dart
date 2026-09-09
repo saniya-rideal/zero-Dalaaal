@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 
@@ -11,7 +12,7 @@ class EmptyStateView extends StatelessWidget {
 
   const EmptyStateView({
     super.key,
-    this.icon = Icons.inbox_outlined,
+    this.icon = LucideIcons.inbox,
     required this.title,
     required this.subtitle,
     this.buttonText,

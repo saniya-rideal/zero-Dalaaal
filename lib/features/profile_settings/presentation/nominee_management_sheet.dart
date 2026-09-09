@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 
 class NomineeManagementSheet extends StatefulWidget {
@@ -74,7 +75,7 @@ class _NomineeManagementSheetState extends State<NomineeManagementSheet> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -91,7 +92,7 @@ class _NomineeManagementSheetState extends State<NomineeManagementSheet> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.verified_user, color: Color(0xFF00A854), size: 20),
+                    const Icon(LucideIcons.shieldCheck, color: Color(0xFF00A854), size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -145,7 +146,7 @@ class _NomineeManagementSheetState extends State<NomineeManagementSheet> {
 
               if (!_isEditing)
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.edit, size: 18),
+                  icon: const Icon(LucideIcons.penSquare, size: 16),
                   label: const Text('EDIT NOMINEE DETAILS', style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.primary,

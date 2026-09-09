@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
+import 'adaptive_leading_button.dart';
 
 enum HistoryDateFilter {
   lastDay('Last Day'),
@@ -56,31 +58,28 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       scrolledUnderElevation: 0,
       leading: leading ??
-          Builder(
-            builder: (innerContext) {
-              final canPop = Navigator.of(innerContext).canPop();
-              final shouldShowBack = showBackButton ?? canPop;
-              if (shouldShowBack) {
-                return IconButton(
-                  icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                  onPressed: () => Navigator.of(innerContext).pop(),
-                  tooltip: 'Back',
-                );
-              }
-              return IconButton(
-                icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-                onPressed: () {
-                  final rootScaffold = innerContext.findRootAncestorStateOfType<ScaffoldState>();
-                  if (rootScaffold != null && rootScaffold.hasDrawer) {
-                    rootScaffold.openDrawer();
-                  } else {
-                    Scaffold.of(innerContext).openDrawer();
-                  }
-                },
-                tooltip: 'Menu',
-              );
-            },
-          ),
+          (showBackButton != null
+              ? IconButton(
+                  icon: Icon(
+                    showBackButton! ? LucideIcons.arrowLeft : LucideIcons.menu,
+                    color: colors.textPrimary,
+                    size: 22,
+                  ),
+                  onPressed: () {
+                    if (showBackButton!) {
+                      Navigator.of(context).pop();
+                    } else {
+                      final root =
+                          context.findRootAncestorStateOfType<ScaffoldState>();
+                      if (root != null && root.hasDrawer) {
+                        root.openDrawer();
+                      } else {
+                        Scaffold.of(context).openDrawer();
+                      }
+                    }
+                  },
+                )
+              : const AdaptiveLeadingButton()),
       centerTitle: true,
       title: Text(
         title,
@@ -92,7 +91,7 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
       actions: [
         if (showFilterAction)
           IconButton(
-            icon: Icon(Icons.filter_alt_outlined, color: colors.textPrimary, size: 22),
+            icon: Icon(LucideIcons.filter, color: colors.textPrimary, size: 20),
             onPressed: onFilterTap ?? () {},
             tooltip: 'Filter',
           ),
@@ -130,8 +129,8 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   const SizedBox(width: 2),
                   Icon(
-                    isSortAscending ? Icons.arrow_downward : Icons.arrow_upward,
-                    size: 15,
+                    isSortAscending ? LucideIcons.arrowDown : LucideIcons.arrowUp,
+                    size: 14,
                     color: colors.textPrimary,
                   ),
                 ],
@@ -140,7 +139,7 @@ class ZeroAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         if (showCalendarAction)
           PopupMenuButton<HistoryDateFilter>(
-            icon: Icon(Icons.event_note_outlined, color: colors.textPrimary, size: 24),
+            icon: Icon(LucideIcons.calendar, color: colors.textPrimary, size: 20),
             offset: const Offset(0, 48),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             color: colors.cardBackground,

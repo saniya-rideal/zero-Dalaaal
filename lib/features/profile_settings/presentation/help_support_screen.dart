@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../data/mock/support_repository.dart';
 import '../../../data/models/models.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import 'create_ticket_sheet.dart';
 import 'live_chat_sheet.dart';
@@ -91,30 +93,14 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
       appBar: AppBar(
         backgroundColor: colors.cardBackground,
         elevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 24),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         title: Text(
           'Support & Help Desk',
           style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.headset_mic_outlined),
+            icon: const Icon(LucideIcons.headset),
             tooltip: 'Live Chat',
             onPressed: () => LiveChatSheet.show(context),
           ),
@@ -220,7 +206,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
         children: [
           Expanded(
             child: _buildChannelButton(
-              icon: Icons.chat_bubble_outline_rounded,
+              icon: LucideIcons.messageSquare,
               label: 'Live Chat',
               color: colors.primary,
               onTap: () => LiveChatSheet.show(context),
@@ -230,7 +216,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
           const SizedBox(width: 8),
           Expanded(
             child: _buildChannelButton(
-              icon: Icons.phone_in_talk_outlined,
+              icon: LucideIcons.phoneCall,
               label: 'Call 24/7',
               color: colors.bullish,
               onTap: () => _makePhoneCall('180093763375'),
@@ -240,7 +226,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
           const SizedBox(width: 8),
           Expanded(
             child: _buildChannelButton(
-              icon: Icons.mail_outline_rounded,
+              icon: LucideIcons.mail,
               label: 'Email Us',
               color: colors.warning,
               onTap: () => _sendEmail('support@zerodalali.com'),
@@ -250,7 +236,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
           const SizedBox(width: 8),
           Expanded(
             child: _buildChannelButton(
-              icon: Icons.confirmation_number_outlined,
+              icon: LucideIcons.ticket,
               label: 'New Ticket',
               color: Colors.purpleAccent,
               onTap: () async {
@@ -332,10 +318,10 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
           decoration: InputDecoration(
             hintText: 'Search FAQs, orders, margin rules, UPI...',
             hintStyle: AppTypography.body(color: colors.textSecondary),
-            prefixIcon: Icon(Icons.search, color: colors.textSecondary),
+            prefixIcon: Icon(LucideIcons.search, color: colors.textSecondary),
             suffixIcon: _faqSearchController.text.isNotEmpty
                 ? IconButton(
-                    icon: Icon(Icons.clear, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary),
                     onPressed: () {
                       _faqSearchController.clear();
                       setState(() {});
@@ -460,7 +446,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.thumb_up_alt_outlined, size: 14, color: colors.primary),
+                                    Icon(LucideIcons.thumbsUp, size: 14, color: colors.primary),
                                     const SizedBox(width: 4),
                                     Text('Helpful (${faq.helpfulCount})', style: AppTypography.labelSmall(color: colors.primary, weight: FontWeight.w600)),
                                   ],
@@ -507,7 +493,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
               ],
             ),
             IconButton(
-              icon: Icon(Icons.add_circle, color: colors.primary),
+              icon: Icon(LucideIcons.plusCircle, color: colors.primary),
               tooltip: 'New Ticket',
               onPressed: () => CreateTicketSheet.show(context),
             ),
@@ -522,14 +508,14 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
               padding: const EdgeInsets.symmetric(vertical: 60),
               child: Column(
                 children: [
-                  Icon(Icons.inbox_outlined, size: 48, color: colors.textSecondary),
+                  Icon(LucideIcons.inbox, size: 48, color: colors.textSecondary),
                   const SizedBox(height: 12),
                   Text('No tickets found', style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text('Need help? Raise a support ticket directly to our desk.', style: AppTypography.caption(color: colors.textSecondary)),
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
+                    icon: const Icon(LucideIcons.plus),
                     label: const Text('RAISE A TICKET'),
                     style: ElevatedButton.styleFrom(backgroundColor: colors.primary, foregroundColor: Colors.white),
                     onPressed: () => CreateTicketSheet.show(context),
@@ -626,7 +612,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
                           children: [
                             Text(t.timeAgo, style: AppTypography.caption(color: colors.textSecondary)),
                             const SizedBox(width: 4),
-                            Icon(Icons.chevron_right, size: 16, color: colors.textSecondary),
+                            Icon(LucideIcons.chevronRight, size: 16, color: colors.textSecondary),
                           ],
                         ),
                       ],
@@ -675,7 +661,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
           ),
           child: Row(
             children: [
-              Icon(Icons.gavel_rounded, color: colors.primary, size: 24),
+              Icon(LucideIcons.scale, color: colors.primary, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -746,7 +732,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
                       onTap: () => _sendEmail(tier.email),
                       child: Row(
                         children: [
-                          Icon(Icons.mail_outline, size: 14, color: colors.primary),
+                          Icon(LucideIcons.mail, size: 14, color: colors.primary),
                           const SizedBox(width: 4),
                           Text(tier.email, style: AppTypography.caption(color: colors.primary, weight: FontWeight.w600)),
                         ],
@@ -756,7 +742,7 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
                       onTap: () => _makePhoneCall(tier.phone.split(' ')[0]),
                       child: Row(
                         children: [
-                          Icon(Icons.phone_outlined, size: 14, color: colors.textSecondary),
+                          Icon(LucideIcons.phone, size: 14, color: colors.textSecondary),
                           const SizedBox(width: 4),
                           Text(tier.phone, style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
                         ],
@@ -802,21 +788,21 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
               const SizedBox(height: 14),
               const Divider(height: 1),
               const SizedBox(height: 14),
-              _buildContactRow(Icons.pin_drop_outlined, 'Registered Office', contact.registeredAddress, colors),
+              _buildContactRow(LucideIcons.mapPin, 'Registered Office', contact.registeredAddress, colors),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.business_outlined, 'Corporate Operations', contact.corporateOffice, colors),
+              _buildContactRow(LucideIcons.building2, 'Corporate Operations', contact.corporateOffice, colors),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.verified_outlined, 'SEBI Registration No', contact.sebiRegNumber, colors),
+              _buildContactRow(LucideIcons.badgeCheck, 'SEBI Registration No', contact.sebiRegNumber, colors),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.account_balance_outlined, 'Depository Participant (DP ID)', 'CDSL: ${contact.cdslDpId} | NSDL: ${contact.nsdlDpId}', colors),
+              _buildContactRow(LucideIcons.landmark, 'Depository Participant (DP ID)', 'CDSL: ${contact.cdslDpId} | NSDL: ${contact.nsdlDpId}', colors),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.swap_horiz_rounded, 'Exchange Member IDs', 'NSE: ${contact.nseMemberId} | BSE: ${contact.bseMemberId} | MCX: ${contact.mcxMemberId}', colors),
+              _buildContactRow(LucideIcons.arrowLeftRight, 'Exchange Member IDs', 'NSE: ${contact.nseMemberId} | BSE: ${contact.bseMemberId} | MCX: ${contact.mcxMemberId}', colors),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.phone_in_talk_outlined, 'Toll-Free Helpline', contact.tollFreePhone, colors, isPhone: true),
+              _buildContactRow(LucideIcons.phoneCall, 'Toll-Free Helpline', contact.tollFreePhone, colors, isPhone: true),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.email_outlined, 'Customer Support', contact.supportEmail, colors, isEmail: true),
+              _buildContactRow(LucideIcons.mail, 'Customer Support', contact.supportEmail, colors, isEmail: true),
               const SizedBox(height: 12),
-              _buildContactRow(Icons.shield_outlined, 'Compliance Desk', contact.complianceEmail, colors, isEmail: true),
+              _buildContactRow(LucideIcons.shield, 'Compliance Desk', contact.complianceEmail, colors, isEmail: true),
             ],
           ),
         ),

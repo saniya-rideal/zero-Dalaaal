@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
@@ -144,7 +145,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary, size: 20),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -175,7 +176,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                     const SnackBar(content: Text('Statement summary copied to clipboard!')),
                   );
                 },
-                icon: const Icon(Icons.copy_rounded, size: 18),
+                icon: const Icon(LucideIcons.copy, size: 18),
                 label: const Text('Copy Summary to Clipboard'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colors.primary,
@@ -243,7 +244,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                   ],
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: colors.textSecondary, size: 20),
+                  icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -265,7 +266,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                   _buildPeriodChip('FY', 'FY 2025-26', colors),
                   const SizedBox(width: 6),
                   ActionChip(
-                    avatar: Icon(Icons.date_range_rounded, size: 14, color: colors.primary),
+                    avatar: Icon(LucideIcons.calendar, size: 14, color: colors.primary),
                     label: Text(
                       _periodPreset == 'CUSTOM'
                           ? '${DateFormatter.formatOrderDate(_startDate)} - ${DateFormatter.formatOrderDate(_endDate)}'
@@ -446,7 +447,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _exportCsv(engine),
-                    icon: const Icon(Icons.download_rounded, size: 18),
+                    icon: const Icon(LucideIcons.download, size: 18),
                     label: const Text('Export CSV'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: colors.primary,
@@ -460,7 +461,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _shareReport(summary, transactions.length, colors),
-                    icon: const Icon(Icons.share_rounded, size: 18),
+                    icon: const Icon(LucideIcons.share2, size: 18),
                     label: const Text('Share Report'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colors.primary,

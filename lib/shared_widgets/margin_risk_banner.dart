@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../data/mock/order_simulation_engine.dart';
 import '../data/models/enums.dart';
 import '../data/models/funds.dart';
@@ -34,21 +35,21 @@ class MarginRiskBanner extends ConsumerWidget {
     switch (risk) {
       case MarginRiskLevel.HIGH_MARGIN:
         bannerColor = const Color(0xFFFFA000); // Amber
-        bannerIcon = Icons.warning_amber_rounded;
+        bannerIcon = LucideIcons.alertTriangle;
         bannerTitle = 'High Margin Utilization (${funds.marginUtilizationPercent.toStringAsFixed(0)}%)';
         bannerMessage =
             'You are currently using ${funds.marginUtilizationPercent.toStringAsFixed(1)}% of your available margin. Monitor open risk closely.';
         break;
       case MarginRiskLevel.MARGIN_CALL:
         bannerColor = const Color(0xFFE64A19); // Deep Orange
-        bannerIcon = Icons.priority_high_rounded;
+        bannerIcon = LucideIcons.alertCircle;
         bannerTitle = 'Margin Call Warning (${funds.marginUtilizationPercent.toStringAsFixed(0)}%)';
         bannerMessage =
             'Margin utilization exceeds 90%. Add funds or square off open positions immediately to prevent forced square-off.';
         break;
       case MarginRiskLevel.FORCED_LIQUIDATION:
         bannerColor = const Color(0xFFD32F2F); // Emergency Red
-        bannerIcon = Icons.dangerous_outlined;
+        bannerIcon = LucideIcons.alertOctagon;
         bannerTitle = 'Forced Liquidation Warning (RMS Auto Square-Off)';
         bannerMessage =
             'Margin deficit detected. Risk Management Systems (RMS) will auto-square off positions to cover shortfalls. Deposit funds now.';

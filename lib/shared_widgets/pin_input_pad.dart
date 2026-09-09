@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 class PinInputPad extends StatefulWidget {
   final int pinLength;
@@ -159,13 +160,13 @@ class _PinInputPadState extends State<PinInputPad> with SingleTickerProviderStat
                 children: [
                   widget.showBiometric
                       ? _buildActionButton(
-                          icon: Icons.fingerprint,
+                          icon: LucideIcons.fingerprint,
                           onPressed: widget.onBiometricPressed,
                         )
                       : const SizedBox(width: 72, height: 72),
                   _buildDigitButton('0'),
                   _buildActionButton(
-                    icon: Icons.backspace_outlined,
+                    icon: LucideIcons.delete,
                     onPressed: _onDeletePressed,
                   ),
                 ],

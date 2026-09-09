@@ -1879,7 +1879,7 @@ class OrderSimulationEngine {
       _dispatchNotification(
         type: NotificationType.liquidationWarning,
         category: NotificationCategory.riskMargin,
-        title: '🚨 RMS Forced Liquidation Executed',
+        title: 'RMS Forced Liquidation Executed',
         body: 'Account margin deficit triggered auto square-off of ${liquidated.length} open position(s).',
         deepLink: '/funds',
         metadata: {'liquidatedOrders': liquidated.map((o) => o.orderId).toList()},

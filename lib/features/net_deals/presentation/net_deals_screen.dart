@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -93,11 +94,11 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
                   hintText: 'Search Net Deals by script',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
                   prefixIcon:
-                      Icon(Icons.search, color: colors.textSecondary, size: 20),
+                      Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear,
-                              color: colors.textSecondary, size: 18),
+                          icon: Icon(LucideIcons.x,
+                              color: colors.textSecondary, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -156,8 +157,8 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inventory_2_outlined,
-                            size: 42,
+                        Icon(LucideIcons.layers,
+                            size: 36,
                             color: colors.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 8),
                         Text(
@@ -337,8 +338,8 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
                                 ],
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.chevron_right,
-                                  color: colors.textSecondary, size: 20),
+                              Icon(LucideIcons.chevronRight,
+                                  color: colors.textSecondary, size: 18),
                             ],
                           ),
                         ),

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_bottom_nav_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import 'widgets/corporate_actions_view.dart';
 
 class EconomicCalendarScreen extends StatefulWidget {
   const EconomicCalendarScreen({super.key});
@@ -16,6 +18,7 @@ class EconomicCalendarScreen extends StatefulWidget {
 
 class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
   final Set<int> _expandedIndices = {};
+  int _selectedTabIndex = 0; // 0: Macro Events, 1: Corporate Actions
 
   final List<Map<String, dynamic>> _events = [
     {
@@ -216,41 +219,75 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           // Dual Script Selector Bar
           const ScriptSelectorBar(),
 
-          // Filter Header Icons Row (Globe + Bar Chart)
+          // Segmented Tab Selector (Macro vs Corporate Actions)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            decoration: BoxDecoration(
-              color: colors.cardBackground,
-              border: Border(
-                bottom: BorderSide(color: colors.divider, width: 1),
-              ),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: colors.cardBackground,
             child: Row(
               children: [
-                InkWell(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Filter by country/region')),
-                    );
-                  },
-                  child: Icon(Icons.language, size: 22, color: colors.textPrimary),
+                Expanded(
+                  child: _buildTabButton(
+                    title: 'Macro Events',
+                    subtitle: 'RBI, Fed, CPI, GDP',
+                    icon: LucideIcons.globe,
+                    isSelected: _selectedTabIndex == 0,
+                    onTap: () => setState(() => _selectedTabIndex = 0),
+                    colors: colors,
+                  ),
                 ),
-                const SizedBox(width: 16),
-                InkWell(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Filter by volatility impact')),
-                    );
-                  },
-                  child: Icon(Icons.bar_chart, size: 22, color: colors.textPrimary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildTabButton(
+                    title: 'Corporate Actions',
+                    subtitle: 'Dividends, Splits, Bonus',
+                    icon: LucideIcons.calendarCheck,
+                    isSelected: _selectedTabIndex == 1,
+                    onTap: () => setState(() => _selectedTabIndex = 1),
+                    colors: colors,
+                  ),
                 ),
               ],
             ),
           ),
+          Divider(height: 1, thickness: 1, color: colors.divider),
 
-          // Events List
-          Expanded(
-            child: ListView.separated(
+          if (_selectedTabIndex == 0) ...[
+            // Filter Header Icons Row (Globe + Bar Chart)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                color: colors.cardBackground,
+                border: Border(
+                  bottom: BorderSide(color: colors.divider, width: 1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Filter by country/region')),
+                      );
+                    },
+                    child: Icon(Icons.language, size: 22, color: colors.textPrimary),
+                  ),
+                  const SizedBox(width: 16),
+                  InkWell(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Filter by volatility impact')),
+                      );
+                    },
+                    child: Icon(Icons.bar_chart, size: 22, color: colors.textPrimary),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          if (_selectedTabIndex == 0)
+            Expanded(
+              child: ListView.separated(
               itemCount: _events.length,
               separatorBuilder: (_, __) =>
                   Divider(height: 1, thickness: 0.8, color: colors.divider),
@@ -617,6 +654,10 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
               ],
             ),
           ),
+          if (_selectedTabIndex == 1)
+            const Expanded(
+              child: CorporateActionsView(),
+            ),
         ],
       ),
       bottomNavigationBar: ZeroBottomNavBar(
@@ -666,6 +707,73 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTabButton({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required TradingColors colors,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colors.primary.withValues(alpha: 0.12)
+              : colors.background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? colors.primary
+                : colors.divider.withValues(alpha: 0.6),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? colors.primary : colors.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight:
+                          isSelected ? FontWeight.w800 : FontWeight.w600,
+                      color: isSelected ? colors.primary : colors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 9.5,
+                      color: colors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

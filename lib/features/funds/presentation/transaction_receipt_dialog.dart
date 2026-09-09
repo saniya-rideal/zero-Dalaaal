@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
@@ -42,17 +43,17 @@ class TransactionReceiptDialog extends ConsumerWidget {
     switch (status) {
       case WalletTransactionStatus.SUCCESS:
       case WalletTransactionStatus.COMPLETED:
-        return Icons.check_circle_rounded;
+        return LucideIcons.checkCircle2;
       case WalletTransactionStatus.PENDING:
       case WalletTransactionStatus.INITIATED:
-        return Icons.hourglass_top_rounded;
+        return LucideIcons.clock;
       case WalletTransactionStatus.PROCESSING:
-        return Icons.sync_rounded;
+        return LucideIcons.refreshCw;
       case WalletTransactionStatus.FAILED:
       case WalletTransactionStatus.REJECTED:
-        return Icons.cancel_rounded;
+        return LucideIcons.xCircle;
       case WalletTransactionStatus.CANCELLED:
-        return Icons.do_not_disturb_on_rounded;
+        return LucideIcons.ban;
     }
   }
 
@@ -217,7 +218,7 @@ class TransactionReceiptDialog extends ConsumerWidget {
                     }
                   }
                 },
-                icon: Icon(Icons.cancel_outlined, size: 18, color: colors.bearish),
+                icon: Icon(LucideIcons.xCircle, size: 18, color: colors.bearish),
                 label: Text(
                   'Cancel Withdrawal Request',
                   style: GoogleFonts.inter(
@@ -294,7 +295,7 @@ class TransactionReceiptDialog extends ConsumerWidget {
                 const SizedBox(width: 4),
                 InkWell(
                   onTap: onCopy,
-                  child: Icon(Icons.copy_rounded, size: 14, color: colors.primary),
+                  child: Icon(LucideIcons.copy, size: 14, color: colors.primary),
                 ),
               ],
             ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -108,9 +109,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ],
                     ),
                     child: const Center(
-                      child: Text(
-                        '🐂',
-                        style: TextStyle(fontSize: 34),
+                      child: Icon(
+                        LucideIcons.trendingUp,
+                        size: 34,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -145,7 +147,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.lock_clock, color: colors.bearish, size: 22),
+                        Icon(LucideIcons.clock, color: colors.bearish, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
@@ -184,7 +186,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   decoration: const InputDecoration(
                     labelText: 'User ID / Account No.',
                     hintText: 'e.g. 159537',
-                    prefixIcon: Icon(Icons.person_outline),
+                    prefixIcon: Icon(LucideIcons.user, size: 18),
                   ),
                   validator: (val) => val == null || val.isEmpty
                       ? 'Please enter your User ID'
@@ -199,11 +201,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                    prefixIcon: const Icon(LucideIcons.lock, size: 18),
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
+                          ? LucideIcons.eye
+                          : LucideIcons.eyeOff, size: 18),
                       onPressed: () =>
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),

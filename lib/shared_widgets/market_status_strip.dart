@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/services/market_status_service.dart';
 import '../core/theme/trading_colors.dart';
 
@@ -80,7 +81,7 @@ class MarketStatusStrip extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Icon(
-                    Icons.info_outline,
+                    LucideIcons.info,
                     size: 13,
                     color: colors.textSecondary.withValues(alpha: 0.7),
                   ),
@@ -120,7 +121,7 @@ class MarketStatusStrip extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -174,7 +175,7 @@ class MarketStatusStrip extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.schedule, color: colors.primary, size: 20),
+                    Icon(LucideIcons.clock, color: colors.primary, size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(

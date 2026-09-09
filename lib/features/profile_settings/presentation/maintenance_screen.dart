@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/maintenance_service.dart';
 import '../../../core/theme/trading_colors.dart';
 
@@ -63,8 +64,8 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   ),
                   child: const Center(
                     child: Icon(
-                      Icons.engineering_outlined,
-                      size: 48,
+                      LucideIcons.wrench,
+                      size: 44,
                       color: Color(0xFFE65100),
                     ),
                   ),
@@ -221,7 +222,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   onPressed: () {
                     context.push('/help');
                   },
-                  icon: Icon(Icons.support_agent, color: colors.primary, size: 20),
+                  icon: Icon(LucideIcons.headset, color: colors.primary, size: 20),
                   label: Text(
                     'Contact Support Desk',
                     style: GoogleFonts.inter(

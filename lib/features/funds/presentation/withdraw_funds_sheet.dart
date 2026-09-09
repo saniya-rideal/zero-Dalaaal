@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -8,6 +9,7 @@ import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/enums.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class WithdrawFundsSheet extends ConsumerStatefulWidget {
   const WithdrawFundsSheet({super.key});
@@ -137,16 +139,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
               Text('Withdraw Funds', style: AppTypography.h1(color: colors.textPrimary)),
@@ -182,7 +175,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                             const SizedBox(width: 4),
                             InkWell(
                               onTap: () => BalanceBreakdownDialog.show(context, Segment.EQUITY),
-                              child: Icon(Icons.info_outline_rounded, size: 14, color: colors.primary),
+                              child: Icon(LucideIcons.info, size: 14, color: colors.primary),
                             ),
                           ],
                         ),
@@ -278,7 +271,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                       ),
                     ),
                     child: ListTile(
-                      leading: const Icon(Icons.account_balance, size: 24),
+                      leading: const Icon(LucideIcons.landmark, size: 22),
                       title: Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,
                         spacing: 6,
@@ -307,7 +300,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.verified, color: colors.bullish, size: 12),
+                                Icon(LucideIcons.badgeCheck, color: colors.bullish, size: 12),
                                 const SizedBox(width: 2),
                                 Text('Verified', style: TextStyle(color: colors.bullish, fontSize: 10.5, fontWeight: FontWeight.bold)),
                               ],
@@ -348,7 +341,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                     ),
                   ),
                   child: ListTile(
-                    leading: const Icon(Icons.account_balance_wallet_outlined, size: 24),
+                    leading: const Icon(LucideIcons.wallet, size: 22),
                     title: Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 6,
@@ -394,7 +387,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.shield_rounded, color: colors.primary, size: 16),
+                          Icon(LucideIcons.shieldCheck, color: colors.primary, size: 16),
                           const SizedBox(width: 6),
                           Text(
                             'Enter 2FA Security OTP',
@@ -448,7 +441,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: colors.primary),
+                    Icon(LucideIcons.info, size: 16, color: colors.primary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(

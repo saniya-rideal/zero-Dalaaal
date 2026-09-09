@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/models/models.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class WatchlistRowActions extends StatelessWidget {
   final Instrument instrument;
@@ -30,14 +32,7 @@ class WatchlistRowActions extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Drag handle
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: colors.divider,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
+          const ZeroDragHandle(padding: EdgeInsets.zero),
           const SizedBox(height: 16),
 
           // Header
@@ -116,7 +111,7 @@ class WatchlistRowActions extends StatelessWidget {
 
           // Actions List
           ListTile(
-            leading: Icon(Icons.show_chart, color: colors.textPrimary),
+            leading: Icon(LucideIcons.lineChart, color: colors.textPrimary, size: 20),
             title: Text('View Chart', style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w500)),
             onTap: () {
               Navigator.pop(context);
@@ -124,7 +119,7 @@ class WatchlistRowActions extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: Icon(Icons.notifications_none_outlined, color: colors.textPrimary),
+            leading: Icon(LucideIcons.bell, color: colors.textPrimary, size: 20),
             title: Text('Set Alert', style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w500)),
             onTap: () {
               Navigator.pop(context);
@@ -132,7 +127,7 @@ class WatchlistRowActions extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: Icon(Icons.shopping_bag_outlined, color: colors.textPrimary),
+            leading: Icon(LucideIcons.shoppingBag, color: colors.textPrimary, size: 20),
             title: Text('Add to Basket', style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w500)),
             onTap: () {
               Navigator.pop(context);
@@ -141,7 +136,7 @@ class WatchlistRowActions extends StatelessWidget {
           ),
           if (instrument.type != InstrumentType.INDEX)
             ListTile(
-              leading: Icon(Icons.info_outline, color: colors.textPrimary),
+              leading: Icon(LucideIcons.info, color: colors.textPrimary, size: 20),
               title: Text('Fundamentals & Technicals', style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w500)),
               onTap: () {
                 Navigator.pop(context);
@@ -149,7 +144,7 @@ class WatchlistRowActions extends StatelessWidget {
               },
             ),
           ListTile(
-            leading: Icon(Icons.delete_outline, color: colors.bearish),
+            leading: Icon(LucideIcons.trash2, color: colors.bearish, size: 20),
             title: Text('Remove from Watchlist', style: AppTypography.body(color: colors.bearish, weight: FontWeight.w500)),
             onTap: () {
               Navigator.pop(context);

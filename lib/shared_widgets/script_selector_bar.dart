@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../data/mock/pinned_scripts_provider.dart';
@@ -97,8 +98,8 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
                         child: TextField(
                           decoration: InputDecoration(
                             hintText: 'Search script to bind...',
-                            prefixIcon: Icon(Icons.search,
-                                color: colors.textSecondary, size: 20),
+                            prefixIcon: Icon(LucideIcons.search,
+                                color: colors.textSecondary, size: 18),
                             border: InputBorder.none,
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 12),
@@ -125,8 +126,8 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
                                 '${script.name} • ${script.exchange.name}',
                                 style: AppTypography.caption(
                                     color: colors.textSecondary)),
-                            trailing: Icon(Icons.add_circle_outline,
-                                color: colors.secondary),
+                            trailing: Icon(LucideIcons.plusCircle,
+                                color: colors.secondary, size: 20),
                             onTap: () {
                               final notifier =
                                   ref.read(pinnedScriptsProvider.notifier);
@@ -188,7 +189,7 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(sheetCtx),
                   ),
                 ],
@@ -196,7 +197,7 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
             ),
             const Divider(height: 1),
             ListTile(
-              leading: Icon(Icons.trending_up, color: colors.primary),
+              leading: Icon(LucideIcons.trendingUp, color: colors.primary, size: 20),
               title: Text('Trade / Place Order',
                   style: TextStyle(
                       color: colors.primary, fontWeight: FontWeight.w600)),
@@ -206,7 +207,7 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.candlestick_chart, color: colors.textPrimary),
+              leading: Icon(LucideIcons.candlestickChart, color: colors.textPrimary, size: 20),
               title: Text('View Fullscreen Chart',
                   style: TextStyle(color: colors.textPrimary)),
               onTap: () {
@@ -215,7 +216,7 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.info_outline, color: colors.textPrimary),
+              leading: Icon(LucideIcons.info, color: colors.textPrimary, size: 20),
               title: Text('Script Details',
                   style: TextStyle(color: colors.textPrimary)),
               onTap: () {
@@ -224,7 +225,7 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.swap_horiz, color: colors.secondary),
+              leading: Icon(LucideIcons.arrowLeftRight, color: colors.secondary, size: 20),
               title: Text('Change Script',
                   style: TextStyle(color: colors.textPrimary)),
               onTap: () {
@@ -233,7 +234,7 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
               },
             ),
             ListTile(
-              leading: Icon(Icons.delete_outline, color: colors.bearish),
+              leading: Icon(LucideIcons.trash2, color: colors.bearish, size: 20),
               title: Text('Unpin from Bar',
                   style: TextStyle(color: colors.bearish)),
               onTap: () {
@@ -323,8 +324,8 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                script != null ? Icons.check : Icons.add,
-                size: 14,
+                script != null ? LucideIcons.check : LucideIcons.plus,
+                size: 13,
                 color: Colors.white,
               ),
             ),

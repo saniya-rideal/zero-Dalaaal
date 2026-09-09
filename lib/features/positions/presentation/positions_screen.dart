@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -156,13 +157,27 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
-                    label: Text(
-                      '🟢 $profitableCount In Profit (${CurrencyFormatter.formatSigned(profitablePnl)})',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _statusFilter == PositionFilterType.profitable ? colors.bullish : colors.textSecondary,
-                      ),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: colors.bullish,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$profitableCount In Profit (${CurrencyFormatter.formatSigned(profitablePnl)})',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _statusFilter == PositionFilterType.profitable ? colors.bullish : colors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                     selected: _statusFilter == PositionFilterType.profitable,
                     selectedColor: colors.bullish.withValues(alpha: 0.18),
@@ -172,13 +187,27 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
-                    label: Text(
-                      '🔴 $losingCount In Loss (${CurrencyFormatter.formatSigned(losingPnl)})',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _statusFilter == PositionFilterType.losing ? colors.bearish : colors.textSecondary,
-                      ),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: colors.bearish,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$losingCount In Loss (${CurrencyFormatter.formatSigned(losingPnl)})',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _statusFilter == PositionFilterType.losing ? colors.bearish : colors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                     selected: _statusFilter == PositionFilterType.losing,
                     selectedColor: colors.bearish.withValues(alpha: 0.18),
@@ -194,7 +223,7 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
           Expanded(
             child: basePositions.isEmpty
                 ? EmptyStateView(
-                    icon: Icons.layers_outlined,
+                    icon: LucideIcons.layers,
                     title: 'No Open Positions',
                     subtitle: 'You do not have any active intraday or F&O positions for today.',
                     buttonText: 'Trade Now',
@@ -203,8 +232,8 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                 : filteredPositions.isEmpty
                     ? EmptyStateView(
                         icon: _statusFilter == PositionFilterType.profitable
-                            ? Icons.trending_up
-                            : Icons.trending_down,
+                            ? LucideIcons.trendingUp
+                            : LucideIcons.trendingDown,
                         title: _statusFilter == PositionFilterType.profitable
                             ? 'No Profitable Positions'
                             : 'No Losing Positions',
@@ -381,8 +410,8 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                                 ],
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.chevron_right,
-                                  color: colors.textSecondary, size: 20),
+                              Icon(LucideIcons.chevronRight,
+                                  color: colors.textSecondary, size: 18),
                             ],
                           ),
                         ),

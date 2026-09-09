@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import 'auth_controller.dart';
@@ -58,9 +59,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 ],
               ),
               child: const Center(
-                child: Text(
-                  '🐂',
-                  style: TextStyle(fontSize: 48),
+                child: Icon(
+                  LucideIcons.trendingUp,
+                  size: 48,
+                  color: Colors.white,
                 ),
               ),
             )

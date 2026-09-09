@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/mock/ticker_service.dart';
@@ -47,7 +48,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             border: InputBorder.none,
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear, size: 20),
+                    icon: const Icon(LucideIcons.x, size: 18),
                     onPressed: () {
                       _searchController.clear();
                       searchNotifier.onQueryChanged('');
@@ -156,9 +157,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 const SizedBox(width: 12),
                                 IconButton(
                                   icon: Icon(
-                                    isInWatchlist ? Icons.check_circle : Icons.add_circle_outline,
+                                    isInWatchlist ? LucideIcons.checkCircle2 : LucideIcons.plusCircle,
                                     color: isInWatchlist ? colors.bullish : colors.primary,
-                                    size: 24,
+                                    size: 22,
                                   ),
                                   onPressed: () {
                                     if (isInWatchlist) {
@@ -246,7 +247,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             runSpacing: 8,
             children: state.trending.map((instrument) {
               return ActionChip(
-                avatar: Icon(Icons.trending_up, color: colors.bullish, size: 16),
+                avatar: Icon(LucideIcons.trendingUp, color: colors.bullish, size: 16),
                 label: Text(instrument.symbol, style: AppTypography.caption(color: colors.textPrimary, weight: FontWeight.w600)),
                 backgroundColor: colors.surface,
                 onPressed: () {

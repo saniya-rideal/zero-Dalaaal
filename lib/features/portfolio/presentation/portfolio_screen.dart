@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -9,10 +10,8 @@ import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/mock/ticker_service.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/holding.dart';
-import '../../../shared_widgets/empty_state_view.dart';
-import '../../../shared_widgets/exchange_chip.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/margin_risk_banner.dart';
-import '../../../shared_widgets/section_card.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'portfolio_performance_chart.dart';
@@ -42,27 +41,11 @@ class PortfolioScreen extends ConsumerWidget {
     return Scaffold(
       drawer: const ZeroDrawer(activeRoute: '/portfolio'),
       appBar: AppBar(
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         title: Text('Holdings (${holdings.length})', style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.analytics_outlined),
+            icon: const Icon(LucideIcons.pieChart, size: 20),
             onPressed: () => context.push('/reports'),
             tooltip: 'Tax & Analytics',
           ),
@@ -149,7 +132,7 @@ class PortfolioScreen extends ConsumerWidget {
           Expanded(
             child: updatedHoldings.isEmpty
                 ? EmptyStateView(
-                    icon: Icons.account_balance_wallet_outlined,
+                    icon: LucideIcons.wallet,
                     title: 'No Holdings in Demat',
                     subtitle: 'Buy stocks with CNC product type to build your long-term wealth portfolio.',
                     buttonText: 'Start Investing',
@@ -260,7 +243,7 @@ class PortfolioScreen extends ConsumerWidget {
                                 ],
                               ),
                               const SizedBox(width: 4),
-                              Icon(Icons.chevron_right, color: colors.textSecondary, size: 18),
+                              Icon(LucideIcons.chevronRight, color: colors.textSecondary, size: 18),
                             ],
                           ),
                         ),
@@ -331,7 +314,7 @@ class PortfolioScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             ListTile(
-              leading: const Icon(Icons.show_chart),
+              leading: const Icon(LucideIcons.candlestickChart, size: 20),
               title: const Text('View Chart'),
               onTap: () {
                 Navigator.pop(context);
@@ -339,7 +322,7 @@ class PortfolioScreen extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.info_outline),
+              leading: const Icon(LucideIcons.info, size: 20),
               title: const Text('View Script Details & Fundamentals'),
               onTap: () {
                 Navigator.pop(context);

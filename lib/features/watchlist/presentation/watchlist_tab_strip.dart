@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/models/models.dart';
@@ -48,7 +49,7 @@ class WatchlistTabStrip extends StatelessWidget {
                       color: colors.surface,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.add, size: 18, color: colors.primary),
+                    child: Icon(LucideIcons.plus, size: 16, color: colors.primary),
                   ),
                 ),
               ),

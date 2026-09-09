@@ -19,3 +19,8 @@ export 'learning_content.dart';
 export 'notification_item.dart';
 export 'support_ticket.dart';
 export 'user_settings.dart';
+export 'stock_fundamentals.dart';
+export 'fatca_declaration.dart';
+export 'investor_risk_profile.dart';
+export 'corporate_action.dart';
+export 'sector_heatmap.dart';

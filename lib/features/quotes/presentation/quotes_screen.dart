@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -396,7 +397,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
         leading: _isEditMode
             ? IconButton(
                 icon:
-                    Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                    Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => setState(() {
                   _isEditMode = false;
                   _selectedForDelete.clear();
@@ -405,7 +406,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
               )
             : Builder(
                 builder: (innerContext) => IconButton(
-                  icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+                  icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 22),
                   onPressed: () {
                     final rootScaffold = innerContext
                         .findRootAncestorStateOfType<ScaffoldState>();
@@ -430,25 +431,25 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                   icon: Icon(
                     _selectedForDelete.length == _quotes.length &&
                             _quotes.isNotEmpty
-                        ? Icons.check_box
-                        : Icons.check_box_outlined,
+                        ? LucideIcons.checkSquare
+                        : LucideIcons.square,
                     color: colors.textPrimary,
-                    size: 24,
+                    size: 22,
                   ),
                   onPressed: _toggleSelectAll,
                   tooltip: 'Select All',
                 ),
                 IconButton(
                   icon: Icon(
-                    Icons.copy_outlined,
+                    LucideIcons.copy,
                     color: colors.textPrimary,
-                    size: 24,
+                    size: 22,
                   ),
                   onPressed: _deleteSelected,
                   tooltip: 'Delete / Manage Selected',
                 ),
                 IconButton(
-                  icon: Icon(Icons.check, color: colors.textPrimary, size: 26),
+                  icon: Icon(LucideIcons.check, color: colors.textPrimary, size: 22),
                   onPressed: () => setState(() {
                     _isEditMode = false;
                     _selectedForDelete.clear();
@@ -459,19 +460,25 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
               ]
             : [
                 IconButton(
-                  icon: Icon(Icons.folder_open_outlined,
-                      color: colors.textPrimary, size: 24),
+                  icon: Icon(LucideIcons.layoutGrid,
+                      color: colors.textPrimary, size: 20),
+                  onPressed: () => context.push('/heatmap'),
+                  tooltip: 'Market Heatmap',
+                ),
+                IconButton(
+                  icon: Icon(LucideIcons.folderOpen,
+                      color: colors.textPrimary, size: 22),
                   onPressed: () => _showManageWatchlistSheet(context, colors),
                   tooltip: 'Manage Watchlists',
                 ),
                 IconButton(
-                  icon: Icon(Icons.add, color: colors.textPrimary, size: 24),
+                  icon: Icon(LucideIcons.plus, color: colors.textPrimary, size: 22),
                   onPressed: () => context.push('/add-script'),
                   tooltip: 'Add Script',
                 ),
                 IconButton(
-                  icon: Icon(Icons.edit_note_outlined,
-                      color: colors.textPrimary, size: 26),
+                  icon: Icon(LucideIcons.edit3,
+                      color: colors.textPrimary, size: 22),
                   onPressed: () => setState(() => _isEditMode = true),
                   tooltip: 'Edit Scripts',
                 ),
@@ -679,14 +686,14 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                                   hintText: 'Search by Script Name',
                                   hintStyle: AppTypography.body(
                                       color: colors.textSecondary),
-                                  prefixIcon: Icon(Icons.search,
+                                  prefixIcon: Icon(LucideIcons.search,
                                       color: colors.textSecondary
                                           .withValues(alpha: 0.7),
-                                      size: 20),
+                                      size: 18),
                                   suffixIcon: _searchController.text.isNotEmpty
                                       ? IconButton(
-                                          icon: Icon(Icons.clear,
-                                              color: colors.textSecondary, size: 18),
+                                          icon: Icon(LucideIcons.x,
+                                              color: colors.textSecondary, size: 16),
                                           onPressed: () {
                                             _searchController.clear();
                                             setState(() => _query = '');
@@ -812,9 +819,9 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                     ],
                   ),
                   child: const Icon(
-                    Icons.support_agent,
+                    LucideIcons.headphones,
                     color: Colors.white,
-                    size: 28,
+                    size: 24,
                   ),
                 ),
               ),
@@ -915,15 +922,15 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 ),
               ),
 
-              // Edit Mode Reorder Handle (⠿)
+              // Edit Mode Reorder Handle
               if (_isEditMode && index != null) ...[
                 const SizedBox(width: 8),
                 ReorderableDragStartListener(
                   index: index,
                   child: Icon(
-                    Icons.drag_indicator,
+                    LucideIcons.gripVertical,
                     color: colors.textSecondary,
-                    size: 22,
+                    size: 20,
                   ),
                 ),
               ],
@@ -990,8 +997,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                           child: Row(
                             children: [
                               Icon(
-                                Icons.show_chart,
-                                size: 16,
+                                LucideIcons.lineChart,
+                                size: 14,
                                 color: colors.textPrimary,
                               ),
                               const SizedBox(width: 4),
@@ -1061,8 +1068,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                                       color: colors.textSecondary, tabular: true),
                                 ),
                                 const SizedBox(width: 4),
-                                Icon(Icons.swap_horiz,
-                                    size: 13, color: colors.textSecondary),
+                                Icon(LucideIcons.arrowLeftRight,
+                                    size: 11, color: colors.textSecondary),
                                 const SizedBox(width: 2),
                                 Text(
                                   '${item.spread}',
@@ -1081,7 +1088,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                               fit: BoxFit.scaleDown,
                               alignment: Alignment.centerRight,
                               child: Text(
-                                '↓ ${CurrencyFormatter.format(item.low, showSymbol: false)}',
+                                'L: ${CurrencyFormatter.format(item.low, showSymbol: false)}',
                                 style: AppTypography.labelSmall(
                                     color: colors.textSecondary, tabular: true),
                               ),
@@ -1093,7 +1100,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                           child: Align(
                             alignment: Alignment.centerRight,
                             child: Text(
-                              '↑ ${CurrencyFormatter.format(item.high, showSymbol: false)}',
+                              'H: ${CurrencyFormatter.format(item.high, showSymbol: false)}',
                               style: AppTypography.labelSmall(
                                   color: colors.textSecondary, tabular: true),
                             ),
@@ -1152,9 +1159,9 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                   child: Icon(
-                    Icons.drag_indicator,
+                    LucideIcons.gripVertical,
                     color: colors.textSecondary,
-                    size: 26,
+                    size: 24,
                   ),
                 ),
               ),
@@ -1290,8 +1297,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       OrderEntrySheet.show(context, instrument: targetInst);
@@ -1314,8 +1321,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       ref.read(watchlistControllerProvider.notifier).addInstrumentToActive(targetInst.token);
@@ -1348,8 +1355,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       context.push('/alerts');
@@ -1372,8 +1379,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       context.push('/option-chain?symbol=${Uri.encodeComponent(targetInst.symbol)}');
@@ -1396,8 +1403,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       context.push('/chart-fullscreen/${targetInst.token}');
@@ -1420,8 +1427,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       context.push('/quote/${targetInst.token}');
@@ -1444,8 +1451,8 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    trailing: Icon(Icons.chevron_right,
-                        color: colors.textSecondary, size: 22),
+                    trailing: Icon(LucideIcons.chevronRight,
+                        color: colors.textSecondary, size: 18),
                     onTap: () {
                       Navigator.pop(bottomSheetContext);
                       setState(() => _isProView = !_isProView);
@@ -1507,9 +1514,9 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isBull ? Icons.trending_up : Icons.trending_down,
+                    isBull ? LucideIcons.trendingUp : LucideIcons.trendingDown,
                     color: color,
-                    size: 15,
+                    size: 14,
                   ),
                   const SizedBox(width: 5),
                   Text(
@@ -1545,7 +1552,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
       color: Colors.black,
       child: Row(
         children: [
-          Icon(Icons.label_outline, size: 16, color: colors.primary),
+          Icon(LucideIcons.tag, size: 14, color: colors.primary),
           const SizedBox(width: 8),
           Text(
             category,
@@ -1608,7 +1615,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: colors.textSecondary),
+                      icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                       onPressed: () => Navigator.pop(ctx),
                     ),
                   ],
@@ -1635,8 +1642,9 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                     child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
                       leading: Icon(
-                        isActive ? Icons.bookmark : Icons.bookmark_outline,
+                        isActive ? LucideIcons.bookmarkCheck : LucideIcons.bookmark,
                         color: isActive ? colors.primary : colors.textSecondary,
+                        size: 20,
                       ),
                       title: Text(
                         group.name,
@@ -1658,14 +1666,14 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                         children: [
                           // Rename Button
                           IconButton(
-                            icon: Icon(Icons.edit_outlined, size: 18, color: colors.textSecondary),
+                            icon: Icon(LucideIcons.edit2, size: 16, color: colors.textSecondary),
                             tooltip: 'Rename',
                             onPressed: () => _showRenameDialog(context, group.id, group.name, colors),
                           ),
                           // Delete Button (if more than 1 watchlist)
                           if (watchlists.length > 1)
                             IconButton(
-                              icon: Icon(Icons.delete_outline, size: 18, color: colors.bearish),
+                              icon: Icon(LucideIcons.trash2, size: 16, color: colors.bearish),
                               tooltip: 'Delete',
                               onPressed: () => _confirmDeleteWatchlist(context, group.id, group.name, colors),
                             ),
@@ -1690,7 +1698,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 // Create Watchlist Button
                 OutlinedButton.icon(
                   onPressed: () => _showCreateWatchlistDialog(context, colors),
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const Icon(LucideIcons.plus, size: 16),
                   label: const Text('Create New Watchlist'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 44),

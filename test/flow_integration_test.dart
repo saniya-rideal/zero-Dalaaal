@@ -8,6 +8,7 @@ import 'package:zero_dalali/data/mock/settings_repository.dart';
 import 'package:zero_dalali/features/order_entry/presentation/order_entry_sheet.dart';
 import 'package:zero_dalali/features/quotes/presentation/quotes_screen.dart';
 import 'package:zero_dalali/shared_widgets/script_selector_bar.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:zero_dalali/shared_widgets/zero_app_bar.dart';
 import 'package:zero_dalali/shared_widgets/zero_bottom_dock.dart';
 import 'package:zero_dalali/shared_widgets/zero_drawer.dart';
@@ -274,12 +275,12 @@ void main() {
         await tester.tap(find.text('Push'));
         await tester.pumpAndSettle();
 
-        // Verify pushed subscreen has Back button (arrow_back)
+        // Verify pushed subscreen has Back button (arrowLeft)
         expect(find.text('Pushed Subscreen'), findsOneWidget);
-        expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+        expect(find.byIcon(LucideIcons.arrowLeft), findsOneWidget);
 
         // Tap back button
-        await tester.tap(find.byIcon(Icons.arrow_back));
+        await tester.tap(find.byIcon(LucideIcons.arrowLeft));
         await tester.pumpAndSettle();
 
         // Returned to home
@@ -317,7 +318,7 @@ void main() {
         expect(find.text('Equity:'), findsOneWidget);
 
         // Tap eye privacy toggle
-        final eyeFinder = find.byIcon(Icons.visibility_outlined);
+        final eyeFinder = find.byIcon(LucideIcons.eye);
         expect(eyeFinder, findsOneWidget);
         await tester.tap(eyeFinder);
         await tester.pump();

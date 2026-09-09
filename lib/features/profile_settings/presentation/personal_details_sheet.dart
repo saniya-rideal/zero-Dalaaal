@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -95,7 +96,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -153,7 +154,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                 controller: _nameController,
                 colors: colors,
                 enabled: _isEditing,
-                suffixIcon: const Icon(Icons.badge_outlined, size: 20),
+                suffixIcon: const Icon(LucideIcons.user, size: 18),
               ),
               const SizedBox(height: 12),
 
@@ -189,7 +190,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                 controller: _dobController,
                 colors: colors,
                 enabled: _isEditing,
-                suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+                suffixIcon: const Icon(LucideIcons.calendar, size: 18),
               ),
               const SizedBox(height: 12),
 
@@ -223,7 +224,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
               // Action Buttons
               if (!_isEditing)
                 ElevatedButton.icon(
-                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  icon: const Icon(LucideIcons.penSquare, size: 16),
                   label: const Text('EDIT PERSONAL DETAILS', style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colors.primary,
@@ -304,7 +305,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.verified, size: 14, color: Color(0xFF00A854)),
+                  const Icon(LucideIcons.badgeCheck, size: 14, color: Color(0xFF00A854)),
                   const SizedBox(width: 4),
                   Text('Verified', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF00A854))),
                 ],

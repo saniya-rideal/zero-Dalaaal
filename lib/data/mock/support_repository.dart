@@ -351,7 +351,7 @@ class SupportRepository extends ChangeNotifier {
         id: 'lc_01',
         senderName: 'Zero Support Desk',
         senderRole: MessageSenderRole.supportAgent,
-        content: '👋 Hi Anurag, welcome to Zero 24/7 Live Support! How can I assist you with your trading or account today?',
+        content: 'Hi Anurag, welcome to Zero 24/7 Live Support! How can I assist you with your trading or account today?',
         timestamp: now.subtract(const Duration(minutes: 5)),
       ),
     ]);

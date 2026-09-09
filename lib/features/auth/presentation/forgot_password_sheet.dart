@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 
 class ForgotPasswordSheet extends StatefulWidget {
@@ -184,7 +185,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -231,7 +232,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           style: TextStyle(color: colors.textPrimary),
           decoration: InputDecoration(
             labelText: 'User ID or Mobile Number',
-            prefixIcon: Icon(Icons.account_circle_outlined, color: colors.primary),
+            prefixIcon: Icon(LucideIcons.user, color: colors.primary, size: 18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
@@ -282,9 +283,9 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           style: TextStyle(color: colors.textPrimary),
           decoration: InputDecoration(
             labelText: 'New Password',
-            prefixIcon: const Icon(Icons.lock_outline),
+            prefixIcon: const Icon(LucideIcons.lock, size: 18),
             suffixIcon: IconButton(
-              icon: Icon(_obscureNew ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+              icon: Icon(_obscureNew ? LucideIcons.eye : LucideIcons.eyeOff, size: 18),
               onPressed: () => setState(() => _obscureNew = !_obscureNew),
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -324,9 +325,9 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           style: TextStyle(color: colors.textPrimary),
           decoration: InputDecoration(
             labelText: 'Confirm New Password',
-            prefixIcon: const Icon(Icons.lock_reset),
+            prefixIcon: const Icon(LucideIcons.keyRound, size: 18),
             suffixIcon: IconButton(
-              icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+              icon: Icon(_obscureConfirm ? LucideIcons.eye : LucideIcons.eyeOff, size: 18),
               onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
             ),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -374,7 +375,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
             color: Color(0xFF00A854),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check, size: 36, color: Colors.white),
+          child: const Icon(LucideIcons.check, size: 36, color: Colors.white),
         ),
         const SizedBox(height: 16),
         Text(

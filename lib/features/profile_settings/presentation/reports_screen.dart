@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
-import '../../../shared_widgets/section_card.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../history/presentation/statement_view_dialog.dart';
 
@@ -34,23 +33,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Text('Tax P&L & Analytics',
             style: GoogleFonts.inter(
@@ -60,18 +43,15 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         actions: [
           IconButton(
             tooltip: 'Digital Statement',
-            icon: Icon(Icons.receipt_long_rounded, color: colors.primary),
+            icon: Icon(LucideIcons.fileText, color: colors.primary),
             onPressed: () => StatementViewDialog.show(context),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Reports Body
           Expanded(
@@ -190,7 +170,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 padding: EdgeInsets.zero,
                                 visualDensity: VisualDensity.compact,
                               ),
-                              icon: Icon(Icons.open_in_new_rounded,
+                              icon: Icon(LucideIcons.externalLink,
                                   size: 16, color: colors.primary),
                               label: Text('Open Viewer',
                                   style: GoogleFonts.inter(
@@ -212,8 +192,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 color: colors.primary.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Icon(Icons.receipt_long_rounded,
-                                  color: colors.primary, size: 22),
+                              child: Icon(LucideIcons.fileText,
+                                  color: colors.primary, size: 20),
                             ),
                             title: Text('Account Statement & Ledger',
                                 style: GoogleFonts.inter(
@@ -225,8 +205,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 style: GoogleFonts.inter(
                                     color: colors.textSecondary,
                                     fontSize: 12)),
-                            trailing: Icon(Icons.chevron_right_rounded,
-                                color: colors.textSecondary, size: 22),
+                            trailing: Icon(LucideIcons.chevronRight,
+                                color: colors.textSecondary, size: 20),
                             onTap: () => StatementViewDialog.show(context),
                           ),
                         ),
@@ -241,8 +221,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 color: Colors.red.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.picture_as_pdf,
-                                  color: Colors.red, size: 22),
+                              child: const Icon(LucideIcons.fileText,
+                                  color: Colors.red, size: 20),
                             ),
                             title: Text('Tax P&L Summary (PDF)',
                                 style: GoogleFonts.inter(
@@ -254,8 +234,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 style: GoogleFonts.inter(
                                     color: colors.textSecondary,
                                     fontSize: 12)),
-                            trailing: Icon(Icons.download_rounded,
-                                color: colors.primary, size: 22),
+                            trailing: Icon(LucideIcons.download,
+                                color: colors.primary, size: 20),
                             onTap: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -284,8 +264,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 color: Colors.green.withOpacity(0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.table_view_rounded,
-                                  color: Colors.green, size: 22),
+                              child: const Icon(LucideIcons.sheet,
+                                  color: Colors.green, size: 20),
                             ),
                             title: Text('Trade Log & Ledger (CSV / Excel)',
                                 style: GoogleFonts.inter(
@@ -296,8 +276,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 style: GoogleFonts.inter(
                                     color: colors.textSecondary,
                                     fontSize: 12)),
-                            trailing: Icon(Icons.download_rounded,
-                                color: colors.primary, size: 22),
+                            trailing: Icon(LucideIcons.download,
+                                color: colors.primary, size: 20),
                             onTap: () {
                               final engine = ref.read(orderSimulationEngineProvider);
                               final now = DateTime.now();

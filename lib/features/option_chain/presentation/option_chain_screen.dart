@@ -3,8 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 
@@ -90,23 +89,7 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Column(
           children: [
@@ -125,11 +108,8 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Expiry Strip
           Container(

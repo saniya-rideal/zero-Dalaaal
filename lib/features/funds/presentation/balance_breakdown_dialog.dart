@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/enums.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 
 class BalanceBreakdownDialog extends ConsumerWidget {
   final Segment segment;
@@ -38,16 +40,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: colors.divider,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
               // Title
@@ -66,7 +59,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary, size: 20),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -122,7 +115,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    Icon(Icons.account_balance_wallet_rounded, color: colors.primary, size: 36),
+                    Icon(LucideIcons.wallet, color: colors.primary, size: 32),
                   ],
                 ),
               ),
@@ -217,7 +210,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.schedule_rounded, size: 16, color: colors.primary),
+                        Icon(LucideIcons.clock, size: 16, color: colors.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -247,7 +240,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.shield_outlined, size: 16, color: colors.bullish),
+                        Icon(LucideIcons.shieldCheck, size: 16, color: colors.bullish),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(

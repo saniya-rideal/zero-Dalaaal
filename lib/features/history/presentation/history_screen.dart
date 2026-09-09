@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -239,7 +240,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         selectedDateFilter: _selectedDateFilter,
         onDateFilterSelected: _applyPresetDateFilter,
         trailingAction: IconButton(
-          icon: Icon(Icons.description_outlined, color: colors.textPrimary, size: 22),
+          icon: Icon(LucideIcons.fileText, color: colors.textPrimary, size: 20),
           tooltip: 'Account Statement',
           onPressed: () => StatementViewDialog.show(
             context,
@@ -273,10 +274,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 decoration: InputDecoration(
                   hintText: 'Search by symbol, narration, order ID, or txn ID',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
-                  prefixIcon: Icon(Icons.search, color: colors.textSecondary, size: 20),
+                  prefixIcon: Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear, color: colors.textSecondary, size: 18),
+                          icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             _resetAndLoadTransactions();
@@ -443,22 +444,22 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     IconData catIcon;
     switch (txn.category) {
       case TransactionCategory.TRADE:
-        catIcon = Icons.candlestick_chart_rounded;
+        catIcon = LucideIcons.candlestickChart;
         break;
       case TransactionCategory.DEPOSIT:
-        catIcon = Icons.south_west_rounded;
+        catIcon = LucideIcons.arrowDownLeft;
         break;
       case TransactionCategory.WITHDRAWAL:
-        catIcon = Icons.north_east_rounded;
+        catIcon = LucideIcons.arrowUpRight;
         break;
       case TransactionCategory.FEE_CHARGE:
-        catIcon = Icons.receipt_long_rounded;
+        catIcon = LucideIcons.receipt;
         break;
       case TransactionCategory.DIVIDEND:
-        catIcon = Icons.stars_rounded;
+        catIcon = LucideIcons.sparkles;
         break;
       case TransactionCategory.TRANSFER:
-        catIcon = Icons.swap_horiz_rounded;
+        catIcon = LucideIcons.arrowLeftRight;
         break;
     }
 
@@ -731,8 +732,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.chevron_right,
-                          color: colors.textSecondary, size: 20),
+                      Icon(LucideIcons.chevronRight,
+                          color: colors.textSecondary, size: 18),
                     ],
                   ),
                 ),
@@ -814,8 +815,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                         ],
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.chevron_right,
-                          color: colors.textSecondary, size: 20),
+                      Icon(LucideIcons.chevronRight,
+                          color: colors.textSecondary, size: 18),
                     ],
                   ),
                 ),
@@ -882,8 +883,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Icon(Icons.chevron_right,
-                          color: colors.textSecondary, size: 20),
+                      Icon(LucideIcons.chevronRight,
+                          color: colors.textSecondary, size: 18),
                     ],
                   ),
                 ),
@@ -899,7 +900,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       alignment: Alignment.center,
       child: Column(
         children: [
-          Icon(Icons.history_toggle_off, size: 42, color: colors.textSecondary.withValues(alpha: 0.5)),
+          Icon(LucideIcons.history, size: 36, color: colors.textSecondary.withValues(alpha: 0.5)),
           const SizedBox(height: 8),
           Text(
             message,

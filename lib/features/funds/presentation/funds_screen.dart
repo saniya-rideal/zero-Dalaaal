@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/balance_privacy_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -66,13 +67,13 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
             final canPop = Navigator.of(ctx).canPop();
             if (canPop) {
               return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => Navigator.of(ctx).pop(),
                 tooltip: 'Back',
               );
             }
             return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 22),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               tooltip: 'Menu',
             );
@@ -90,7 +91,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
         actions: [
           IconButton(
             icon: Icon(
-              isHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              isHidden ? LucideIcons.eyeOff : LucideIcons.eye,
               color: colors.textSecondary,
               size: 20,
             ),
@@ -193,7 +194,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.pie_chart_outline_rounded, size: 13, color: colors.primary),
+                            Icon(LucideIcons.pieChart, size: 12, color: colors.primary),
                             const SizedBox(width: 4),
                             Text(
                               'Breakdown',
@@ -284,7 +285,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.verified_user_outlined, size: 16, color: colors.bullish),
+                  Icon(LucideIcons.shieldCheck, size: 15, color: colors.bullish),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -501,8 +502,8 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      isDeposit ? Icons.south_west_rounded : Icons.north_east_rounded,
-                      size: 16,
+                      isDeposit ? LucideIcons.arrowDownLeft : LucideIcons.arrowUpRight,
+                      size: 15,
                       color: isDeposit ? colors.bullish : colors.primary,
                     ),
                   ),
@@ -610,7 +611,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                           }
                         }
                       },
-                      icon: Icon(Icons.cancel_outlined, size: 14, color: colors.bearish),
+                      icon: Icon(LucideIcons.xCircle, size: 14, color: colors.bearish),
                       label: Text(
                         'Cancel Request',
                         style: GoogleFonts.inter(

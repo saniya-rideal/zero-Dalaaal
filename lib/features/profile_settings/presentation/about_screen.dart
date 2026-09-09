@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 
@@ -41,9 +42,10 @@ class AboutScreen extends StatelessWidget {
                         ],
                       ),
                       child: const Center(
-                        child: Text(
-                          '🐂',
-                          style: TextStyle(fontSize: 70),
+                        child: Icon(
+                          LucideIcons.trendingUp,
+                          size: 64,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -65,8 +67,8 @@ class AboutScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.language,
-                            color: colors.textPrimary, size: 22),
+                        Icon(LucideIcons.globe,
+                            color: colors.textPrimary, size: 20),
                         const SizedBox(width: 8),
                         Text(
                           'www.Zero.life',
@@ -84,8 +86,8 @@ class AboutScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.mail_outline,
-                            color: colors.textPrimary, size: 22),
+                        Icon(LucideIcons.mail,
+                            color: colors.textPrimary, size: 20),
                         const SizedBox(width: 8),
                         Text(
                           'mgmt1@Zero.life',
@@ -114,9 +116,9 @@ class AboutScreen extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.chat,
+                              LucideIcons.messageCircle,
                               color: Colors.white,
-                              size: 26,
+                              size: 24,
                             ),
                           ),
                         ),
@@ -132,9 +134,9 @@ class AboutScreen extends StatelessWidget {
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.share,
+                              LucideIcons.share2,
                               color: Colors.white,
-                              size: 26,
+                              size: 24,
                             ),
                           ),
                         ),

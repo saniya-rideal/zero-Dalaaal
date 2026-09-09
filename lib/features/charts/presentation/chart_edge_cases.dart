@@ -11,6 +11,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../data/models/models.dart';
 
@@ -144,7 +145,7 @@ class ChartNoDataOverlay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.bar_chart_outlined,
+              LucideIcons.barChart2,
               size: 56,
               color: colors.textSecondary.withValues(alpha: 0.35),
             ),
@@ -167,7 +168,7 @@ class ChartNoDataOverlay extends StatelessWidget {
               const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: onRetry,
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: const Icon(LucideIcons.rotateCcw, size: 16),
                 label: const Text('Retry'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: colors.primary,
@@ -215,7 +216,7 @@ class ChartDelayedDataBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.access_time, size: 13, color: Color(0xFFF57C00)),
+          const Icon(LucideIcons.clock, size: 13, color: Color(0xFFF57C00)),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -258,7 +259,7 @@ class ChartMarketClosedBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_clock_outlined, size: 13, color: colors.textSecondary),
+          Icon(LucideIcons.clock, size: 13, color: colors.textSecondary),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -298,7 +299,7 @@ class ChartNetworkErrorOverlay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.wifi_off_rounded,
+              LucideIcons.wifiOff,
               size: 56,
               color: colors.bearish.withValues(alpha: 0.7),
             ),
@@ -320,7 +321,7 @@ class ChartNetworkErrorOverlay extends StatelessWidget {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh, size: 16),
+              icon: const Icon(LucideIcons.rotateCcw, size: 16),
               label: const Text('Reconnect'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.primary,
@@ -471,7 +472,7 @@ class _ChartFastMovementBadgeState extends State<ChartFastMovementBadge>
     final color =
         isUp ? const Color(0xFF00897B) : const Color(0xFFE82B57);
     final icon =
-        isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded;
+        isUp ? LucideIcons.trendingUp : LucideIcons.trendingDown;
     final pctStr =
         '${isUp ? '+' : ''}${widget.changePercent.toStringAsFixed(2)}%';
 
@@ -536,7 +537,7 @@ class ChartDelistedOverlay extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.do_not_disturb_alt_rounded,
+              LucideIcons.ban,
               size: 56,
               color: colors.textSecondary.withValues(alpha: 0.40),
             ),
@@ -564,7 +565,7 @@ class ChartDelistedOverlay extends StatelessWidget {
               const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: onChangeSymbol,
-                icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                icon: const Icon(LucideIcons.arrowLeftRight, size: 16),
                 label: const Text('Change Symbol'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: colors.primary,

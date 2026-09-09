@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../data/mock/candle_generator.dart';
 import '../../../data/mock/order_simulation_engine.dart';
@@ -137,13 +138,13 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
             final canPop = Navigator.of(ctx).canPop();
             if (canPop) {
               return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => Navigator.of(ctx).pop(),
                 tooltip: 'Back',
               );
             }
             return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 22),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               tooltip: 'Menu',
             );
@@ -388,7 +389,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 2),
-                                    Icon(Icons.keyboard_arrow_down,
+                                    Icon(LucideIcons.chevronDown,
                                         size: 14, color: colors.textSecondary),
                                   ],
                                 ),
@@ -474,7 +475,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 2),
                                       child: Icon(
-                                        Icons.settings_outlined,
+                                        LucideIcons.settings,
                                         size: 14,
                                         color: colors.textSecondary,
                                       ),
@@ -545,7 +546,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  Icon(Icons.keyboard_arrow_down,
+                  Icon(LucideIcons.chevronDown,
                       size: 14, color: colors.textSecondary),
                 ],
               ),
@@ -570,7 +571,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  Icon(Icons.keyboard_arrow_down,
+                  Icon(LucideIcons.chevronDown,
                       size: 14, color: colors.textSecondary),
                 ],
               ),
@@ -586,10 +587,10 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
             child: Center(
               child: Icon(
                 _chartType == ChartType.candle
-                    ? Icons.candlestick_chart_outlined
+                    ? LucideIcons.candlestickChart
                     : _chartType == ChartType.line
-                        ? Icons.show_chart
-                        : Icons.bar_chart,
+                        ? LucideIcons.lineChart
+                        : LucideIcons.barChart2,
                 size: 18,
                 color: colors.textPrimary,
               ),
@@ -603,7 +604,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
           InkWell(
             onTap: () => _showInstrumentPicker(context),
             child: Center(
-              child: Icon(Icons.add_circle_outline,
+              child: Icon(LucideIcons.plusCircle,
                   size: 18, color: colors.textSecondary),
             ),
           ),
@@ -649,7 +650,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               }
             },
             child: Center(
-              child: Icon(Icons.undo, size: 18, color: colors.textSecondary),
+              child: Icon(LucideIcons.undo, size: 18, color: colors.textSecondary),
             ),
           ),
           const SizedBox(width: 14),
@@ -667,7 +668,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               }
             },
             child: Center(
-              child: Icon(Icons.redo, size: 18, color: colors.textSecondary),
+              child: Icon(LucideIcons.redo, size: 18, color: colors.textSecondary),
             ),
           ),
           const SizedBox(width: 14),
@@ -685,7 +686,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
             child: Center(
               child: Row(
                 children: [
-                  Icon(Icons.cloud_outlined,
+                  Icon(LucideIcons.cloud,
                       size: 18, color: colors.textSecondary),
                   const SizedBox(width: 4),
                   Text(
@@ -718,20 +719,20 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
   // 2. Left Vertical Drawing Toolbar
   Widget _buildLeftDrawingToolbar(TradingColors colors) {
     final tools = [
-      {'id': 'crosshair', 'icon': Icons.add, 'label': 'Crosshair'},
-      {'id': 'trendline', 'icon': Icons.timeline_outlined, 'label': 'Trend Line'},
-      {'id': 'fibonacci', 'icon': Icons.density_medium_outlined, 'label': 'Fibonacci'},
-      {'id': 'brush', 'icon': Icons.brush_outlined, 'label': 'Brush'},
-      {'id': 'text', 'icon': Icons.title_outlined, 'label': 'Text'},
-      {'id': 'pattern', 'icon': Icons.gesture_outlined, 'label': 'Pattern'},
-      {'id': 'prediction', 'icon': Icons.square_foot_outlined, 'label': 'Long/Short Position'},
-      {'id': 'emoji', 'icon': Icons.sentiment_satisfied_alt_outlined, 'label': 'Sticker'},
-      {'id': 'ruler', 'icon': Icons.straighten_outlined, 'label': 'Ruler'},
-      {'id': 'zoom', 'icon': Icons.zoom_in_outlined, 'label': 'Zoom In'},
-      {'id': 'magnet', 'icon': Icons.all_inclusive_outlined, 'label': 'Magnet Mode'},
-      {'id': 'lock', 'icon': _isLocked ? Icons.lock : Icons.lock_outline, 'label': 'Lock All'},
-      {'id': 'eye', 'icon': _showDrawings ? Icons.visibility_outlined : Icons.visibility_off_outlined, 'label': 'Hide Drawings'},
-      {'id': 'trash', 'icon': Icons.delete_outline, 'label': 'Clear All'},
+      {'id': 'crosshair', 'icon': LucideIcons.crosshair, 'label': 'Crosshair'},
+      {'id': 'trendline', 'icon': LucideIcons.trendingUp, 'label': 'Trend Line'},
+      {'id': 'fibonacci', 'icon': LucideIcons.alignJustify, 'label': 'Fibonacci'},
+      {'id': 'brush', 'icon': LucideIcons.paintbrush, 'label': 'Brush'},
+      {'id': 'text', 'icon': LucideIcons.type, 'label': 'Text'},
+      {'id': 'pattern', 'icon': LucideIcons.spline, 'label': 'Pattern'},
+      {'id': 'prediction', 'icon': LucideIcons.target, 'label': 'Long/Short Position'},
+      {'id': 'emoji', 'icon': LucideIcons.smile, 'label': 'Sticker'},
+      {'id': 'ruler', 'icon': LucideIcons.ruler, 'label': 'Ruler'},
+      {'id': 'zoom', 'icon': LucideIcons.zoomIn, 'label': 'Zoom In'},
+      {'id': 'magnet', 'icon': LucideIcons.magnet, 'label': 'Magnet Mode'},
+      {'id': 'lock', 'icon': _isLocked ? LucideIcons.lock : LucideIcons.unlock, 'label': 'Lock All'},
+      {'id': 'eye', 'icon': _showDrawings ? LucideIcons.eye : LucideIcons.eyeOff, 'label': 'Hide Drawings'},
+      {'id': 'trash', 'icon': LucideIcons.trash2, 'label': 'Clear All'},
     ];
 
     return Container(
@@ -918,7 +919,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Down Arrow (▼)
+                  // Down Arrow
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -932,8 +933,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                         width: 32,
                         height: 32,
                         child: Center(
-                          child: Icon(Icons.arrow_drop_down,
-                              size: 24, color: Colors.black),
+                          child: Icon(LucideIcons.chevronDown,
+                              size: 18, color: Colors.black),
                         ),
                       ),
                     ),
@@ -956,7 +957,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                     ),
                   ),
 
-                  // Up Arrow (▲)
+                  // Up Arrow
                   Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -968,8 +969,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                         width: 32,
                         height: 32,
                         child: Center(
-                          child: Icon(Icons.arrow_drop_up,
-                              size: 24, color: Colors.black),
+                          child: Icon(LucideIcons.chevronUp,
+                              size: 18, color: Colors.black),
                         ),
                       ),
                     ),
@@ -1237,7 +1238,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                             color: colors.textSecondary, fontSize: 12),
                       ),
                       trailing: isSelected
-                          ? Icon(Icons.check, color: colors.primary)
+                          ? Icon(LucideIcons.check, color: colors.primary, size: 18)
                           : null,
                       onTap: () {
                         Navigator.pop(context);
@@ -1279,11 +1280,11 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: Icon(Icons.candlestick_chart_outlined, color: colors.textPrimary),
+                  leading: Icon(LucideIcons.candlestickChart, color: colors.textPrimary),
                   title: Text('Candlestick Chart',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                   trailing: _chartType == ChartType.candle
-                      ? const Icon(Icons.check, color: Color(0xFF00A854))
+                      ? const Icon(LucideIcons.check, color: Color(0xFF00A854), size: 18)
                       : null,
                   onTap: () {
                     setState(() => _chartType = ChartType.candle);
@@ -1294,11 +1295,11 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: Icon(Icons.show_chart, color: colors.textPrimary),
+                  leading: Icon(LucideIcons.lineChart, color: colors.textPrimary),
                   title: Text('Line Chart',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                   trailing: _chartType == ChartType.line
-                      ? const Icon(Icons.check, color: Color(0xFF00A854))
+                      ? const Icon(LucideIcons.check, color: Color(0xFF00A854), size: 18)
                       : null,
                   onTap: () {
                     setState(() => _chartType = ChartType.line);
@@ -1309,11 +1310,11 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
               Material(
                 color: Colors.transparent,
                 child: ListTile(
-                  leading: Icon(Icons.bar_chart, color: colors.textPrimary),
+                  leading: Icon(LucideIcons.barChart2, color: colors.textPrimary),
                   title: Text('Bar Chart',
                       style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colors.textPrimary)),
                   trailing: _chartType == ChartType.bar
-                      ? const Icon(Icons.check, color: Color(0xFF00A854))
+                      ? const Icon(LucideIcons.check, color: Color(0xFF00A854), size: 18)
                       : null,
                   onTap: () {
                     setState(() => _chartType = ChartType.bar);

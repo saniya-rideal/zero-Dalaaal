@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
-import '../../../shared_widgets/section_card.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../auth/presentation/auth_controller.dart';
 import 'kyc_management_sheet.dart';
 import 'nominee_management_sheet.dart';
 import 'personal_details_sheet.dart';
+import 'fatca_declaration_sheet.dart';
+import 'risk_profile_sheet.dart';
+import '../../../data/mock/fatca_repository.dart';
+import '../../../data/mock/risk_profile_repository.dart';
+import '../../../data/models/investor_risk_profile.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -20,7 +24,22 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
     final authState = ref.watch(authControllerProvider);
+    final fatca = ref.watch(fatcaDeclarationProvider);
+    final riskProfile = ref.watch(riskProfileProvider);
     final profile = authState.session?.profile;
+
+    Color riskBadgeColor;
+    switch (riskProfile.category) {
+      case RiskCategory.conservative:
+        riskBadgeColor = const Color(0xFF0284C7);
+        break;
+      case RiskCategory.moderate:
+        riskBadgeColor = const Color(0xFF10B981);
+        break;
+      case RiskCategory.aggressive:
+        riskBadgeColor = const Color(0xFFF59E0B);
+        break;
+    }
 
     final name = profile?.name ?? AppConstants.demoUserName;
     final userId = profile?.userId ?? AppConstants.demoUserId;
@@ -33,23 +52,7 @@ class ProfileScreen extends ConsumerWidget {
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Text('Account & Profile',
             style: GoogleFonts.inter(
@@ -59,11 +62,8 @@ class ProfileScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Profile Body
           Expanded(
@@ -110,7 +110,7 @@ class ProfileScreen extends ConsumerWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    Icon(Icons.edit_outlined, size: 16, color: colors.primary),
+                                    Icon(LucideIcons.penSquare, size: 16, color: colors.primary),
                                   ],
                                 ),
                                 const SizedBox(height: 2),
@@ -153,25 +153,87 @@ class ProfileScreen extends ConsumerWidget {
                   // 2. Profile, KYC & Account Management Section
                   _buildMenuGroup(context, [
                     _MenuItem(
-                      icon: Icons.person_outline,
+                      icon: LucideIcons.user,
                       title: 'Personal & Demat Details',
                       subtitle: 'Edit contact, address, DOB, BO ID',
                       onTap: () => PersonalDetailsSheet.show(context),
                     ),
                     _MenuItem(
-                      icon: Icons.verified_user_outlined,
+                      icon: LucideIcons.shieldCheck,
                       title: 'Identity & KYC Documents',
                       subtitle: 'PAN, Aadhaar, verification status',
                       onTap: () => KycManagementSheet.show(context),
                     ),
                     _MenuItem(
-                      icon: Icons.family_restroom_outlined,
+                      icon: LucideIcons.fileCheck2,
+                      title: 'FATCA / CRS & PEP Declaration',
+                      subtitle: 'Tax residency (IT Rules 114F–114H)',
+                      trailingWidget: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: colors.bullish.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              fatca.status == 'VERIFIED'
+                                  ? 'COMPLIED'
+                                  : 'PENDING',
+                              style: GoogleFonts.inter(
+                                color: colors.bullish,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(LucideIcons.chevronRight,
+                                size: 14, color: colors.textSecondary),
+                          ],
+                        ),
+                      ),
+                      onTap: () => FatcaDeclarationSheet.show(context),
+                    ),
+                    _MenuItem(
+                      icon: LucideIcons.gauge,
+                      title: 'Investor Risk Profile',
+                      subtitle: 'SEBI suitability & risk tolerance assessment',
+                      trailingWidget: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: riskBadgeColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              riskProfile.category.label.toUpperCase(),
+                              style: GoogleFonts.inter(
+                                color: riskBadgeColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(LucideIcons.chevronRight,
+                                size: 14, color: colors.textSecondary),
+                          ],
+                        ),
+                      ),
+                      onTap: () => RiskProfileSheet.show(context),
+                    ),
+                    _MenuItem(
+                      icon: LucideIcons.users,
                       title: 'Nominee / Beneficiary',
                       subtitle: 'SEBI compliant nominee allocation',
                       onTap: () => NomineeManagementSheet.show(context),
                     ),
                     const _MenuItem(
-                      icon: Icons.account_balance_outlined,
+                      icon: LucideIcons.landmark,
                       title: 'Bank Accounts & UPI',
                       subtitle: 'Linked bank, IFSC, instant pay-in',
                       route: '/funds',
@@ -183,32 +245,32 @@ class ProfileScreen extends ConsumerWidget {
                   // 3. Products & Utilities Section
                   _buildMenuGroup(context, const [
                     _MenuItem(
-                        icon: Icons.account_balance_wallet_outlined,
+                        icon: LucideIcons.wallet,
                         title: 'Funds & Ledger',
                         subtitle: 'Pay in, withdraw, balance',
                         route: '/funds'),
                     _MenuItem(
-                        icon: Icons.shopping_bag_outlined,
+                        icon: LucideIcons.shoppingBag,
                         title: 'Baskets',
                         subtitle: 'Multi-leg order baskets',
                         route: '/baskets'),
                     _MenuItem(
-                        icon: Icons.calendar_today_outlined,
+                        icon: LucideIcons.calendar,
                         title: 'Stock SIP',
                         subtitle: 'Automated recurring investments',
                         route: '/sip'),
                     _MenuItem(
-                        icon: Icons.notifications_none_outlined,
+                        icon: LucideIcons.bell,
                         title: 'Alerts',
                         subtitle: 'Price and percentage triggers',
                         route: '/alerts'),
                     _MenuItem(
-                        icon: Icons.rocket_launch_outlined,
+                        icon: LucideIcons.rocket,
                         title: 'IPO',
                         subtitle: 'Initial public offerings',
                         route: '/ipo'),
                     _MenuItem(
-                        icon: Icons.table_chart_outlined,
+                        icon: LucideIcons.candlestickChart,
                         title: 'Option Chain',
                         subtitle: 'Nifty & Bank Nifty derivatives',
                         route: '/option-chain'),
@@ -219,17 +281,17 @@ class ProfileScreen extends ConsumerWidget {
                   // 4. Reports, Settings & Support
                   _buildMenuGroup(context, const [
                     _MenuItem(
-                        icon: Icons.assessment_outlined,
+                        icon: LucideIcons.barChart2,
                         title: 'Reports & Tax P&L',
                         subtitle: 'Capital gains, trade log',
                         route: '/reports'),
                     _MenuItem(
-                        icon: Icons.settings_outlined,
+                        icon: LucideIcons.settings,
                         title: 'Settings & Security',
                         subtitle: 'Theme, Security, PIN',
                         route: '/settings'),
                     _MenuItem(
-                        icon: Icons.help_outline,
+                        icon: LucideIcons.helpCircle,
                         title: 'Help & Support',
                         subtitle: 'FAQs, tickets, contact desk',
                         route: '/help'),
@@ -241,7 +303,7 @@ class ProfileScreen extends ConsumerWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
                     child: TextButton.icon(
-                      icon: Icon(Icons.delete_forever_outlined, color: colors.bearish, size: 20),
+                      icon: Icon(LucideIcons.userX, color: colors.bearish, size: 20),
                       label: Text(
                         'Close Trading Account & Request Data Deletion',
                         style: GoogleFonts.inter(
@@ -261,7 +323,7 @@ class ProfileScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16.0, vertical: 8.0),
                     child: OutlinedButton.icon(
-                      icon: Icon(Icons.logout, color: colors.bearish),
+                      icon: Icon(LucideIcons.logOut, color: colors.bearish, size: 18),
                       label: Text('Logout from Zero',
                           style: TextStyle(
                               color: colors.bearish,
@@ -299,7 +361,7 @@ class ProfileScreen extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: colors.bearish, size: 28),
+            Icon(LucideIcons.alertTriangle, color: colors.bearish, size: 26),
             const SizedBox(width: 8),
             Text('Account Closure', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 18, color: colors.textPrimary)),
           ],
@@ -369,8 +431,9 @@ class ProfileScreen extends ConsumerWidget {
                   subtitle: Text(item.subtitle,
                       style: GoogleFonts.inter(
                           color: colors.textSecondary, fontSize: 12)),
-                  trailing: Icon(Icons.chevron_right,
-                      size: 20, color: colors.textSecondary),
+                  trailing: item.trailingWidget ??
+                      Icon(LucideIcons.chevronRight,
+                          size: 20, color: colors.textSecondary),
                   onTap: () {
                     if (item.onTap != null) {
                       item.onTap!();
@@ -399,6 +462,7 @@ class _MenuItem {
   final String subtitle;
   final String route;
   final VoidCallback? onTap;
+  final Widget? trailingWidget;
 
   const _MenuItem({
     required this.icon,
@@ -406,5 +470,6 @@ class _MenuItem {
     required this.subtitle,
     this.route = '',
     this.onTap,
+    this.trailingWidget,
   });
 }

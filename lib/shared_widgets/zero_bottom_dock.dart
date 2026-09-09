@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/services/balance_privacy_service.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
@@ -81,7 +82,7 @@ class ZeroBottomDock extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      Icon(Icons.arrow_drop_down, color: colors.textSecondary, size: 16),
+                      Icon(LucideIcons.chevronDown, color: colors.textSecondary, size: 14),
                     ],
                   ),
                 ),
@@ -90,7 +91,7 @@ class ZeroBottomDock extends ConsumerWidget {
               // Eye Privacy Toggle
               IconButton(
                 icon: Icon(
-                  isHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  isHidden ? LucideIcons.eyeOff : LucideIcons.eye,
                   color: colors.textSecondary,
                   size: 16,
                 ),
@@ -213,7 +214,7 @@ class ZeroBottomDock extends ConsumerWidget {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: colors.textSecondary),
+                    icon: Icon(LucideIcons.x, color: colors.textSecondary, size: 20),
                     onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
@@ -236,7 +237,7 @@ class ZeroBottomDock extends ConsumerWidget {
                 ),
                 title: Text('159537 • Primary Account', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: colors.textPrimary)),
                 subtitle: Text('Individual Equity & F&O', style: GoogleFonts.inter(fontSize: 12, color: colors.textSecondary)),
-                trailing: const Icon(Icons.check_circle, color: Color(0xFF00A854)),
+                trailing: const Icon(LucideIcons.checkCircle2, color: Color(0xFF00A854), size: 20),
                 onTap: () => Navigator.pop(ctx),
               ),
               const Divider(height: 12),
@@ -277,7 +278,7 @@ class ZeroBottomDock extends ConsumerWidget {
                     const SnackBar(content: Text('Link Account flow initialized.')),
                   );
                 },
-                icon: const Icon(Icons.add, size: 18),
+                icon: const Icon(LucideIcons.plus, size: 18),
                 label: const Text('Link Another Client Account'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 44),

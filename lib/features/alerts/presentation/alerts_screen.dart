@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 
 class AlertItem {
@@ -186,23 +186,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
         backgroundColor: colors.cardBackground,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         centerTitle: true,
         title: Text('Alerts',
             style: GoogleFonts.inter(
@@ -211,7 +195,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                 fontSize: 18)),
         actions: [
           IconButton(
-            icon: Icon(Icons.add, color: colors.primary, size: 26),
+            icon: Icon(LucideIcons.plus, color: colors.primary, size: 22),
             onPressed: _showAddAlertDialog,
             tooltip: 'Add Alert',
           ),
@@ -220,11 +204,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
+          // Combined Market Header Strip
+          const ZeroMarketHeaderStrip(),
 
           // Search Bar
           Padding(
@@ -246,11 +227,11 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   hintText: 'Search by Script Name',
                   hintStyle: AppTypography.body(color: colors.textSecondary),
                   prefixIcon:
-                      Icon(Icons.search, color: colors.textSecondary, size: 20),
+                      Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
-                          icon: Icon(Icons.clear,
-                              color: colors.textSecondary, size: 18),
+                          icon: Icon(LucideIcons.x,
+                              color: colors.textSecondary, size: 16),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -343,8 +324,8 @@ class _AlertsScreenState extends State<AlertsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.notifications_off_outlined,
-                            size: 42,
+                        Icon(LucideIcons.bellOff,
+                            size: 40,
                             color: colors.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 8),
                         Text(

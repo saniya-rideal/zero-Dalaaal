@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 
@@ -123,7 +124,7 @@ class _PortfolioPerformanceChartState extends State<PortfolioPerformanceChart> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.show_chart_rounded, size: 18, color: Color(0xFF1E88E5)),
+                  const Icon(LucideIcons.trendingUp, size: 18, color: Color(0xFF1E88E5)),
                   const SizedBox(width: 6),
                   Text(
                     'Performance History',

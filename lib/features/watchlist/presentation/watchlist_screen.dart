@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/mock/ticker_service.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/empty_state_view.dart';
-import '../../../shared_widgets/instrument_row.dart';
-import '../../../shared_widgets/skeleton_loader.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'watchlist_controller.dart';
@@ -84,30 +83,14 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
     return Scaffold(
       drawer: const ZeroDrawer(activeRoute: '/watchlist'),
       appBar: AppBar(
-        leading: Builder(
-          builder: (innerContext) {
-            final canPop = Navigator.of(innerContext).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
-                onPressed: () => Navigator.of(innerContext).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
-              onPressed: () => Scaffold.of(innerContext).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
+        leading: const AdaptiveLeadingButton(),
         title: Text(
           'Marketwatch',
           style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
+            icon: const Icon(LucideIcons.search, size: 20),
             onPressed: () => context.push('/search'),
           ),
           Consumer(
@@ -117,7 +100,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                 icon: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    const Icon(Icons.notifications_none_outlined),
+                    const Icon(LucideIcons.bell, size: 20),
                     if (unreadCount > 0)
                       Positioned(
                         top: -2,
@@ -167,7 +150,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                 ? const ListSkeletonView(count: 10)
                 : activeGroup == null || activeGroup.instrumentTokens.isEmpty
                     ? EmptyStateView(
-                        icon: Icons.bookmark_border,
+                        icon: LucideIcons.bookmark,
                         title: 'Your Watchlist is Empty',
                         subtitle: 'Explore 150+ equities, indices, and derivatives to add them to this list.',
                         buttonText: 'Add Instruments',
@@ -245,7 +228,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
         onPressed: () => context.push('/search'),
         backgroundColor: colors.primary,
         foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
+        icon: const Icon(LucideIcons.plus, size: 20),
         label: const Text('Add Stock'),
       ),
     );

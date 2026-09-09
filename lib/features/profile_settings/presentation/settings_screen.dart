@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../data/mock/legal_documents.dart';
 import '../../../data/mock/settings_repository.dart';
@@ -37,13 +38,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             final canPop = Navigator.of(ctx).canPop();
             if (canPop) {
               return IconButton(
-                icon: Icon(Icons.arrow_back, color: colors.textPrimary, size: 24),
+                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
                 onPressed: () => Navigator.of(ctx).pop(),
                 tooltip: 'Back',
               );
             }
             return IconButton(
-              icon: Icon(Icons.menu, color: colors.textPrimary, size: 26),
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 24),
               onPressed: () => Scaffold.of(ctx).openDrawer(),
               tooltip: 'Menu',
             );
@@ -79,20 +80,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   // ================= 1. PROFILE SECTION =================
                   _buildSectionHeader('Profile', colors),
                   _buildNavRow(
-                    icon: Icons.password,
+                    icon: LucideIcons.keyRound,
                     title: 'Change Passwords',
                     onTap: () => _showChangePasswordSheet(context, repo, colors),
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.phonelink_lock_outlined,
+                    icon: LucideIcons.smartphone,
                     title: 'Enable two-factor authentication',
                     value: settings.twoFactorEnabled,
                     onChanged: (val) => repo.setTwoFactorEnabled(val),
                     colors: colors,
                   ),
                   _buildNavRow(
-                    icon: Icons.person_remove_outlined,
+                    icon: LucideIcons.userX,
                     title: 'Delete My User',
                     onTap: () => _showAccountDeletionSheet(context, repo, colors),
                     colors: colors,
@@ -108,7 +109,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.wb_sunny_outlined,
+                    icon: LucideIcons.sun,
                     title: 'Dark Theme',
                     value: settings.themeMode == ThemeMode.dark,
                     onChanged: (isDark) {
@@ -117,21 +118,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.screen_lock_portrait_outlined,
+                    icon: LucideIcons.smartphone,
                     title: 'Keep Screen Awake',
                     value: settings.keepScreenAwake,
                     onChanged: (val) => repo.setKeepScreenAwake(val),
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.volume_off_outlined,
+                    icon: LucideIcons.volumeX,
                     title: 'Mute All Sounds',
                     value: settings.muteAllSounds,
                     onChanged: (val) => repo.setMuteAllSounds(val),
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.all_inclusive,
+                    icon: LucideIcons.infinity,
                     title: 'Open From Where We Left?',
                     value: settings.openWhereLeft,
                     onChanged: (val) => repo.setOpenWhereLeft(val),
@@ -148,14 +149,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.table_rows_outlined,
+                    icon: LucideIcons.layoutGrid,
                     title: 'Quotes Grouping',
                     value: settings.quotesGrouping,
                     onChanged: (val) => repo.setQuotesGrouping(val),
                     colors: colors,
                   ),
                   _buildSwitchRow(
-                    icon: Icons.bookmark_border_outlined,
+                    icon: LucideIcons.pin,
                     title: 'Show Sticky Scripts',
                     value: settings.showStickyScripts,
                     onChanged: (val) => repo.setShowStickyScripts(val),
@@ -167,19 +168,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   // ================= 4. SUPPORT SECTION =================
                   _buildSectionHeader('Support', colors),
                   _buildNavRow(
-                    icon: Icons.assignment_outlined,
+                    icon: LucideIcons.fileText,
                     title: 'Terms and Conditions',
                     onTap: () => _showDocumentViewer(context, LegalDocuments.termsAndConditions, colors),
                     colors: colors,
                   ),
                   _buildNavRow(
-                    icon: Icons.help_outline,
+                    icon: LucideIcons.helpCircle,
                     title: 'Help',
                     onTap: () => context.push('/help'),
                     colors: colors,
                   ),
                   _buildNavRow(
-                    icon: Icons.shield_outlined,
+                    icon: LucideIcons.shield,
                     title: 'Privacy Policy',
                     onTap: () => _showDocumentViewer(context, LegalDocuments.privacyPolicy, colors),
                     colors: colors,
@@ -236,7 +237,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, size: 24, color: colors.textPrimary.withValues(alpha: 0.6)),
+            Icon(LucideIcons.chevronRight, size: 20, color: colors.textPrimary.withValues(alpha: 0.6)),
           ],
         ),
       ),
@@ -290,7 +291,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
-          Icon(Icons.translate, size: 24, color: colors.textPrimary),
+          Icon(LucideIcons.languages, size: 22, color: colors.textPrimary),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
@@ -308,7 +309,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ? currentLanguage
                   : AppLanguage.english,
               dropdownColor: colors.cardBackground,
-              icon: Icon(Icons.arrow_drop_down, color: colors.textPrimary, size: 20),
+              icon: Icon(LucideIcons.chevronDown, color: colors.textPrimary, size: 18),
               items: [
                 DropdownMenuItem(
                   value: AppLanguage.english,
@@ -345,7 +346,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.functions, size: 24, color: colors.textPrimary),
+              Icon(LucideIcons.calculator, size: 22, color: colors.textPrimary),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
@@ -370,7 +371,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: Color(0xFFE53935),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.remove, size: 16, color: Colors.white),
+                  child: const Icon(LucideIcons.minus, size: 14, color: Colors.white),
                 ),
               ),
               const SizedBox(width: 12),
@@ -396,7 +397,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     color: Color(0xFF1E88E5),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.add, size: 16, color: Colors.white),
+                  child: const Icon(LucideIcons.plus, size: 14, color: Colors.white),
                 ),
               ),
             ],
@@ -518,7 +519,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: colors.bearish, size: 28),
+                    Icon(LucideIcons.alertTriangle, color: colors.bearish, size: 26),
                     const SizedBox(width: 8),
                     Text('Delete My User', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: colors.textPrimary)),
                   ],
@@ -536,9 +537,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: colors.warning.withValues(alpha: 0.4)),
                   ),
-                  child: Text(
-                    '⚠️ Statutory Retention Notice: Under Section 12 of the PMLA Act, 2002 and SEBI guidelines, KYC documents and trade logs must be preserved for 5 years after account deletion.',
-                    style: GoogleFonts.inter(fontSize: 11.5, color: colors.textPrimary, height: 1.35),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(LucideIcons.alertTriangle, size: 16, color: colors.warning),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Statutory Retention Notice: Under Section 12 of the PMLA Act, 2002 and SEBI guidelines, KYC documents and trade logs must be preserved for 5 years after account deletion.',
+                          style: GoogleFonts.inter(fontSize: 11.5, color: colors.textPrimary, height: 1.35),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -602,7 +612,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: colors.textPrimary),
                     ),
                   ),
-                  IconButton(icon: Icon(Icons.close, color: colors.textSecondary), onPressed: () => Navigator.pop(ctx)),
+                  IconButton(icon: Icon(LucideIcons.x, color: colors.textSecondary), onPressed: () => Navigator.pop(ctx)),
                 ],
               ),
               Text(

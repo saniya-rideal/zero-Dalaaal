@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/services/security_privacy_service.dart';
 import '../../../core/theme/trading_colors.dart';
@@ -133,7 +134,7 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.lock_clock, color: colors.bearish, size: 20),
+                      Icon(LucideIcons.clock, color: colors.bearish, size: 18),
                       const SizedBox(width: 8),
                       Text(
                         'PIN Locked. Try again in $_lockoutSeconds s',
