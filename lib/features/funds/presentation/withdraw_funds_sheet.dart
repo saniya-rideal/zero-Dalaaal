@@ -9,18 +9,14 @@ import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/enums.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
+import '../../../core/services/web_redirect_service.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
 class WithdrawFundsSheet extends ConsumerStatefulWidget {
   const WithdrawFundsSheet({super.key});
 
   static void show(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const WithdrawFundsSheet(),
-    );
+    WebRedirectService.openWithdrawWebsite(context: context);
   }
 
   @override

@@ -215,13 +215,13 @@ void main() {
         await tester.pumpAndSettle();
 
         // Verify key navigation items exist in drawer
-        expect(find.text('Holdings & Portfolio'), findsOneWidget);
-        expect(find.text('Option Chain'), findsOneWidget);
-        expect(find.text('IPO Central'), findsOneWidget);
-        expect(find.text('Baskets'), findsOneWidget);
-        expect(find.text('SIP Investment'), findsOneWidget);
-        expect(find.text('Funds & Margin'), findsOneWidget);
-        expect(find.text('Reports & Tax P&L'), findsOneWidget);
+        expect(find.text('Quotes'), findsWidgets);
+        expect(find.text('Deals'), findsWidgets);
+        expect(find.text('Net Deals'), findsWidgets);
+        expect(find.text('Economic Calendar'), findsOneWidget);
+        expect(find.text('Profit Calculator'), findsOneWidget);
+        expect(find.text('Margin Calculator'), findsOneWidget);
+        expect(find.text('News'), findsOneWidget);
         expect(find.text('Share'), findsOneWidget);
 
         // Ensure visible & tap Share item

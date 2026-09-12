@@ -8,18 +8,14 @@ import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/funds.dart';
 import 'payment_gateway_dialog.dart';
 import 'transaction_receipt_dialog.dart';
+import '../../../core/services/web_redirect_service.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
 class AddFundsSheet extends ConsumerStatefulWidget {
   const AddFundsSheet({super.key});
 
   static void show(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const AddFundsSheet(),
-    );
+    WebRedirectService.openDepositWebsite(context: context);
   }
 
   @override

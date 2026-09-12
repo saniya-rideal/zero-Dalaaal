@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/balance_privacy_service.dart';
+import '../../../core/services/web_redirect_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -13,10 +14,8 @@ import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/section_card.dart';
 import '../../../shared_widgets/zero_drawer.dart';
-import 'add_funds_sheet.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
-import 'withdraw_funds_sheet.dart';
 
 class FundsScreen extends ConsumerStatefulWidget {
   const FundsScreen({super.key});
@@ -233,7 +232,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => AddFundsSheet.show(context),
+                        onPressed: () => WebRedirectService.openDepositWebsite(context: context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.bullish,
                           foregroundColor: Colors.white,
@@ -252,7 +251,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => WithdrawFundsSheet.show(context),
+                        onPressed: () => WebRedirectService.openWithdrawWebsite(context: context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.primary,
                           side: BorderSide(color: colors.primary),

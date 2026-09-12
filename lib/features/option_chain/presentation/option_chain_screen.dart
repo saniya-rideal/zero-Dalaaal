@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
+import 'payoff_graph_sheet.dart';
 
 class OptionChainScreen extends StatefulWidget {
   final String underlying;
@@ -42,13 +44,9 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
       final isAtm = i == 0;
 
       // Mock options pricing
-      final callLtp = (i < 0
-              ? (spot - strike) + 40.0
-              : 180.0 / (i + 1))
+      final callLtp = (i < 0 ? (spot - strike) + 40.0 : 180.0 / (i + 1))
           .clamp(2.5, 950.0);
-      final putLtp = (i > 0
-              ? (strike - spot) + 40.0
-              : 180.0 / (i.abs() + 1))
+      final putLtp = (i > 0 ? (strike - spot) + 40.0 : 180.0 / (i.abs() + 1))
           .clamp(2.5, 950.0);
 
       _rows.add(OptionChainRow(
@@ -78,6 +76,15 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
     }
   }
 
+  void _showStrategyPayoff() {
+    final strategy = OptionStrategy.bullCallSpread(
+      underlying: widget.underlying,
+      spot: 25150.0,
+      expiry: _expiries[_selectedExpiryIndex],
+    );
+    PayoffGraphSheet.show(context, strategy: strategy);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
@@ -105,6 +112,14 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
                     fontWeight: FontWeight.w500)),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: Icon(LucideIcons.chartLine, color: colors.primary, size: 20),
+            tooltip: 'Strategy Payoff',
+            onPressed: _showStrategyPayoff,
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Column(
         children: [
@@ -129,38 +144,48 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                   child: ChoiceChip(
-                    label: Text(_expiries[index],
-                        style: GoogleFonts.inter(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: isSelected
-                                ? Colors.white
-                                : colors.textPrimary)),
+                    label: Text(_expiries[index]),
                     selected: isSelected,
-                    selectedColor: colors.primary,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() => _selectedExpiryIndex = index);
+                      }
+                    },
+                    selectedColor: colors.primary.withValues(alpha: 0.2),
                     backgroundColor: colors.cardBackground,
-                    onSelected: (_) =>
-                        setState(() => _selectedExpiryIndex = index),
+                    labelStyle: GoogleFonts.inter(
+                      color: isSelected ? colors.primary : colors.textSecondary,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: isSelected ? colors.primary : colors.divider,
+                        width: 1,
+                      ),
+                    ),
+                    visualDensity: VisualDensity.compact,
                   ),
                 );
               },
             ),
           ),
 
-          // Option Chain Header (CALLS | STRIKE | PUTS)
+          // Header Table Strip
           Container(
             height: 32,
-            color: colors.scriptBarBackground,
             padding: const EdgeInsets.symmetric(horizontal: 8),
+            color: colors.cardBackground,
             child: Row(
               children: [
                 Expanded(
                   flex: 3,
-                  child: Text('CALLS (CE)',
-                      textAlign: TextAlign.center,
+                  child: Text('CALLS (LTP / OI)',
                       style: GoogleFonts.inter(
-                          color: colors.bullish,
-                          fontWeight: FontWeight.w800,
+                          color: colors.textSecondary,
+                          fontWeight: FontWeight.w600,
                           fontSize: 11)),
                 ),
                 Expanded(
@@ -168,29 +193,30 @@ class _OptionChainScreenState extends State<OptionChainScreen> {
                   child: Text('STRIKE',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
-                          color: colors.textPrimary,
-                          fontWeight: FontWeight.w800,
+                          color: colors.textSecondary,
+                          fontWeight: FontWeight.w600,
                           fontSize: 11)),
                 ),
                 Expanded(
                   flex: 3,
-                  child: Text('PUTS (PE)',
-                      textAlign: TextAlign.center,
+                  child: Text('PUTS (LTP / OI)',
+                      textAlign: TextAlign.end,
                       style: GoogleFonts.inter(
-                          color: colors.bearish,
-                          fontWeight: FontWeight.w800,
+                          color: colors.textSecondary,
+                          fontWeight: FontWeight.w600,
                           fontSize: 11)),
                 ),
               ],
             ),
           ),
+          Divider(height: 1, color: colors.divider),
 
-          // Option Chain Rows
+          // Rows List
           Expanded(
             child: ListView.separated(
               itemCount: _rows.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: colors.divider),
+              separatorBuilder: (context, index) =>
+                  Divider(height: 0.5, color: colors.divider.withValues(alpha: 0.5)),
               itemBuilder: (context, index) {
                 final row = _rows[index];
                 final isAtm = row.isAtm;

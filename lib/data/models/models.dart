@@ -24,3 +24,4 @@ export 'fatca_declaration.dart';
 export 'investor_risk_profile.dart';
 export 'corporate_action.dart';
 export 'sector_heatmap.dart';
+export 'option_strategy.dart';

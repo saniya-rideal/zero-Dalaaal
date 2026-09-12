@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/web_redirect_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -12,12 +13,9 @@ import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/mock/seed_instruments.dart';
 import '../../../data/mock/settings_repository.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/market_status_strip.dart';
 import '../../../shared_widgets/mt_price_text.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
-import '../../funds/presentation/add_funds_sheet.dart';
-import '../../funds/presentation/withdraw_funds_sheet.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import '../../profile_settings/presentation/live_chat_sheet.dart';
 import '../../watchlist/presentation/watchlist_controller.dart';
@@ -460,13 +458,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
               ]
             : [
                 IconButton(
-                  icon: Icon(LucideIcons.layoutGrid,
-                      color: colors.textPrimary, size: 20),
-                  onPressed: () => context.push('/heatmap'),
-                  tooltip: 'Market Heatmap',
-                ),
-                IconButton(
-                  icon: Icon(LucideIcons.folderOpen,
+                  icon: Icon(LucideIcons.star,
                       color: colors.textPrimary, size: 22),
                   onPressed: () => _showManageWatchlistSheet(context, colors),
                   tooltip: 'Manage Watchlists',
@@ -494,9 +486,6 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 onPublicNewsTap: () => context.push('/news'),
                 onPrivateNewsTap: () => context.push('/mails'),
               ),
-
-              // Real-time Market Status Strip (NSE/MCX Open/Closed & IST Timezone)
-              const MarketStatusStrip(),
 
               // Dual Script Selector Bar (Sticky Scripts Toggle)
               if (settings.showStickyScripts)
@@ -528,7 +517,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                                     height: 38,
                                     child: ElevatedButton(
                                       onPressed: () =>
-                                          AddFundsSheet.show(context),
+                                          WebRedirectService.openDepositWebsite(context: context),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor:
                                             const Color(0xFF1D357F),
@@ -556,7 +545,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                                     height: 38,
                                     child: ElevatedButton(
                                       onPressed: () =>
-                                          WithdrawFundsSheet.show(context),
+                                          WebRedirectService.openWithdrawWebsite(context: context),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: colors.primary,
                                         foregroundColor: Colors.white,
@@ -1365,29 +1354,6 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 ),
                 Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
-                // 4. Option Chain
-                Material(
-                  color: Colors.transparent,
-                  child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 20.0, vertical: 0.0),
-                    title: Text(
-                      'Option Chain',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        color: colors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: Icon(LucideIcons.chevronRight,
-                        color: colors.textSecondary, size: 18),
-                    onTap: () {
-                      Navigator.pop(bottomSheetContext);
-                      context.push('/option-chain?symbol=${Uri.encodeComponent(targetInst.symbol)}');
-                    },
-                  ),
-                ),
-                Divider(height: 1, thickness: 0.8, color: colors.divider.withValues(alpha: 0.6)),
 
                 // 5. Chart
                 Material(

@@ -4,11 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../core/services/web_redirect_service.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../features/auth/presentation/auth_controller.dart';
-import '../features/funds/presentation/add_funds_sheet.dart';
-import '../features/funds/presentation/withdraw_funds_sheet.dart';
 import 'zero_nav_icons.dart';
 
 class ZeroDrawer extends ConsumerStatefulWidget {
@@ -33,11 +32,8 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
         ? '${profile.userId}: ${profile.name}'
         : '159537: Anurag Sin...';
     final displayPhone = profile != null
-        ? '${profile.phone} - Zero'
-        : '8739039936 - Zero';
-    final initials = (profile?.name.isNotEmpty == true)
-        ? profile!.name.substring(0, 1).toUpperCase()
-        : 'A';
+        ? '${profile.phone} - ZeroDalali'
+        : '8739039936 - ZeroDalali';
 
     return Drawer(
       width: (screenWidth * 0.74).clamp(260.0, 320.0),
@@ -49,34 +45,32 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
       child: SafeArea(
         child: Column(
           children: [
-            // User Header
+            // User Header with Bull Logo
             InkWell(
               onTap: () {
                 if (_isNavigating) return;
                 _showAccountSwitchSheet(context);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: colors.divider.withValues(alpha: 0.5), width: 0.5)),
                 ),
                 child: Row(
                   children: [
+                    // Bull Logo Icon Badge (Matching Reference Image)
                     Container(
-                      width: 40,
-                      height: 40,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.85),
-                        shape: BoxShape.circle,
+                        color: const Color(0xFFFF5252),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                      child: const Center(
+                        child: Icon(
+                          LucideIcons.bicepsFlexed,
+                          color: Colors.white,
+                          size: 22,
                         ),
                       ),
                     ),
@@ -115,7 +109,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
               ),
             ),
 
-            // Navigation Items List
+            // Navigation Items List (Matching Reference Screenshots 1-5)
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
@@ -143,13 +137,6 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
-                    title: 'Orders',
-                    iconBuilder: (color) => Icon(LucideIcons.clipboardList, color: color, size: 20),
-                    route: '/orders',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
                     title: 'Net Deals',
                     iconBuilder: (color) => ZeroNavIcons.netDealsIcon(color: color, size: 20),
                     route: '/net-deals',
@@ -160,41 +147,6 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                     title: 'History',
                     iconBuilder: (color) => ZeroNavIcons.historyIcon(color: color, size: 20),
                     route: '/history',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
-                    title: 'Holdings & Portfolio',
-                    iconBuilder: (color) => Icon(LucideIcons.pieChart, color: color, size: 20),
-                    route: '/portfolio',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
-                    title: 'Option Chain',
-                    iconBuilder: (color) => Icon(LucideIcons.gitFork, color: color, size: 20),
-                    route: '/option-chain',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
-                    title: 'IPO Central',
-                    iconBuilder: (color) => Icon(LucideIcons.rocket, color: color, size: 20),
-                    route: '/ipo',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
-                    title: 'Baskets',
-                    iconBuilder: (color) => Icon(LucideIcons.shoppingBag, color: color, size: 20),
-                    route: '/baskets',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
-                    title: 'SIP Investment',
-                    iconBuilder: (color) => Icon(LucideIcons.repeat, color: color, size: 20),
-                    route: '/sip',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
@@ -213,13 +165,6 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
-                    title: 'Market Heatmap',
-                    iconBuilder: (color) => Icon(LucideIcons.layoutGrid, color: color, size: 20),
-                    route: '/heatmap',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
                     title: 'Accounts',
                     iconBuilder: (color) => Icon(LucideIcons.users, color: color, size: 20),
                     onTap: () => _showAccountSwitchSheet(context),
@@ -227,34 +172,27 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
-                    title: 'Funds & Margin',
-                    iconBuilder: (color) => Icon(LucideIcons.wallet, color: color, size: 20),
-                    route: '/funds',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
                     title: 'Deposit Fund',
-                    iconBuilder: (color) => Icon(LucideIcons.arrowDownLeft, color: color, size: 20),
+                    iconBuilder: (color) => Icon(LucideIcons.dollarSign, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
-                      AddFundsSheet.show(context);
+                      WebRedirectService.openDepositWebsite(context: context);
                     },
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
                     title: 'Withdraw Fund',
-                    iconBuilder: (color) => Icon(LucideIcons.arrowUpRight, color: color, size: 20),
+                    iconBuilder: (color) => Icon(LucideIcons.arrowDownLeft, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
-                      WithdrawFundsSheet.show(context);
+                      WebRedirectService.openWithdrawWebsite(context: context);
                     },
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
                     context: context,
-                    title: 'News & Insights',
+                    title: 'News',
                     iconBuilder: (color) => Icon(LucideIcons.newspaper, color: color, size: 20),
                     route: '/news',
                     colors: colors,
@@ -278,13 +216,6 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                     title: 'Margin Calculator',
                     iconBuilder: (color) => Icon(LucideIcons.percent, color: color, size: 20),
                     route: '/margin-calculator',
-                    colors: colors,
-                  ),
-                  _buildCustomDrawerItem(
-                    context: context,
-                    title: 'Reports & Tax P&L',
-                    iconBuilder: (color) => Icon(LucideIcons.fileSpreadsheet, color: color, size: 20),
-                    route: '/reports',
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(

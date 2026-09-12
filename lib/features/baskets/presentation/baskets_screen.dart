@@ -9,6 +9,7 @@ import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../../option_chain/presentation/payoff_graph_sheet.dart';
 
 class BasketsScreen extends ConsumerStatefulWidget {
   const BasketsScreen({super.key});
@@ -180,33 +181,63 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
                               );
                             }),
                             const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _executingBasketIds.contains(basket.id)
-                                    ? null
-                                    : () => _executeBasket(basket),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: colors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6)),
+                            Row(
+                              children: [
+                                // Payoff Graph button
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _showPayoffGraph(basket),
+                                    icon: Icon(LucideIcons.chartLine,
+                                        size: 14, color: colors.primary),
+                                    label: Text('Payoff',
+                                        style: GoogleFonts.inter(
+                                            color: colors.primary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 11.5)),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 9),
+                                      side: BorderSide(color: colors.primary),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6)),
+                                    ),
+                                  ),
                                 ),
-                                child: _executingBasketIds.contains(basket.id)
-                                    ? const SizedBox(
-                                        height: 16,
-                                        width: 16,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white),
-                                      )
-                                    : const Text('EXECUTE BASKET',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12.5)),
-                              ),
+                                const SizedBox(width: 8),
+                                // Execute button
+                                Expanded(
+                                  flex: 2,
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        _executingBasketIds.contains(basket.id)
+                                            ? null
+                                            : () => _executeBasket(basket),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: colors.primary,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(6)),
+                                    ),
+                                    child: _executingBasketIds
+                                            .contains(basket.id)
+                                        ? const SizedBox(
+                                            height: 16,
+                                            width: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white),
+                                          )
+                                        : const Text('EXECUTE',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12.5)),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -217,6 +248,34 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
         ],
       ),
     );
+  }
+
+  void _showPayoffGraph(Basket basket) {
+    // Build an OptionStrategy from the basket legs using seeded instrument data.
+    // For equity baskets, stock-type legs produce linear P&L payoffs.
+    const double mockSpot = 25150.0;
+    final legs = basket.legs.map((leg) {
+      final inst = SeedInstruments.findByToken(leg.instrumentToken);
+      final price = inst != null ? 1200.0 : 500.0; // approximate entry price
+      return OptionStrategyLeg(
+        side: leg.side,
+        type: StrategyLegType.stock,
+        strike: price,
+        premium: 0.0,
+        quantity: leg.quantity,
+        lotSize: 1,
+      );
+    }).toList();
+
+    final strategy = OptionStrategy(
+      name: basket.name,
+      underlying: 'EQUITY BASKET',
+      spotPrice: mockSpot,
+      expiry: 'N/A',
+      legs: legs,
+    );
+
+    PayoffGraphSheet.show(context, strategy: strategy);
   }
 
   void _executeBasket(Basket basket) async {
