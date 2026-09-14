@@ -172,6 +172,7 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
                     ),
                   )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     itemCount: positions.length,
                     separatorBuilder: (_, __) =>

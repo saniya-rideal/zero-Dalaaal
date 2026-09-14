@@ -328,6 +328,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
   // 1. Root Folder List (Global 1/47, Indian 19/816) - Matching Screenshot 1
   Widget _buildRootFolderList(TradingColors colors) {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: _folders.length,
       itemBuilder: (context, index) {
@@ -376,6 +377,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
   // 2. Sub-Folder List (Inside Global or Indian) - Matching Screenshots 2 & 3
   Widget _buildSubFolderList(AddScriptFolder folder, TradingColors colors) {
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: folder.categories.length,
       itemBuilder: (context, index) {
@@ -427,6 +429,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: cat.scripts.length,
       separatorBuilder: (_, __) => const Divider(height: 1),
@@ -473,6 +476,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(vertical: 4),
       itemCount: matches.length,
       separatorBuilder: (_, __) => const Divider(height: 1),

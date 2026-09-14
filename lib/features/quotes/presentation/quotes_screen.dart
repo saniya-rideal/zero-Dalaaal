@@ -498,6 +498,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                   child: ClipRect(
                     clipBehavior: Clip.hardEdge,
                     child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                       clipBehavior: Clip.hardEdge,
                       slivers: [
                     // Collapsible Header Section (Deposit/Withdraw, Toggles, Search)

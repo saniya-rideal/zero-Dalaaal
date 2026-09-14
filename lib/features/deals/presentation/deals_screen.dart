@@ -133,6 +133,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
 
           Expanded(
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding: const EdgeInsets.only(bottom: 24),
               child: Column(
                 children: [

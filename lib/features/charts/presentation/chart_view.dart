@@ -226,58 +226,85 @@ class _CandlestickChartViewState extends State<CandlestickChartView> {
             isFastMovement: _edgeCtrl.isFastMovement,
             fastMovementPercent: _edgeCtrl.fastMovementPercent,
             onRetry: () => _loadCandles(),
-            child: GestureDetector(
-              onScaleUpdate: (details) {
-                setState(() {
-                  if (details.scale != 1.0) {
-                    _candleWidth = (_candleWidth * details.scale).clamp(3.0, 24.0);
-                  }
-                  if (details.focalPointDelta.dx != 0) {
-                    _scrollOffset += details.focalPointDelta.dx;
-                  }
-                });
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onScaleUpdate: (details) {
+                    setState(() {
+                      if (details.scale != 1.0) {
+                        _candleWidth = (_candleWidth * details.scale).clamp(3.0, 24.0);
+                      }
+                      if (details.focalPointDelta.dx != 0) {
+                        final spacing = _candleWidth * 0.3;
+                        final fullStep = _candleWidth + spacing;
+                        final chartWidth = constraints.maxWidth - 60.0;
+                        final maxScroll = max(0.0, (_candles.length * fullStep) - chartWidth);
+                        _scrollOffset = (_scrollOffset + details.focalPointDelta.dx).clamp(-maxScroll, 0.0);
+                      }
+                    });
+                  },
+                  onLongPressStart: (details) {
+                    _updateCrosshairPosition(details.localPosition, constraints.maxWidth);
+                  },
+                  onLongPressMoveUpdate: (details) {
+                    _updateCrosshairPosition(details.localPosition, constraints.maxWidth);
+                  },
+                  onLongPressEnd: (_) {
+                    setState(() {
+                      _crosshairPosition = null;
+                      _selectedCandle = null;
+                    });
+                  },
+                  child: ClipRect(
+                    child: _edgeCtrl.state == ChartDataState.loaded ||
+                            _edgeCtrl.state == ChartDataState.marketClosed
+                        ? RepaintBoundary(
+                            child: CustomPaint(
+                              painter: _TradingChartPainter(
+                                candles: _candles,
+                                candleWidth: _candleWidth,
+                                scrollOffset: _scrollOffset,
+                                chartType: _selectedChartType,
+                                crosshairPosition: _crosshairPosition,
+                                colors: colors,
+                                indicators: _activeIndicators,
+                              ),
+                              child: Container(),
+                            ),
+                          )
+                        : const SizedBox.expand(),
+                  ),
+                );
               },
-              onLongPressStart: (details) {
-                setState(() => _crosshairPosition = details.localPosition);
-              },
-              onLongPressMoveUpdate: (details) {
-                setState(() => _crosshairPosition = details.localPosition);
-              },
-              onLongPressEnd: (_) {
-                setState(() {
-                  _crosshairPosition = null;
-                  _selectedCandle = null;
-                });
-              },
-              child: ClipRect(
-                child: _edgeCtrl.state == ChartDataState.loaded ||
-                        _edgeCtrl.state == ChartDataState.marketClosed
-                    ? CustomPaint(
-                        painter: _TradingChartPainter(
-                          candles: _candles,
-                          candleWidth: _candleWidth,
-                          scrollOffset: _scrollOffset,
-                          chartType: _selectedChartType,
-                          crosshairPosition: _crosshairPosition,
-                          colors: colors,
-                          indicators: _activeIndicators,
-                          onCandleSelected: (c) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (_selectedCandle != c && mounted) {
-                                setState(() => _selectedCandle = c);
-                              }
-                            });
-                          },
-                        ),
-                        child: Container(),
-                      )
-                    : const SizedBox.expand(),
-              ),
             ),
           ),
         ),
       ],
     );
+  }
+
+  void _updateCrosshairPosition(Offset pos, double totalWidth) {
+    if (_candles.isEmpty) return;
+    const priceAxisWidth = 60.0;
+    final chartWidth = totalWidth - priceAxisWidth;
+    final spacing = _candleWidth * 0.3;
+    final fullStep = _candleWidth + spacing;
+    final totalCandles = _candles.length;
+
+    final maxScroll = max(0.0, (totalCandles * fullStep) - chartWidth);
+    final clampedOffset = _scrollOffset.clamp(-maxScroll, 0.0);
+
+    final double rawIndex = (totalCandles - 1) - ((chartWidth + clampedOffset - pos.dx) / fullStep);
+    final int index = rawIndex.round().clamp(0, totalCandles - 1);
+    final candle = _candles[index];
+
+    if (_crosshairPosition != pos || _selectedCandle != candle) {
+      setState(() {
+        _crosshairPosition = pos;
+        _selectedCandle = candle;
+      });
+    }
   }
 
   Widget _buildChartTypeIcon(IconData icon, ChartType type) {
@@ -310,7 +337,6 @@ class _TradingChartPainter extends CustomPainter {
   final Offset? crosshairPosition;
   final TradingColors colors;
   final List<IndicatorConfig> indicators;
-  final ValueChanged<Candle?> onCandleSelected;
 
   _TradingChartPainter({
     required this.candles,
@@ -320,7 +346,6 @@ class _TradingChartPainter extends CustomPainter {
     required this.crosshairPosition,
     required this.colors,
     required this.indicators,
-    required this.onCandleSelected,
   });
 
   @override
@@ -395,9 +420,6 @@ class _TradingChartPainter extends CustomPainter {
     bool smaStarted = false;
 
     // Candle Render Loop
-    Candle? nearestCandle;
-    double minCrosshairDist = double.infinity;
-
     for (int i = 0; i < totalCandles; i++) {
       final candle = candles[i];
       final x = chartWidth - ((totalCandles - 1 - i) * fullStep) + clampedOffset;
@@ -456,15 +478,6 @@ class _TradingChartPainter extends CustomPainter {
           smaPath.lineTo(x, smaY);
         }
       }
-
-      // Check crosshair proximity
-      if (crosshairPosition != null) {
-        final dist = (crosshairPosition!.dx - x).abs();
-        if (dist < minCrosshairDist) {
-          minCrosshairDist = dist;
-          nearestCandle = candle;
-        }
-      }
     }
 
     // Draw Line chart if selected
@@ -509,14 +522,17 @@ class _TradingChartPainter extends CustomPainter {
       canvas.drawLine(Offset(crosshairPosition!.dx, 0), Offset(crosshairPosition!.dx, chartHeight), chPaint);
       // Horizontal line
       canvas.drawLine(Offset(0, crosshairPosition!.dy), Offset(chartWidth, crosshairPosition!.dy), chPaint);
-
-      // Trigger callback
-      if (nearestCandle != null) {
-        onCandleSelected(nearestCandle);
-      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _TradingChartPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _TradingChartPainter oldDelegate) {
+    return oldDelegate.candles != candles ||
+        oldDelegate.candleWidth != candleWidth ||
+        oldDelegate.scrollOffset != scrollOffset ||
+        oldDelegate.chartType != chartType ||
+        oldDelegate.crosshairPosition != crosshairPosition ||
+        oldDelegate.indicators != indicators ||
+        oldDelegate.colors != colors;
+  }
 }

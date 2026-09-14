@@ -83,6 +83,7 @@ class _SipScreenState extends State<SipScreen> {
                     onButtonPressed: _showCreateSipDialog,
                   )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     itemCount: _sips.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 6),

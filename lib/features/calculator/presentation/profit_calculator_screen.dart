@@ -86,6 +86,7 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
           // Main Inputs Scrollable List
           Expanded(
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

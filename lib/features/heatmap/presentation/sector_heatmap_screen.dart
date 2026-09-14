@@ -587,6 +587,7 @@ class SectorHeatmapScreen extends ConsumerWidget {
     SectorHeatmapFilterNotifier notifier,
   ) {
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       itemCount: payload.sectors.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),

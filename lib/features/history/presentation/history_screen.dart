@@ -382,6 +382,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           child: _loadedTransactions.isEmpty
               ? _buildEmptyState('No transactions match the selected filters.', colors)
               : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                   controller: _transactionsScrollController,
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: _loadedTransactions.length + 1,

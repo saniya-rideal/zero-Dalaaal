@@ -339,6 +339,7 @@ class _AlertsScreenState extends State<AlertsScreen> {
                     ),
                   )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     itemCount: filteredAlerts.length,
                     separatorBuilder: (_, __) =>

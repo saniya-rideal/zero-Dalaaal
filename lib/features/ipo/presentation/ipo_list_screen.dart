@@ -140,6 +140,7 @@ class _IpoListScreenState extends State<IpoListScreen>
     }
 
     return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: ipos.length,
       separatorBuilder: (_, __) => const SizedBox(height: 6),

@@ -130,6 +130,7 @@ class _CorporateActionsViewState extends ConsumerState<CorporateActionsView> {
           child: actions.isEmpty
               ? _buildEmptyState(colors)
               : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 12),
                   itemCount: actions.length,

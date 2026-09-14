@@ -111,6 +111,7 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
                     onButtonPressed: _showCreateBasketDialog,
                   )
                 : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     itemCount: _baskets.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 6),

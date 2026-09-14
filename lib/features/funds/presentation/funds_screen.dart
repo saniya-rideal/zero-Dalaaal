@@ -159,6 +159,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
     }).toList();
 
     return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

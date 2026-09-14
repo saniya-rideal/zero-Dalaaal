@@ -351,7 +351,9 @@ class PayoffChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(PayoffChartPainter oldDelegate) =>
-      points != oldDelegate.points;
+      points != oldDelegate.points ||
+      spotPrice != oldDelegate.spotPrice ||
+      metrics != oldDelegate.metrics;
 }
 
 /// The Flutter widget wrapping [PayoffChartPainter].
@@ -382,18 +384,20 @@ class PayoffChart extends StatelessWidget {
 
     return SizedBox(
       height: height,
-      child: CustomPaint(
-        painter: PayoffChartPainter(
-          points: points,
-          metrics: metrics,
-          spotPrice: spotPrice,
-          bullishColor: bullish,
-          bearishColor: bearish,
-          axisColor: axisColor,
-          gridColor: gridColor,
-          textColor: textColor,
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: PayoffChartPainter(
+            points: points,
+            metrics: metrics,
+            spotPrice: spotPrice,
+            bullishColor: bullish,
+            bearishColor: bearish,
+            axisColor: axisColor,
+            gridColor: gridColor,
+            textColor: textColor,
+          ),
+          child: const SizedBox.expand(),
         ),
-        child: const SizedBox.expand(),
       ),
     );
   }

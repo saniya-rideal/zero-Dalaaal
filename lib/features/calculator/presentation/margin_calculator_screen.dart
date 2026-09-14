@@ -82,6 +82,7 @@ class _MarginCalculatorScreenState extends State<MarginCalculatorScreen> {
           // Main Inputs Scrollable List
           Expanded(
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               padding:
                   const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Column(

@@ -288,7 +288,8 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           if (_selectedTabIndex == 0)
             Expanded(
               child: ListView.separated(
-              itemCount: _events.length,
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                itemCount: _events.length,
               separatorBuilder: (_, __) =>
                   Divider(height: 1, thickness: 0.8, color: colors.divider),
               itemBuilder: (context, index) {
