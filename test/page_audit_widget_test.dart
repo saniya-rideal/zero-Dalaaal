@@ -135,7 +135,7 @@ void main() {
       await tester.pumpWidget(_wrapScreen(const QuotesScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ListView), findsWidgets);
+      expect(find.byType(CustomScrollView), findsWidgets);
     });
 
     testWidgets('Audit 7: Deals (Positions) screen mounts with P&L and risk filters', (tester) async {

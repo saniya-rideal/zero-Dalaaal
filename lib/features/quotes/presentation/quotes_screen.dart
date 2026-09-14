@@ -698,9 +698,6 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                               ),
                             ),
                           ),
-
-                          // Top Movers (Gainers & Losers) Horizontal Carousel Strip
-                          _buildTopMoversStrip(colors),
                         ],
                       ),
                     ),
@@ -1443,73 +1440,7 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
     LiveChatSheet.show(context);
   }
 
-  Widget _buildTopMoversStrip(TradingColors colors) {
-    final sortedByGain = List<QuoteItemData>.from(_quotes)
-      ..sort((a, b) => b.changePercent.compareTo(a.changePercent));
-    final topGainers = sortedByGain.where((q) => q.changePercent > 0).take(3).toList();
-    final topLosers = sortedByGain.reversed.where((q) => q.changePercent < 0).take(3).toList();
-    final allMovers = [...topGainers, ...topLosers];
 
-    if (allMovers.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      height: 44,
-      margin: const EdgeInsets.only(top: 4, bottom: 4),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: allMovers.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = allMovers[index];
-          final isBull = item.changePercent >= 0;
-          final color = isBull ? colors.bullish : colors.bearish;
-          final prefix = isBull ? '+' : '';
-
-          return InkWell(
-            onTap: () => _handleQuoteTap(item),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: colors.cardBackground,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: color.withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isBull ? LucideIcons.trendingUp : LucideIcons.trendingDown,
-                    color: color,
-                    size: 14,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    item.symbol.split(' ').first,
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$prefix${item.changePercent.toStringAsFixed(2)}%',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
 
   Widget _buildCategoryHeader(
       String category, int count, TradingColors colors) {
