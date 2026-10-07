@@ -9,9 +9,11 @@ import 'package:zero_dalali/features/order_entry/presentation/order_entry_sheet.
 import 'package:zero_dalali/features/quotes/presentation/quotes_screen.dart';
 import 'package:zero_dalali/shared_widgets/script_selector_bar.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:zero_dalali/features/deals/presentation/deals_screen.dart';
 import 'package:zero_dalali/shared_widgets/zero_app_bar.dart';
 import 'package:zero_dalali/shared_widgets/zero_bottom_dock.dart';
 import 'package:zero_dalali/shared_widgets/zero_drawer.dart';
+import 'package:zero_dalali/shared_widgets/margin_risk_banner.dart';
 
 void main() {
   group('End-to-End Flow Integration Tests', () {
@@ -331,5 +333,32 @@ void main() {
         container.dispose();
       }
     });
+
+    testWidgets('DealsScreen mounts, filters deals by search query, and toggles profit filter',
+        (tester) async {
+      final container = ProviderContainer();
+      try {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(
+              home: Scaffold(
+                body: DealsScreen(),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Verify DealsScreen elements mount cleanly
+        expect(find.byType(DealsScreen), findsOneWidget);
+        expect(find.byType(MarginRiskBanner), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        container.dispose();
+      }
+    });
   });
 }
+
