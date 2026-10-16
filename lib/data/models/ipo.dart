@@ -43,22 +43,32 @@ class IpoListing {
     'description': description,
   };
 
-  factory IpoListing.fromJson(Map<String, dynamic> json) => IpoListing(
-    id: json['id'] as String,
-    companyName: json['companyName'] as String,
-    symbol: json['symbol'] as String,
-    openDate: DateTime.parse(json['openDate'] as String),
-    closeDate: DateTime.parse(json['closeDate'] as String),
-    priceBandLow: (json['priceBandLow'] as num).toDouble(),
-    priceBandHigh: (json['priceBandHigh'] as num).toDouble(),
-    lotSize: (json['lotSize'] as num).toInt(),
-    gmp: (json['gmp'] as num?)?.toDouble() ?? 0.0,
-    status: IpoStatus.values.byName(json['status'] as String),
-    description: json['description'] as String? ?? '',
-  );
+  factory IpoListing.fromJson(Map<String, dynamic> json) {
+    final statusStr = (json['status'] ?? 'CURRENT').toString().toUpperCase();
+    IpoStatus stat = IpoStatus.CURRENT;
+    if (statusStr == 'UPCOMING') {
+      stat = IpoStatus.UPCOMING;
+    } else if (statusStr == 'CLOSED') {
+      stat = IpoStatus.CLOSED;
+    }
+
+    return IpoListing(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      companyName: (json['companyName'] ?? json['name'] ?? '').toString(),
+      symbol: (json['symbol'] ?? '').toString(),
+      openDate: DateTime.tryParse((json['openDate'] ?? '').toString()) ?? DateTime.now(),
+      closeDate: DateTime.tryParse((json['closeDate'] ?? '').toString()) ?? DateTime.now().add(const Duration(days: 3)),
+      priceBandLow: (json['priceBandLow'] as num?)?.toDouble() ?? 0.0,
+      priceBandHigh: (json['priceBandHigh'] as num?)?.toDouble() ?? 0.0,
+      lotSize: (json['lotSize'] as num?)?.toInt() ?? 1,
+      gmp: (json['gmp'] as num?)?.toDouble() ?? 0.0,
+      status: stat,
+      description: (json['description'] ?? '').toString(),
+    );
+  }
 }
 
-enum ApplicationStatus { APPLIED, ALLOTTED, NOT_ALLOTTED }
+enum ApplicationStatus { APPLIED, ALLOTTED, NOT_ALLOTTED, CANCELLED }
 
 class IpoApplicationRequest {
   final String ipoId;
@@ -105,13 +115,43 @@ class IpoApplication {
     'appliedAt': appliedAt.toIso8601String(),
   };
 
-  factory IpoApplication.fromJson(Map<String, dynamic> json) => IpoApplication(
-    id: json['id'] as String,
-    ipo: IpoListing.fromJson(json['ipo'] as Map<String, dynamic>),
-    upiId: json['upiId'] as String,
-    lots: (json['lots'] as num).toInt(),
-    amount: (json['amount'] as num).toDouble(),
-    status: ApplicationStatus.values.byName(json['status'] as String),
-    appliedAt: DateTime.parse(json['appliedAt'] as String),
-  );
+  factory IpoApplication.fromJson(Map<String, dynamic> json) {
+    IpoListing listing;
+    if (json['ipo'] is Map<String, dynamic>) {
+      listing = IpoListing.fromJson(json['ipo'] as Map<String, dynamic>);
+    } else {
+      final sym = (json['symbol'] ?? '').toString();
+      listing = IpoListing(
+        id: (json['ipoId'] ?? json['ipo'] ?? '').toString(),
+        companyName: sym,
+        symbol: sym,
+        openDate: DateTime.now(),
+        closeDate: DateTime.now(),
+        priceBandLow: 0.0,
+        priceBandHigh: (json['bidPrice'] ?? json['price'] as num?)?.toDouble() ?? 0.0,
+        lotSize: (json['lots'] as num?)?.toInt() ?? 1,
+        status: IpoStatus.CURRENT,
+      );
+    }
+
+    final statStr = (json['status'] ?? 'APPLIED').toString().toUpperCase();
+    ApplicationStatus appStatus = ApplicationStatus.APPLIED;
+    if (statStr == 'ALLOTTED') {
+      appStatus = ApplicationStatus.ALLOTTED;
+    } else if (statStr == 'NOT_ALLOTTED') {
+      appStatus = ApplicationStatus.NOT_ALLOTTED;
+    } else if (statStr == 'CANCELLED') {
+      appStatus = ApplicationStatus.CANCELLED;
+    }
+
+    return IpoApplication(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      ipo: listing,
+      upiId: (json['upiId'] ?? '').toString(),
+      lots: (json['lots'] as num?)?.toInt() ?? 1,
+      amount: (json['amount'] ?? json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      status: appStatus,
+      appliedAt: DateTime.tryParse((json['appliedAt'] ?? json['createdAt'] ?? '').toString()) ?? DateTime.now(),
+    );
+  }
 }

@@ -85,33 +85,53 @@ class NewsArticle {
     'keyTakeaways': keyTakeaways,
   };
 
-  factory NewsArticle.fromJson(Map<String, dynamic> json) => NewsArticle(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    summary: json['summary'] as String,
-    fullContent: json['fullContent'] as String,
-    timestamp: DateTime.parse(json['timestamp'] as String),
-    source: json['source'] as String,
-    sourceUrl: json['sourceUrl'] as String?,
-    category: NewsCategory.values.byName(json['category'] as String),
-    sentiment: json['sentiment'] != null
-        ? NewsSentiment.values.byName(json['sentiment'] as String)
-        : NewsSentiment.NEUTRAL,
-    relatedTokens: (json['relatedTokens'] as List<dynamic>?)
-            ?.map((e) => e as String)
-            .toList() ??
-        const [],
-    relatedSymbols: (json['relatedSymbols'] as List<dynamic>?)
-            ?.map((e) => e as String)
-            .toList() ??
-        const [],
-    readTimeMinutes: (json['readTimeMinutes'] as num?)?.toInt() ?? 3,
-    imageUrl: json['imageUrl'] as String?,
-    keyTakeaways: (json['keyTakeaways'] as List<dynamic>?)
-            ?.map((e) => e as String)
-            .toList() ??
-        const [],
-  );
+  factory NewsArticle.fromJson(Map<String, dynamic> json) {
+    final catStr = (json['category'] ?? 'EQUITIES').toString().toUpperCase();
+    NewsCategory cat = NewsCategory.EQUITIES;
+    if (catStr.contains('FNO') || catStr.contains('DERIV')) {
+      cat = NewsCategory.FNO;
+    } else if (catStr.contains('COMMOD')) {
+      cat = NewsCategory.COMMODITIES;
+    } else if (catStr.contains('FOREX') || catStr.contains('CURR')) {
+      cat = NewsCategory.FOREX;
+    } else if (catStr.contains('ECON')) {
+      cat = NewsCategory.ECONOMY;
+    }
+
+    final sentStr = (json['sentiment'] ?? 'NEUTRAL').toString().toUpperCase();
+    NewsSentiment sent = NewsSentiment.NEUTRAL;
+    if (sentStr.contains('BULL')) {
+      sent = NewsSentiment.BULLISH;
+    } else if (sentStr.contains('BEAR')) {
+      sent = NewsSentiment.BEARISH;
+    }
+
+    final symbols = <String>[];
+    if (json['relatedSymbols'] is List) {
+      symbols.addAll((json['relatedSymbols'] as List).map((e) => e.toString()));
+    } else if (json['symbols'] is List) {
+      symbols.addAll((json['symbols'] as List).map((e) => e.toString()));
+    } else if (json['symbol'] != null) {
+      symbols.add(json['symbol'].toString());
+    }
+
+    return NewsArticle(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      summary: (json['summary'] ?? json['description'] ?? '').toString(),
+      fullContent: (json['fullContent'] ?? json['content'] ?? json['summary'] ?? json['description'] ?? '').toString(),
+      timestamp: DateTime.tryParse((json['timestamp'] ?? json['createdAt'] ?? json['publishedAt'] ?? '').toString()) ?? DateTime.now(),
+      source: (json['source'] ?? 'Market News').toString(),
+      sourceUrl: json['sourceUrl'] as String? ?? json['url'] as String?,
+      category: cat,
+      sentiment: sent,
+      relatedTokens: (json['relatedTokens'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+      relatedSymbols: symbols,
+      readTimeMinutes: (json['readTimeMinutes'] as num?)?.toInt() ?? 3,
+      imageUrl: json['imageUrl'] as String? ?? json['image'] as String?,
+      keyTakeaways: (json['keyTakeaways'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? const [],
+    );
+  }
 
   NewsArticle copyWith({
     String? id,

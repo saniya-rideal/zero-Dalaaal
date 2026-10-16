@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/app_constants.dart';
 import '../core/theme/app_theme.dart';
-import '../data/mock/settings_repository.dart';
+import '../features/profile_settings/data/settings_repository.dart';
 import 'router.dart';
 
 class ZeroApp extends ConsumerWidget {

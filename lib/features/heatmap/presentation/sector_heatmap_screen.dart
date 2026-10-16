@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/sector_heatmap_repository.dart';
+import '../data/heatmap_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';

@@ -81,18 +81,33 @@ class LearningModule {
     'iconName': iconName,
   };
 
-  factory LearningModule.fromJson(Map<String, dynamic> json) => LearningModule(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    description: json['description'] as String,
-    category: LearningCategory.values.byName(json['category'] as String),
-    level: DifficultyLevel.values.byName(json['level'] as String),
-    readTimeMinutes: (json['readTimeMinutes'] as num).toInt(),
-    sections: (json['sections'] as List<dynamic>)
-        .map((e) => LearningSection.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    iconName: json['iconName'] as String? ?? 'school',
-  );
+  factory LearningModule.fromJson(Map<String, dynamic> json) {
+    LearningCategory cat = LearningCategory.BASICS;
+    try {
+      cat = LearningCategory.values.byName((json['category'] ?? 'BASICS').toString());
+    } catch (_) {}
+
+    DifficultyLevel lvl = DifficultyLevel.BEGINNER;
+    try {
+      lvl = DifficultyLevel.values.byName((json['level'] ?? 'BEGINNER').toString());
+    } catch (_) {}
+
+    final secList = (json['sections'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(LearningSection.fromJson)
+        .toList();
+
+    return LearningModule(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      category: cat,
+      level: lvl,
+      readTimeMinutes: (json['readTimeMinutes'] as num?)?.toInt() ?? 5,
+      sections: secList,
+      iconName: json['iconName'] as String? ?? 'school',
+    );
+  }
 }
 
 @immutable

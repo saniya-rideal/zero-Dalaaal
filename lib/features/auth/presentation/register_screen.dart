@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,89 +15,54 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  // Step 1: Form Details, Step 2: OTP Verification, Step 3: Success Confirmation
-  int _currentStep = 1;
+  int _currentStep = 1; // 1: Form, 2: Success
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _mobileController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _otpController = TextEditingController();
+  final _pinController = TextEditingController();
+  final _confirmPinController = TextEditingController();
 
   String _countryCode = '+91';
-  String _selectedLanguage = 'English';
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _obscurePin = true;
+  bool _obscureConfirmPin = true;
 
-  // Checkboxes
   bool _acceptTerms = false;
   bool _acceptPrivacy = false;
   bool _acceptRiskDisclosure = false;
 
-  // OTP State
-  int _otpCountdown = 30;
-  Timer? _countdownTimer;
-  int _failedOtpAttempts = 0;
-  bool _isRateLimited = false;
-  int _rateLimitSeconds = 0;
-  Timer? _rateLimitTimer;
-  String? _otpError;
-  String _generatedOtp = '123456';
-  String? _generatedUserId;
+  String? _generatedClientId;
 
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(() => setState(() {}));
     _confirmPasswordController.addListener(() => setState(() {}));
+    _pinController.addListener(() => setState(() {}));
+    _confirmPinController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
-    _rateLimitTimer?.cancel();
     _nameController.dispose();
+    _emailController.dispose();
     _mobileController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _otpController.dispose();
+    _pinController.dispose();
+    _confirmPinController.dispose();
     super.dispose();
   }
 
-  void _startOtpCountdown() {
-    _countdownTimer?.cancel();
-    setState(() => _otpCountdown = 30);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_otpCountdown > 0) {
-        setState(() => _otpCountdown--);
-      } else {
-        timer.cancel();
-      }
-    });
-  }
-
-  void _startRateLimit(int seconds) {
-    setState(() {
-      _isRateLimited = true;
-      _rateLimitSeconds = seconds;
-    });
-    _rateLimitTimer?.cancel();
-    _rateLimitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_rateLimitSeconds > 0) {
-        setState(() => _rateLimitSeconds--);
-      } else {
-        setState(() => _isRateLimited = false);
-        timer.cancel();
-      }
-    });
-  }
-
-  // Password strength checker (0 to 4)
   int _calculatePasswordStrength(String password) {
     if (password.isEmpty) return 0;
     int strength = 0;
-    if (password.length >= 8) strength++;
+    if (password.length >= 10) strength++;
     if (password.contains(RegExp(r'[A-Z]'))) strength++;
     if (password.contains(RegExp(r'[0-9]'))) strength++;
     if (password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) strength++;
@@ -108,13 +72,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Color _getStrengthColor(int strength) {
     switch (strength) {
       case 1:
-        return const Color(0xFFE82B57); // Red
+        return const Color(0xFFE82B57);
       case 2:
-        return const Color(0xFFF5A623); // Orange
+        return const Color(0xFFF5A623);
       case 3:
-        return const Color(0xFF2F80ED); // Blue
+        return const Color(0xFF2F80ED);
       case 4:
-        return const Color(0xFF00A854); // Green
+        return const Color(0xFF00A854);
       default:
         return Colors.grey.shade400;
     }
@@ -137,16 +101,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   bool get _isFormValid {
     final hasName = _nameController.text.trim().isNotEmpty;
+    final hasEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text.trim());
     final hasMobile = _mobileController.text.trim().length >= 10;
+    final hasMinPassword = _passwordController.text.length >= 10;
     final strength = _calculatePasswordStrength(_passwordController.text);
     final passwordsMatch = _passwordController.text.isNotEmpty &&
         _passwordController.text == _confirmPasswordController.text;
-    final legalAccepted =
-        _acceptTerms && _acceptPrivacy && _acceptRiskDisclosure;
-    return hasName && hasMobile && strength >= 2 && passwordsMatch && legalAccepted;
+    final pinValid = RegExp(r'^\d{6}$').hasMatch(_pinController.text.trim()) &&
+        _pinController.text.trim() == _confirmPinController.text.trim();
+    final legalAccepted = _acceptTerms && _acceptPrivacy && _acceptRiskDisclosure;
+
+    return hasName && hasEmail && hasMobile && hasMinPassword && strength >= 2 && passwordsMatch && pinValid && legalAccepted;
   }
 
-  void _requestOtp() {
+  Future<void> _handleRegister() async {
     if (ref.read(isOfflineProvider)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -157,67 +125,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    // Duplicate mobile check simulation
-    if (_mobileController.text.trim() == '9999999999') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This mobile number is already registered. Please log in.'),
-          backgroundColor: Color(0xFFE65100),
-        ),
-      );
-      return;
-    }
+    final formattedPhone = _mobileController.text.trim().startsWith('+')
+        ? _mobileController.text.trim()
+        : '$_countryCode${_mobileController.text.trim()}';
 
-    setState(() {
-      _currentStep = 2;
-      _otpError = null;
-      _failedOtpAttempts = 0;
-      _generatedOtp = '123456';
-    });
-    _startOtpCountdown();
+    final result = await ref.read(authControllerProvider.notifier).register(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          phone: formattedPhone,
+          password: _passwordController.text,
+          pin: _pinController.text.trim(),
+        );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('OTP sent to $_countryCode ${_mobileController.text.trim()} (Demo OTP: 123456)'),
-        backgroundColor: const Color(0xFF00A854),
-        duration: const Duration(seconds: 4),
-      ),
-    );
-  }
-
-  void _verifyOtp() {
-    if (_isRateLimited) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Too many failed attempts. Try again in $_rateLimitSeconds seconds.'),
-          backgroundColor: const Color(0xFFC62828),
-        ),
-      );
-      return;
-    }
-
-    final entered = _otpController.text.trim();
-    if (entered == _generatedOtp) {
-      _countdownTimer?.cancel();
-      final randomNum = 100000 + DateTime.now().millisecond * 89;
+    if (result != null && mounted) {
       setState(() {
-        _generatedUserId = 'ZD-$randomNum';
-        _currentStep = 3;
+        _generatedClientId = result.clientId;
+        _currentStep = 2;
       });
-    } else {
-      setState(() {
-        _failedOtpAttempts++;
-        _otpError = 'Invalid OTP entered. Please try again.';
-      });
-      if (_failedOtpAttempts >= 3) {
-        _startRateLimit(60);
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final authState = ref.watch(authControllerProvider);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -227,67 +158,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
-          onPressed: () {
-            if (_currentStep == 2) {
-              setState(() => _currentStep = 1);
-            } else {
-              context.pop();
-            }
-          },
+          onPressed: () => context.pop(),
         ),
         title: Text(
-          _currentStep == 1
-              ? 'Create Zero Account'
-              : (_currentStep == 2 ? 'Verify Mobile OTP' : 'Account Created'),
+          _currentStep == 1 ? 'Create Zero Account' : 'Account Created',
           style: GoogleFonts.inter(
             color: colors.textPrimary,
             fontSize: 18,
             fontWeight: FontWeight.w700,
           ),
         ),
-        actions: [
-          if (_currentStep == 1)
-            Padding(
-              padding: const EdgeInsets.only(right: 16.0),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedLanguage,
-                  dropdownColor: colors.cardBackground,
-                  icon: Icon(LucideIcons.globe, color: colors.primary, size: 18),
-                  items: ['English'].map((lang) {
-                    return DropdownMenuItem(
-                      value: lang,
-                      child: Text(
-                        lang,
-                        style: GoogleFonts.inter(
-                          color: colors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _selectedLanguage = val);
-                  },
-                ),
-              ),
-            ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: _currentStep == 1
-              ? _buildStep1Form(colors)
-              : (_currentStep == 2 ? _buildStep2Otp(colors) : _buildStep3Success(colors)),
+              ? _buildForm(colors, authState)
+              : _buildSuccess(colors),
         ),
       ),
     );
   }
 
-  // STEP 1: REGISTRATION FORM
-  Widget _buildStep1Form(TradingColors colors) {
+  Widget _buildForm(TradingColors colors, AuthState authState) {
     final strength = _calculatePasswordStrength(_passwordController.text);
 
     return Form(
@@ -311,9 +204,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               color: colors.textSecondary,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // 1. Full Name Field
+          if (authState.errorMessage != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: colors.bearish.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colors.bearish.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                authState.errorMessage!,
+                style: GoogleFonts.inter(color: colors.bearish, fontSize: 13, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+
+          // 1. Full Name
           TextFormField(
             controller: _nameController,
             style: TextStyle(color: colors.textPrimary),
@@ -325,13 +234,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
             onChanged: (_) => setState(() {}),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // 2. Mobile Number & Country Code Field
+          // 2. Email Address
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            style: TextStyle(color: colors.textPrimary),
+            decoration: InputDecoration(
+              labelText: 'Email Address',
+              labelStyle: TextStyle(color: colors.textSecondary),
+              prefixIcon: Icon(LucideIcons.mail, color: colors.primary, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+
+          // 3. Mobile Number
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Country Code Selector
               Container(
                 height: 58,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -344,14 +267,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   child: DropdownButton<String>(
                     value: _countryCode,
                     dropdownColor: colors.cardBackground,
-                    items: ['+91', '+1', '+44', '+971', '+65'].map((code) {
+                    items: ['+91', '+1', '+44', '+971'].map((code) {
                       return DropdownMenuItem(
                         value: code,
                         child: Text(
                           code,
                           style: TextStyle(
-                              color: colors.textPrimary,
-                              fontWeight: FontWeight.w700),
+                            color: colors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       );
                     }).toList(),
@@ -362,7 +286,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ),
               const SizedBox(width: 10),
-              // Mobile Number Field
               Expanded(
                 child: TextFormField(
                   controller: _mobileController,
@@ -379,15 +302,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // 3. Password Creation Field
+          // 4. Password
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
             style: TextStyle(color: colors.textPrimary),
             decoration: InputDecoration(
               labelText: 'Password',
+              helperText: _passwordController.text.isNotEmpty && _passwordController.text.length < 10
+                  ? 'Must be at least 10 characters (${_passwordController.text.length}/10)'
+                  : 'At least 10 characters with numbers/symbols',
+              helperStyle: TextStyle(
+                color: _passwordController.text.isNotEmpty && _passwordController.text.length < 10
+                    ? colors.bearish
+                    : colors.textSecondary,
+                fontSize: 11,
+              ),
               labelStyle: TextStyle(color: colors.textSecondary),
               prefixIcon: Icon(LucideIcons.lock, color: colors.primary, size: 18),
               suffixIcon: IconButton(
@@ -401,10 +333,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          const SizedBox(height: 6),
-
-          // Password Strength Bar
           if (_passwordController.text.isNotEmpty) ...[
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -429,15 +359,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Minimum 8 chars with uppercase, number & symbol',
-              style: GoogleFonts.inter(fontSize: 10.5, color: colors.textSecondary),
-            ),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // 4. Confirm Password Field
+          // 5. Confirm Password
           TextFormField(
             controller: _confirmPasswordController,
             obscureText: _obscureConfirmPassword,
@@ -457,250 +382,136 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
-          if (_confirmPasswordController.text.isNotEmpty &&
-              _passwordController.text != _confirmPasswordController.text) ...[
-            const SizedBox(height: 4),
-            Text(
-              'Passwords do not match',
-              style: GoogleFonts.inter(fontSize: 11, color: colors.bearish),
-            ),
-          ],
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
 
-          // 5. Legal Checkboxes & Risk Disclosure
-          _buildCheckboxTile(
-            title: 'I accept the Terms & Conditions',
+          // 6. Security PIN (6 digits)
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _pinController,
+                  obscureText: _obscurePin,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  style: TextStyle(color: colors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: '6-digit PIN',
+                    counterText: '',
+                    labelStyle: TextStyle(color: colors.textSecondary),
+                    prefixIcon: Icon(LucideIcons.shieldCheck, color: colors.primary, size: 18),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePin ? LucideIcons.eye : LucideIcons.eyeOff,
+                        color: colors.textSecondary,
+                        size: 18,
+                      ),
+                      onPressed: () => setState(() => _obscurePin = !_obscurePin),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextFormField(
+                  controller: _confirmPinController,
+                  obscureText: _obscureConfirmPin,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
+                  style: TextStyle(color: colors.textPrimary),
+                  decoration: InputDecoration(
+                    labelText: 'Confirm PIN',
+                    counterText: '',
+                    labelStyle: TextStyle(color: colors.textSecondary),
+                    prefixIcon: Icon(LucideIcons.shieldCheck, color: colors.primary, size: 18),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPin ? LucideIcons.eye : LucideIcons.eyeOff,
+                        color: colors.textSecondary,
+                        size: 18,
+                      ),
+                      onPressed: () => setState(() => _obscureConfirmPin = !_obscureConfirmPin),
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Legal Checkboxes
+          CheckboxListTile(
+            title: Text('I accept the Terms & Conditions', style: GoogleFonts.inter(fontSize: 12, color: colors.textPrimary)),
             value: _acceptTerms,
             onChanged: (val) => setState(() => _acceptTerms = val ?? false),
-            colors: colors,
-            onInfoTap: () => _showDialogInfo(
-              context,
-              'Terms & Conditions',
-              'By opening a Zero account, you agree to exchange rules (NSE/BSE/MCX) and standard client broking agreements.',
-            ),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
           ),
-          _buildCheckboxTile(
-            title: 'I accept the Privacy Policy',
+          CheckboxListTile(
+            title: Text('I accept the Privacy Policy', style: GoogleFonts.inter(fontSize: 12, color: colors.textPrimary)),
             value: _acceptPrivacy,
             onChanged: (val) => setState(() => _acceptPrivacy = val ?? false),
-            colors: colors,
-            onInfoTap: () => _showDialogInfo(
-              context,
-              'Privacy Policy',
-              'Your PAN, mobile, KYC and banking records are protected with bank-grade 256-bit encryption.',
-            ),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
           ),
-          _buildCheckboxTile(
-            title: 'Risk Disclosure: 9 out of 10 individual traders in F&O incur net losses.',
+          CheckboxListTile(
+            title: Text('Risk Disclosure: 9 out of 10 traders incur losses in F&O.', style: GoogleFonts.inter(fontSize: 12, color: colors.bearish)),
             value: _acceptRiskDisclosure,
             onChanged: (val) => setState(() => _acceptRiskDisclosure = val ?? false),
-            colors: colors,
-            isWarning: true,
-            onInfoTap: () => _showDialogInfo(
-              context,
-              'SEBI Risk Disclosure',
-              'Derivative trading carries substantial capital risk. Over 90% of active retail traders incur losses.',
-            ),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
           ),
+          const SizedBox(height: 20),
 
-          const SizedBox(height: 24),
-
-          // 6. Create Account Button (Disabled until valid)
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: _isFormValid ? _requestOtp : null,
+              onPressed: (_isFormValid && !authState.isLoading) ? _handleRegister : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.primary,
                 disabledBackgroundColor: colors.surface,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
               ),
-              child: Text(
-                'CONTINUE & REQUEST OTP',
-                style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                  letterSpacing: 0.5,
-                ),
-              ),
+              child: authState.isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      'CREATE ACCOUNT',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
             ),
           ),
+          const SizedBox(height: 16),
 
-          const SizedBox(height: 18),
-
-          // Back to Login Link
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text('Already have an account? ',
-                  style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13)),
-              InkWell(
-                onTap: () => context.pop(),
-                child: Text(
-                  'Log In',
-                  style: GoogleFonts.inter(
-                    color: colors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
+          Center(
+            child: Wrap(
+              children: [
+                Text('Already registered? ', style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13)),
+                InkWell(
+                  onTap: () => context.pop(),
+                  child: Text('Log In', style: GoogleFonts.inter(color: colors.primary, fontWeight: FontWeight.w700, fontSize: 13)),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  // STEP 2: OTP VERIFICATION
-  Widget _buildStep2Otp(TradingColors colors) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Center(
-          child: Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(LucideIcons.messageSquare, size: 36, color: colors.primary),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Enter Verification Code',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
-            color: colors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'A 6-digit OTP has been sent to $_countryCode ${_mobileController.text.trim()}',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(fontSize: 13, color: colors.textSecondary),
-        ),
-        const SizedBox(height: 24),
-
-        // OTP Input Field
-        TextFormField(
-          controller: _otpController,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 12,
-            color: colors.textPrimary,
-          ),
-          decoration: InputDecoration(
-            counterText: '',
-            hintText: '••••••',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          onChanged: (val) {
-            if (val.length == 6) {
-              _verifyOtp();
-            }
-          },
-        ),
-
-        if (_otpError != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            _otpError!,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-                fontSize: 12.5,
-                color: colors.bearish,
-                fontWeight: FontWeight.w600),
-          ),
-        ],
-
-        if (_isRateLimited) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colors.bearish.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              'Too many failed attempts. Cooldown: $_rateLimitSeconds seconds remaining.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: colors.bearish,
-                  fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-
-        const SizedBox(height: 20),
-
-        // Resend Timer / Action
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("Didn't receive code? ",
-                style: GoogleFonts.inter(
-                    color: colors.textSecondary, fontSize: 13)),
-            if (_otpCountdown > 0)
-              Text(
-                'Resend in ${_otpCountdown}s',
-                style: GoogleFonts.inter(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              )
-            else
-              InkWell(
-                onTap: _isRateLimited ? null : _requestOtp,
-                child: Text(
-                  'Resend OTP',
-                  style: GoogleFonts.inter(
-                    color: _isRateLimited ? Colors.grey : colors.primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // Verify Button
-        SizedBox(
-          height: 48,
-          child: ElevatedButton(
-            onPressed: _otpController.text.length == 6 ? _verifyOtp : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: Text(
-              'VERIFY & REGISTER',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // STEP 3: SUCCESS CONFIRMATION
-  Widget _buildStep3Success(TradingColors colors) {
+  Widget _buildSuccess(TradingColors colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -726,159 +537,68 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Welcome to Zero Dalali. Your trading account has been successfully initialized.',
+          'Please note your permanent Client ID below. You will use it to log in.',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(fontSize: 13.5, color: colors.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 24),
 
-        // Account Card
+        // Generated Client ID Card
         Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: colors.cardBackground,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colors.divider),
+            border: Border.all(color: colors.primary.withValues(alpha: 0.4)),
           ),
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Client User ID',
-                      style: GoogleFonts.inter(
-                          color: colors.textSecondary, fontSize: 13)),
-                  Text(_generatedUserId ?? 'ZD-159537',
-                      style: GoogleFonts.inter(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16)),
-                ],
+              Text('Your Client ID', style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13)),
+              const SizedBox(height: 6),
+              Text(
+                _generatedClientId ?? '-',
+                style: GoogleFonts.inter(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 24,
+                  letterSpacing: 2,
+                ),
               ),
-              const Divider(height: 20),
+              const Divider(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Registered Name',
-                      style: GoogleFonts.inter(
-                          color: colors.textSecondary, fontSize: 13)),
-                  Text(_nameController.text.trim(),
-                      style: GoogleFonts.inter(
-                          color: colors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13.5)),
+                  Text('Name', style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13)),
+                  Text(_nameController.text.trim(), style: GoogleFonts.inter(color: colors.textPrimary, fontWeight: FontWeight.bold)),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Mobile',
-                      style: GoogleFonts.inter(
-                          color: colors.textSecondary, fontSize: 13)),
-                  Text('$_countryCode ${_mobileController.text.trim()}',
-                      style: GoogleFonts.inter(
-                          color: colors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13.5)),
+                  Text('Email', style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13)),
+                  Text(_emailController.text.trim(), style: GoogleFonts.inter(color: colors.textPrimary, fontWeight: FontWeight.bold)),
                 ],
               ),
             ],
           ),
         ),
-
         const SizedBox(height: 28),
 
-        // Proceed to Trade Button
         SizedBox(
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: () {
-              ref.read(authControllerProvider.notifier).login(
-                    _generatedUserId ?? 'ZD-159537',
-                    _passwordController.text,
-                  );
-              context.go('/quotes');
-            },
+            onPressed: () => context.go('/quotes'),
             style: ElevatedButton.styleFrom(
               backgroundColor: colors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text(
-              'PROCEED TO TRADE',
-              style: GoogleFonts.inter(
-                  fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: 0.5),
-            ),
+            child: const Text('PROCEED TO TRADE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildCheckboxTile({
-    required String title,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
-    required TradingColors colors,
-    required VoidCallback onInfoTap,
-    bool isWarning = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: value,
-              onChanged: onChanged,
-              activeColor: isWarning ? colors.bearish : colors.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: InkWell(
-              onTap: () => onChanged(!value),
-              child: Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 11.5,
-                  fontWeight: isWarning ? FontWeight.w700 : FontWeight.w500,
-                  color: isWarning ? colors.bearish : colors.textPrimary,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: Icon(LucideIcons.info, size: 16, color: colors.textSecondary),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: onInfoTap,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDialogInfo(BuildContext context, String title, String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Text(message, style: const TextStyle(fontSize: 13, height: 1.4)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('I Understand'),
-          ),
-        ],
-      ),
     );
   }
 }

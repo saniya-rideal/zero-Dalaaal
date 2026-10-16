@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zero_dalali/data/mock/fatca_repository.dart';
 import 'package:zero_dalali/data/models/fatca_declaration.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/fatca_declaration_sheet.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/profile_screen.dart';
@@ -81,17 +80,15 @@ void main() {
       expect(updated.isIndianTaxResidentOnly, original.isIndianTaxResidentOnly);
     });
 
-    test('FatcaRepository and Notifier state mutation and isComplied', () {
-      final repo = FatcaRepository();
-      expect(repo.isComplied, isTrue);
+    test('FatcaDeclaration compliance status verification', () {
+      final defaultDecl = FatcaDeclaration.defaultIndianResident();
+      expect(defaultDecl.status == 'VERIFIED' || defaultDecl.status == 'DECLARED', isTrue);
 
-      final custom = repo.declaration.copyWith(status: 'PENDING');
-      repo.updateDeclaration(custom);
-      expect(repo.isComplied, isFalse);
+      final custom = defaultDecl.copyWith(status: 'PENDING');
+      expect(custom.status == 'VERIFIED' || custom.status == 'DECLARED', isFalse);
 
       final declared = custom.copyWith(status: 'DECLARED');
-      repo.updateDeclaration(declared);
-      expect(repo.isComplied, isTrue);
+      expect(declared.status == 'VERIFIED' || declared.status == 'DECLARED', isTrue);
     });
   });
 

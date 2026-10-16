@@ -38,6 +38,8 @@ class OrderRequest {
   final OrderVariety variety;
   final BracketParams? bracket;
   final String? idempotencyKey;
+  final double? leverage;
+  final String? market;
 
   const OrderRequest({
     required this.instrumentToken,
@@ -52,6 +54,8 @@ class OrderRequest {
     this.variety = OrderVariety.REGULAR,
     this.bracket,
     this.idempotencyKey,
+    this.leverage,
+    this.market,
   });
 
   OrderRequest copyWith({
@@ -67,6 +71,8 @@ class OrderRequest {
     OrderVariety? variety,
     BracketParams? bracket,
     String? idempotencyKey,
+    double? leverage,
+    String? market,
   }) {
     return OrderRequest(
       instrumentToken: instrumentToken ?? this.instrumentToken,
@@ -81,6 +87,8 @@ class OrderRequest {
       variety: variety ?? this.variety,
       bracket: bracket ?? this.bracket,
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      leverage: leverage ?? this.leverage,
+      market: market ?? this.market,
     );
   }
 
@@ -97,22 +105,54 @@ class OrderRequest {
     'variety': variety.name,
     'bracket': bracket?.toJson(),
     'idempotencyKey': idempotencyKey,
+    if (leverage != null) 'leverage': leverage,
+    if (market != null) 'market': market,
   };
 
-  factory OrderRequest.fromJson(Map<String, dynamic> json) => OrderRequest(
-    instrumentToken: json['instrumentToken'] as String,
-    side: TransactionType.values.byName(json['side'] as String),
-    product: ProductType.values.byName(json['product'] as String),
-    kind: OrderKind.values.byName(json['kind'] as String),
-    quantity: (json['quantity'] as num).toInt(),
-    price: (json['price'] as num?)?.toDouble(),
-    triggerPrice: (json['triggerPrice'] as num?)?.toDouble(),
-    validity: Validity.values.byName(json['validity'] as String),
-    disclosedQty: (json['disclosedQty'] as num?)?.toInt() ?? 0,
-    variety: OrderVariety.values.byName(json['variety'] as String),
-    bracket: json['bracket'] != null ? BracketParams.fromJson(json['bracket'] as Map<String, dynamic>) : null,
-    idempotencyKey: json['idempotencyKey'] as String?,
-  );
+  factory OrderRequest.fromJson(Map<String, dynamic> json) {
+    final sym = (json['symbol'] ?? json['instrumentToken'] ?? '').toString();
+    final sideStr = (json['side'] ?? 'BUY').toString().toUpperCase();
+    final side = sideStr == 'SELL' ? TransactionType.SELL : TransactionType.BUY;
+
+    final prodStr = (json['product'] ?? 'MIS').toString().toUpperCase();
+    final product = prodStr == 'CNC' ? ProductType.CNC : ProductType.MIS;
+
+    final typeStr = (json['type'] ?? json['kind'] ?? 'MARKET').toString().toUpperCase();
+    final kind = typeStr == 'LIMIT' ? OrderKind.LIMIT : OrderKind.MARKET;
+
+    final qty = (json['quantity'] as num?)?.toInt() ?? 1;
+    final price = (json['price'] as num?)?.toDouble();
+    final trig = (json['triggerPrice'] as num?)?.toDouble();
+
+    Validity val = Validity.DAY;
+    if (json['validity'] != null) {
+      try {
+        val = Validity.values.byName(json['validity'].toString());
+      } catch (_) {}
+    }
+
+    OrderVariety varType = OrderVariety.REGULAR;
+    if (json['variety'] != null) {
+      try {
+        varType = OrderVariety.values.byName(json['variety'].toString());
+      } catch (_) {}
+    }
+
+    return OrderRequest(
+      instrumentToken: sym,
+      side: side,
+      product: product,
+      kind: kind,
+      quantity: qty,
+      price: price,
+      triggerPrice: trig,
+      validity: val,
+      disclosedQty: (json['disclosedQty'] as num?)?.toInt() ?? 0,
+      variety: varType,
+      bracket: json['bracket'] != null ? BracketParams.fromJson(json['bracket'] as Map<String, dynamic>) : null,
+      idempotencyKey: json['idempotencyKey'] as String?,
+    );
+  }
 }
 
 class OrderEvent {
@@ -248,7 +288,8 @@ class Order {
     this.rejectionReason,
   });
 
-  String get effectiveServerOrderId => serverOrderId ?? 'ZD-SRV-$orderId';
+  String get id => orderId;
+  String get effectiveServerOrderId => serverOrderId ?? orderId;
   String? get idempotencyKey => request.idempotencyKey;
 
   Order copyWith({
@@ -299,25 +340,149 @@ class Order {
     'rejectionReason': rejectionReason,
   };
 
-  factory Order.fromJson(Map<String, dynamic> json) => Order(
-    orderId: json['orderId'] as String,
-    exchangeOrderId: json['exchangeOrderId'] as String,
-    serverOrderId: json['serverOrderId'] as String?,
-    instrument: Instrument.fromJson(json['instrument'] as Map<String, dynamic>),
-    request: OrderRequest.fromJson(json['request'] as Map<String, dynamic>),
-    status: OrderStatus.values.byName(json['status'] as String),
-    filledQty: (json['filledQty'] as num).toInt(),
-    averagePrice: (json['averagePrice'] as num).toDouble(),
-    placedAt: DateTime.parse(json['placedAt'] as String),
-    timeline: (json['timeline'] as List<dynamic>).map((e) => OrderEvent.fromJson(e as Map<String, dynamic>)).toList(),
-    auditTrail: (json['auditTrail'] as List<dynamic>?)?.map((e) => OrderAuditEntry.fromJson(e as Map<String, dynamic>)).toList() ?? const [],
-    charges: ChargesBreakdown.fromJson(json['charges'] as Map<String, dynamic>),
-    rejectionReason: json['rejectionReason'] as String?,
-  );
+  factory Order.fromJson(Map<String, dynamic> json) {
+    final oId = (json['orderId'] ?? json['id'] ?? json['_id'] ?? '').toString();
+    final exId = (json['exchangeOrderId'] ?? json['serverOrderId'] ?? oId).toString();
+    final srvId = json['serverOrderId']?.toString();
+
+    // Tolerant status parsing
+    OrderStatus stat = OrderStatus.OPEN;
+    final statRaw = (json['status'] ?? '').toString().toUpperCase();
+    for (final val in OrderStatus.values) {
+      if (val.name == statRaw) {
+        stat = val;
+        break;
+      }
+    }
+    if (statRaw == 'PENDING') stat = OrderStatus.OPEN;
+    if (statRaw == 'FILLED') stat = OrderStatus.COMPLETE;
+
+    // Instrument parsing
+    Instrument inst;
+    if (json['instrument'] is Map<String, dynamic>) {
+      inst = Instrument.fromJson(json['instrument'] as Map<String, dynamic>);
+    } else {
+      final sym = (json['symbol'] ?? json['instrumentToken'] ?? '').toString();
+      inst = Instrument(
+        symbol: sym,
+        token: sym,
+        name: sym,
+        exchange: Exchange.NSE,
+        type: InstrumentType.EQ,
+      );
+    }
+
+    // Request parsing
+    OrderRequest req;
+    if (json['request'] is Map<String, dynamic>) {
+      req = OrderRequest.fromJson(json['request'] as Map<String, dynamic>);
+    } else {
+      TransactionType s = TransactionType.BUY;
+      final sideRaw = (json['side'] ?? '').toString().toUpperCase();
+      if (sideRaw == 'SELL') s = TransactionType.SELL;
+
+      OrderKind k = OrderKind.MARKET;
+      final kindRaw = (json['orderType'] ?? json['kind'] ?? '').toString().toUpperCase();
+      if (kindRaw == 'LIMIT') k = OrderKind.LIMIT;
+      if (kindRaw == 'SL' || kindRaw == 'STOP') k = OrderKind.SL;
+      if (kindRaw == 'SL_M' || kindRaw == 'STOP_MARKET') k = OrderKind.SL_M;
+
+      final qty = (json['quantity'] ?? json['filledQty'] as num?)?.toInt() ?? 1;
+      final limPrice = (json['limitPrice'] ?? json['price'] as num?)?.toDouble();
+      final stopLoss = (json['stopLoss'] as num?)?.toDouble();
+      final takeProfit = (json['takeProfit'] as num?)?.toDouble();
+
+      BracketParams? brk;
+      if (stopLoss != null || takeProfit != null) {
+        brk = BracketParams(
+          target: takeProfit ?? 0.0,
+          stopLoss: stopLoss ?? 0.0,
+        );
+      }
+
+      req = OrderRequest(
+        instrumentToken: inst.symbol,
+        side: s,
+        product: ProductType.MIS,
+        kind: k,
+        quantity: qty,
+        price: limPrice,
+        bracket: brk,
+        idempotencyKey: json['idempotencyKey']?.toString(),
+      );
+    }
+
+    final filled = (json['filledQty'] ?? json['quantity'] as num?)?.toInt() ?? 0;
+    final avg = (json['averagePrice'] ?? json['avgPrice'] ?? json['entryPrice'] ?? json['price'] as num?)?.toDouble() ?? 0.0;
+
+    DateTime placed;
+    final rawDate = json['placedAt'] ?? json['createdAt'] ?? json['timestamp'];
+    if (rawDate != null) {
+      placed = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+    } else {
+      placed = DateTime.now();
+    }
+
+    List<OrderEvent> tl = [];
+    if (json['timeline'] is List) {
+      tl = (json['timeline'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => OrderEvent.fromJson(e))
+          .toList();
+    }
+    if (tl.isEmpty) {
+      tl = [
+        OrderEvent(
+          status: stat,
+          description: 'Order $statRaw',
+          at: placed,
+        ),
+      ];
+    }
+
+    List<OrderAuditEntry> audits = [];
+    if (json['auditTrail'] is List) {
+      audits = (json['auditTrail'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => OrderAuditEntry.fromJson(e))
+          .toList();
+    }
+
+    ChargesBreakdown chg;
+    if (json['charges'] is Map<String, dynamic>) {
+      chg = ChargesBreakdown.fromJson(json['charges'] as Map<String, dynamic>);
+    } else {
+      final fee = (json['fees'] ?? json['margin'] as num?)?.toDouble() ?? 0.0;
+      chg = ChargesBreakdown(
+        brokerage: 0.0,
+        stt: 0.0,
+        exchangeTxnCharge: fee,
+        gst: 0.0,
+        sebiCharges: 0.0,
+        stampDuty: 0.0,
+      );
+    }
+
+    return Order(
+      orderId: oId,
+      exchangeOrderId: exId,
+      serverOrderId: srvId,
+      instrument: inst,
+      request: req,
+      status: stat,
+      filledQty: filled,
+      averagePrice: avg,
+      placedAt: placed,
+      timeline: tl,
+      auditTrail: audits,
+      charges: chg,
+      rejectionReason: json['rejectionReason']?.toString(),
+    );
+  }
 }
 
 enum GttType { SINGLE, OCO }
-enum GttStatus { ACTIVE, TRIGGERED, EXPIRED, CANCELLED }
+enum GttStatus { ACTIVE, TRIGGERED, EXPIRED, CANCELLED, REJECTED }
 
 class GttRequest {
   final String instrumentToken;
@@ -389,12 +554,68 @@ class GttOrder {
     'triggeredAt': triggeredAt?.toIso8601String(),
   };
 
-  factory GttOrder.fromJson(Map<String, dynamic> json) => GttOrder(
-    id: json['id'] as String,
-    instrument: Instrument.fromJson(json['instrument'] as Map<String, dynamic>),
-    request: GttRequest.fromJson(json['request'] as Map<String, dynamic>),
-    status: GttStatus.values.byName(json['status'] as String),
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    triggeredAt: json['triggeredAt'] != null ? DateTime.parse(json['triggeredAt'] as String) : null,
-  );
+  factory GttOrder.fromJson(Map<String, dynamic> json) {
+    final id = (json['id'] ?? json['_id'] ?? '').toString();
+    final sym = (json['symbol'] ?? (json['instrument'] is Map ? (json['instrument'] as Map)['symbol'] : '') ?? '').toString();
+
+    Instrument inst;
+    if (json['instrument'] is Map<String, dynamic>) {
+      inst = Instrument.fromJson(json['instrument'] as Map<String, dynamic>);
+    } else {
+      inst = Instrument(
+        token: sym,
+        symbol: sym,
+        name: sym,
+        exchange: Exchange.NSE,
+        segment: 'EQUITY',
+        type: InstrumentType.EQ,
+        lotSize: 1.0,
+        tickSize: 0.05,
+      );
+    }
+
+    GttRequest req;
+    if (json['request'] is Map<String, dynamic>) {
+      req = GttRequest.fromJson(json['request'] as Map<String, dynamic>);
+    } else {
+      final sideStr = (json['orderSide'] ?? json['side'] ?? 'BUY').toString().toUpperCase();
+      final side = sideStr == 'SELL' ? TransactionType.SELL : TransactionType.BUY;
+      final qty = (json['quantity'] as num?)?.toInt() ?? 1;
+      final trig = (json['triggerPrice'] as num?)?.toDouble() ?? 0.0;
+      final ordPrice = (json['price'] ?? json['orderPrice'] as num?)?.toDouble() ?? trig;
+      req = GttRequest(
+        instrumentToken: sym,
+        side: side,
+        quantity: qty,
+        triggerPrice: trig,
+        orderPrice: ordPrice,
+      );
+    }
+
+    final statusStr = (json['status'] ?? 'ACTIVE').toString().toUpperCase();
+    GttStatus st = GttStatus.ACTIVE;
+    if (statusStr == 'TRIGGERED') {
+      st = GttStatus.TRIGGERED;
+    } else if (statusStr == 'CANCELLED') {
+      st = GttStatus.CANCELLED;
+    } else if (statusStr == 'REJECTED') {
+      st = GttStatus.REJECTED;
+    }
+
+    final created = json['createdAt'] != null
+        ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
+        : DateTime.now();
+    final triggered = json['triggeredAt'] != null
+        ? DateTime.tryParse(json['triggeredAt'].toString())
+        : null;
+
+    return GttOrder(
+      id: id,
+      instrument: inst,
+      request: req,
+      status: st,
+      createdAt: created,
+      triggeredAt: triggered,
+    );
+  }
 }

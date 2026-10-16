@@ -5,14 +5,15 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/services/web_redirect_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/mock/seed_instruments.dart';
-import '../../../data/mock/settings_repository.dart';
 import '../../../data/models/models.dart';
+import '../../market/data/real_market_repository.dart';
+import '../../orders/data/real_trading_repository.dart';
+import '../../profile_settings/data/settings_repository.dart';
 import '../../../shared_widgets/mt_price_text.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
@@ -74,278 +75,89 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
   bool _isOpeningSheet = false;
   final Set<String> _selectedForDelete = {};
   String _query = '';
-  Timer? _liveSimulationTimer;
-
-  late List<QuoteItemData> _quotes;
+  StreamSubscription? _quoteSub;
+  bool _isLoading = true;
+  List<QuoteItemData> _quotes = [];
 
   @override
   void initState() {
     super.initState();
-    _quotes = [
-      QuoteItemData(
-        id: 'copper_mcx',
-        symbol: 'COPPER MCX Sep',
-        category: 'COMMODITIES',
-        change: -3.85,
-        changePercent: -0.28,
-        bid: 1368.20,
-        ask: 1368.60,
-        spread: 40,
-        low: 1361.10,
-        high: 1368.60,
-        open: 1366.00,
-        close: 1372.40,
-        ltp: 1368.55,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.red,
-        askColorMode: PriceColorMode.blue,
-      ),
-      QuoteItemData(
-        id: 'ltc_spot',
-        symbol: 'Litecoin Spot',
-        category: 'CRYPTO',
-        change: -0.65,
-        changePercent: -1.30,
-        bid: 49.27,
-        ask: 49.31,
-        spread: 4,
-        low: 48.84,
-        high: 50.06,
-        open: 49.91,
-        close: 49.92,
-        ltp: 49.27,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.normal,
-        askColorMode: PriceColorMode.blue,
-      ),
-      QuoteItemData(
-        id: 'mankind_sep',
-        symbol: 'MANKIND Sep',
-        category: 'EQUITIES',
-        change: 23.60,
-        changePercent: 1.00,
-        bid: 2382.10,
-        ask: 2386.50,
-        spread: 440,
-        low: 2347.30,
-        high: 2388.00,
-        open: 2347.30,
-        close: 2360.40,
-        ltp: 2384.00,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.red,
-        askColorMode: PriceColorMode.red,
-      ),
-      QuoteItemData(
-        id: 'gold_mcx',
-        symbol: 'GOLD MCX Oct',
-        category: 'COMMODITIES',
-        change: -1680.00,
-        changePercent: -1.11,
-        bid: 15002.90,
-        ask: 15004.90,
-        spread: 20,
-        low: 149665.0,
-        high: 150329.0,
-        open: 150033.0,
-        close: 151729.0,
-        ltp: 150049.0,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.normal,
-        askColorMode: PriceColorMode.normal,
-      ),
-      QuoteItemData(
-        id: 'mazdock_sep',
-        symbol: 'MAZDOCK Sep',
-        category: 'EQUITIES',
-        change: -19.90,
-        changePercent: -0.80,
-        bid: 2466.30,
-        ask: 2469.30,
-        spread: 300,
-        low: 2455.30,
-        high: 2480.00,
-        open: 2480.00,
-        close: 2488.90,
-        ltp: 2469.00,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.blue,
-        askColorMode: PriceColorMode.red,
-      ),
-      QuoteItemData(
-        id: 'natgas_mcx',
-        symbol: 'NATURALGAS MCX Sep',
-        category: 'COMMODITIES',
-        change: 2.90,
-        changePercent: 1.05,
-        bid: 280.10,
-        ask: 281.30,
-        spread: 10,
-        low: 278.50,
-        high: 281.30,
-        open: 279.00,
-        close: 278.40,
-        ltp: 280.10,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.normal,
-        askColorMode: PriceColorMode.normal,
-      ),
-      QuoteItemData(
-        id: 'crude_mcx',
-        symbol: 'CRUDEOIL MCX Oct',
-        category: 'COMMODITIES',
-        change: -35.00,
-        changePercent: -0.57,
-        bid: 6142.00,
-        ask: 6145.00,
-        spread: 30,
-        low: 6120.00,
-        high: 6195.00,
-        open: 6180.00,
-        close: 6177.00,
-        ltp: 6142.00,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.red,
-        askColorMode: PriceColorMode.red,
-      ),
-      QuoteItemData(
-        id: 'nifty_50',
-        symbol: 'NIFTY 50',
-        category: 'INDICES',
-        change: 74.50,
-        changePercent: 0.30,
-        bid: 25150.25,
-        ask: 25151.50,
-        spread: 12,
-        low: 25080.00,
-        high: 25185.00,
-        open: 25095.00,
-        close: 25075.75,
-        ltp: 25150.25,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.blue,
-        askColorMode: PriceColorMode.normal,
-      ),
-      QuoteItemData(
-        id: 'crypto_btcusd',
-        symbol: 'Bitcoin Spot (BTC)',
-        category: 'CRYPTO',
-        change: 1420.50,
-        changePercent: 2.49,
-        bid: 58450.00,
-        ask: 58452.50,
-        spread: 250,
-        low: 56980.00,
-        high: 58600.00,
-        open: 57029.50,
-        close: 57029.50,
-        ltp: 58450.00,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.blue,
-        askColorMode: PriceColorMode.blue,
-      ),
-      QuoteItemData(
-        id: 'crypto_ethusd',
-        symbol: 'Ethereum Spot (ETH)',
-        category: 'CRYPTO',
-        change: -32.40,
-        changePercent: -1.27,
-        bid: 2510.00,
-        ask: 2510.80,
-        spread: 80,
-        low: 2480.00,
-        high: 2555.00,
-        open: 2542.40,
-        close: 2542.40,
-        ltp: 2510.00,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.red,
-        askColorMode: PriceColorMode.red,
-      ),
-      QuoteItemData(
-        id: 'fx_usdinr',
-        symbol: 'USDINR Sep FUT',
-        category: 'FOREX',
-        change: 0.08,
-        changePercent: 0.10,
-        bid: 83.9425,
-        ask: 83.9450,
-        spread: 2,
-        low: 83.8500,
-        high: 83.9800,
-        open: 83.8625,
-        close: 83.8625,
-        ltp: 83.9425,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.blue,
-        askColorMode: PriceColorMode.normal,
-      ),
-      QuoteItemData(
-        id: 'fx_eurusd',
-        symbol: 'EURUSD Spot',
-        category: 'FOREX',
-        change: -0.0035,
-        changePercent: -0.32,
-        bid: 1.1045,
-        ask: 1.1047,
-        spread: 2,
-        low: 1.1020,
-        high: 1.1090,
-        open: 1.1080,
-        close: 1.1080,
-        ltp: 1.1045,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.red,
-        askColorMode: PriceColorMode.red,
-      ),
-      QuoteItemData(
-        id: 'global_us500',
-        symbol: 'US 500 (S&P 500)',
-        category: 'INDICES',
-        change: 28.40,
-        changePercent: 0.52,
-        bid: 5520.20,
-        ask: 5521.00,
-        spread: 8,
-        low: 5490.00,
-        high: 5535.00,
-        open: 5491.80,
-        close: 5491.80,
-        ltp: 5520.20,
-        timestamp: DateTime.now(),
-        bidColorMode: PriceColorMode.blue,
-        askColorMode: PriceColorMode.blue,
-      ),
-    ];
-
-    _startLiveSimulation();
+    _loadRealQuotes();
   }
 
-  void _startLiveSimulation() {
-    _liveSimulationTimer =
-        Timer.periodic(const Duration(milliseconds: 1600), (_) {
+  Future<void> _loadRealQuotes() async {
+    try {
+      final repo = ref.read(marketRepositoryProvider);
+      final instruments = await repo.getInstruments();
+      final quoteService = ref.read(realtimeQuoteServiceProvider);
+
       if (!mounted) return;
       setState(() {
-        for (var i = 0; i < _quotes.length; i++) {
-          if (i % 2 == 0) {
-            final delta = (i.isEven ? 0.20 : -0.20);
-            _quotes[i].bid += delta;
-            _quotes[i].ask += delta;
-            _quotes[i].ltp = _quotes[i].bid;
-            _quotes[i].timestamp = DateTime.now();
-            _quotes[i].bidColorMode =
-                delta > 0 ? PriceColorMode.blue : PriceColorMode.red;
-            _quotes[i].askColorMode =
-                delta > 0 ? PriceColorMode.blue : PriceColorMode.red;
+        _quotes = instruments.map((inst) {
+          quoteService.subscribe(inst.symbol);
+          final q = quoteService.getQuote(inst.symbol);
+          return QuoteItemData(
+            id: inst.token,
+            symbol: inst.symbol,
+            category: inst.category.isNotEmpty ? inst.category : inst.exchange.name,
+            change: q.netChange,
+            changePercent: q.percentChange,
+            bid: q.bestBid,
+            ask: q.bestAsk,
+            spread: ((q.bestAsk - q.bestBid) * 100).toInt(),
+            low: q.dayLow,
+            high: q.dayHigh,
+            open: q.openPrice,
+            close: q.prevClose,
+            ltp: q.lastPrice > 0 ? q.lastPrice : (q.bestBid > 0 ? q.bestBid : 100.0),
+            timestamp: q.lastTradeTime,
+          );
+        }).toList();
+        _isLoading = false;
+      });
+
+      _quoteSub = quoteService.stream.listen((incoming) {
+        if (!mounted) return;
+        bool changed = false;
+        for (final q in _quotes) {
+          final updated = incoming[q.symbol] ?? incoming[q.id];
+          if (updated != null && updated.lastPrice > 0) {
+            final prevPrice = q.ltp;
+            q.bid = updated.bestBid;
+            q.ask = updated.bestAsk;
+            q.ltp = updated.lastPrice;
+            q.change = updated.netChange;
+            q.changePercent = updated.percentChange;
+            q.low = updated.dayLow;
+            q.high = updated.dayHigh;
+            q.open = updated.openPrice;
+            q.close = updated.prevClose;
+            q.spread = ((updated.bestAsk - updated.bestBid) * 100).toInt();
+            q.timestamp = updated.lastTradeTime;
+            if (updated.lastPrice > prevPrice) {
+              q.bidColorMode = PriceColorMode.blue;
+              q.askColorMode = PriceColorMode.blue;
+            } else if (updated.lastPrice < prevPrice) {
+              q.bidColorMode = PriceColorMode.red;
+              q.askColorMode = PriceColorMode.red;
+            }
+            changed = true;
           }
         }
+        if (changed) {
+          setState(() {});
+        }
       });
-    });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   void dispose() {
-    _liveSimulationTimer?.cancel();
+    _quoteSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -474,234 +286,301 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                   onPressed: () => setState(() => _isEditMode = true),
                   tooltip: 'Edit Scripts',
                 ),
+                IconButton(
+                  icon: Icon(LucideIcons.headphones,
+                      color: colors.textPrimary, size: 20),
+                  onPressed: () => _openSupportModal(context),
+                  tooltip: 'Live Support',
+                ),
                 const SizedBox(width: 4),
               ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // Dual-line Public & Private News Ticker Strip (Permanently Pinned)
-              NewsTickerStrip(
-                onPublicNewsTap: () => context.push('/news'),
-                onPrivateNewsTap: () => context.push('/mails'),
-              ),
+      body: Container(
+        color: isDark ? Colors.black : colors.background,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
+            // Collapsible Header Section: Ticker, Sticky Bar, Quick Actions, Search
+            SliverToBoxAdapter(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Dual-line Public & Private News Ticker Strip (Scrolls with content)
+                  NewsTickerStrip(
+                    onPublicNewsTap: () => context.push('/news'),
+                    onPrivateNewsTap: () => context.push('/mails'),
+                  ),
 
-              // Dual Script Selector Bar (Sticky Scripts Toggle)
-              if (settings.showStickyScripts)
-                const ScriptSelectorBar(),
+                  // Dual Script Selector Bar (Sticky Scripts Toggle)
+                  if (settings.showStickyScripts)
+                    const ScriptSelectorBar(),
 
-              // Scrollable Quotes & Actions Area
-              Expanded(
-                child: Container(
-                  color: isDark ? Colors.black : colors.background,
-                  child: ClipRect(
-                    clipBehavior: Clip.hardEdge,
-                    child: CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                      clipBehavior: Clip.hardEdge,
-                      slivers: [
-                    // Collapsible Header Section (Deposit/Withdraw, Toggles, Search)
-                    SliverToBoxAdapter(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // DEPOSIT & WITHDRAWAL Action Buttons Bar
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0, vertical: 4.0),
-                            child: Row(
-                              children: [
-                                // DEPOSIT Button (Deep Navy Blue)
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 38,
-                                    child: ElevatedButton(
-                                      onPressed: () =>
-                                          WebRedirectService.openDepositWebsite(context: context),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            const Color(0xFF1D357F),
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(6)),
-                                        elevation: 0,
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                      child: const Text(
-                                        'DEPOSIT',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.5,
-                                            fontSize: 13),
-                                      ),
+                  // Sleek Quick Action Chips: DEPOSIT & WITHDRAWAL
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 6.0),
+                    child: Row(
+                      children: [
+                        // DEPOSIT Quick Action Chip
+                        Expanded(
+                          child: InkWell(
+                            onTap: () =>
+                                WebRedirectService.openDepositWebsite(context: context),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB).withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(LucideIcons.arrowDownToLine,
+                                      size: 14, color: Color(0xFF2563EB)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Deposit',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFF2563EB),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                // WITHDRAWAL Button (Vibrant Rose Red)
-                                Expanded(
-                                  child: SizedBox(
-                                    height: 38,
-                                    child: ElevatedButton(
-                                      onPressed: () =>
-                                          WebRedirectService.openWithdrawWebsite(context: context),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: colors.primary,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(6)),
-                                        elevation: 0,
-                                        padding: EdgeInsets.zero,
-                                      ),
-                                      child: const Text(
-                                        'WITHDRAWAL',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 0.5,
-                                            fontSize: 13),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-
-                          // Pro View & One Click Trade Toggles Bar
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0, vertical: 4.0),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
+                        ),
+                        const SizedBox(width: 10),
+                        // WITHDRAWAL Quick Action Chip
+                        Expanded(
+                          child: InkWell(
+                            onTap: () =>
+                                WebRedirectService.openWithdrawWebsite(context: context),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: colors.primary.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: colors.primary.withValues(alpha: 0.35),
+                                  width: 1,
+                                ),
+                              ),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  // Pro View Switch
-                                  Row(
-                                    children: [
-                                      Transform.scale(
-                                        scale: 0.75,
-                                        child: Switch(
-                                          value: _isProView,
-                                          activeColor: colors.primary,
-                                          onChanged: (val) =>
-                                              setState(() => _isProView = val),
-                                        ),
-                                      ),
-                                      Text(
-                                        'Pro View',
-                                        style: AppTypography.caption(
-                                            color: colors.textPrimary,
-                                            weight: FontWeight.w600),
-                                      ),
-                                    ],
+                                  Icon(LucideIcons.arrowUpFromLine,
+                                      size: 14, color: colors.primary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Withdraw',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: colors.primary,
+                                    ),
                                   ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
-                                  const SizedBox(width: 12),
-
-                                  // Live Last Updated Timestamp Badge
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF00A854),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Live • ${DateFormat('HH:mm:ss').format(DateTime.now())}',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: colors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
+                  // Compact Pro View, Live Badge & One Click Trade Toolbar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 4.0),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          // Pro View Toggle Chip
+                          InkWell(
+                            onTap: () => setState(() => _isProView = !_isProView),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _isProView
+                                    ? colors.primary.withValues(alpha: 0.12)
+                                    : colors.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _isProView ? colors.primary : colors.divider,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _isProView
+                                        ? LucideIcons.layoutGrid
+                                        : LucideIcons.alignJustify,
+                                    size: 13,
+                                    color: _isProView
+                                        ? colors.primary
+                                        : colors.textSecondary,
                                   ),
-
-                                  const SizedBox(width: 12),
-
-                                  // One Click Trade Switch
-                                  Row(
-                                    children: [
-                                      Text(
-                                        settings.defaultLots > 0
-                                            ? 'One Click (${settings.defaultLots.toStringAsFixed(1)}L)'
-                                            : 'One Click Trade',
-                                        style: AppTypography.caption(
-                                            color: colors.textPrimary,
-                                            weight: FontWeight.w600),
-                                      ),
-                                      Transform.scale(
-                                        scale: 0.75,
-                                        child: Switch(
-                                          value: _isOneClickTrade,
-                                          activeColor: colors.primary,
-                                          onChanged: (val) => setState(
-                                              () => _isOneClickTrade = val),
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _isProView ? 'Pro View' : 'Simple View',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: _isProView
+                                          ? colors.primary
+                                          : colors.textSecondary,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                           ),
 
-                          // Search Bar
-                          Padding(
+                          const SizedBox(width: 8),
+
+                          // Live status pulse indicator
+                          Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16.0, vertical: 4.0),
-                            child: Container(
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: colors.surface,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color:
-                                        colors.divider.withValues(alpha: 0.6)),
-                              ),
-                              child: TextField(
-                                controller: _searchController,
-                                textAlignVertical: TextAlignVertical.center,
-                                style: AppTypography.body(
-                                    color: colors.textPrimary),
-                                decoration: InputDecoration(
-                                  hintText: 'Search by Script Name',
-                                  hintStyle: AppTypography.body(
-                                      color: colors.textSecondary),
-                                  prefixIcon: Icon(LucideIcons.search,
-                                      color: colors.textSecondary
-                                          .withValues(alpha: 0.7),
-                                      size: 18),
-                                  suffixIcon: _searchController.text.isNotEmpty
-                                      ? IconButton(
-                                          icon: Icon(LucideIcons.x,
-                                              color: colors.textSecondary, size: 16),
-                                          onPressed: () {
-                                            _searchController.clear();
-                                            setState(() => _query = '');
-                                          },
-                                        )
-                                      : null,
-                                  border: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: colors.surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF00A854),
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
-                                onChanged: (val) =>
-                                    setState(() => _query = val),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Live • ${DateFormat('HH:mm:ss').format(DateTime.now())}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+
+                          // One Click Trade Chip
+                          InkWell(
+                            onTap: () => setState(
+                                () => _isOneClickTrade = !_isOneClickTrade),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _isOneClickTrade
+                                    ? const Color(0xFFF5A623).withValues(alpha: 0.15)
+                                    : colors.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: _isOneClickTrade
+                                      ? const Color(0xFFF5A623)
+                                      : colors.divider,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.zap,
+                                    size: 13,
+                                    color: _isOneClickTrade
+                                        ? const Color(0xFFF5A623)
+                                        : colors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _isOneClickTrade
+                                        ? (settings.defaultLots > 0
+                                            ? '1-Click (${settings.defaultLots.toStringAsFixed(1)}L)'
+                                            : '1-Click ON')
+                                        : '1-Click OFF',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: _isOneClickTrade
+                                          ? const Color(0xFFF5A623)
+                                          : colors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ),
+
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 5.0),
+                    child: Container(
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: colors.surface,
+                        borderRadius: BorderRadius.circular(19),
+                        border: Border.all(
+                            color: colors.divider.withValues(alpha: 0.6)),
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        textAlignVertical: TextAlignVertical.center,
+                        style: AppTypography.body(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Search by Script Name',
+                          hintStyle: AppTypography.body(color: colors.textSecondary),
+                          prefixIcon: Icon(LucideIcons.search,
+                              color: colors.textSecondary.withValues(alpha: 0.7),
+                              size: 17),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(LucideIcons.x,
+                                      color: colors.textSecondary, size: 16),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _query = '');
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        onChanged: (val) => setState(() => _query = val),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
                     // Pinned Table Header Strip (Script | Bid | Ask)
                     SliverPersistentHeader(
@@ -710,7 +589,13 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                     ),
 
                     // Quotes List
-                    if (_isEditMode)
+                    if (_isLoading)
+                      SliverFillRemaining(
+                        child: Center(
+                          child: CircularProgressIndicator(color: colors.primary),
+                        ),
+                      )
+                    else if (_isEditMode)
                       SliverReorderableList(
                         itemCount: filteredQuotes.length,
                         onReorder: (oldIndex, newIndex) {
@@ -779,42 +664,6 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                   ],
                 ),
               ),
-            ),
-          ),
-            ],
-          ),
-
-          // Floating Support Chat Headset Button (in normal mode)
-          if (!_isEditMode)
-            Positioned(
-              right: 16,
-              bottom: 12,
-              child: GestureDetector(
-                onTap: () => _openSupportModal(context),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: colors.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.primary.withValues(alpha: 0.35),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    LucideIcons.headphones,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -1167,33 +1016,38 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
       try {
         final settings = ref.read(appSettingsProvider);
         final lots = settings.defaultLots > 0 ? settings.defaultLots : 1.0;
-        final engine = ref.read(orderSimulationEngineProvider);
-        final isCommodity = item.category == 'COMMODITIES';
+        final repo = ref.read(marketRepositoryProvider);
+        final instrument = repo.findBySymbol(item.symbol) ??
+            repo.findBySymbol(item.id);
 
-        final seedInst = SeedInstruments.all.firstWhere(
-          (s) =>
-              s.symbol.toLowerCase() == item.symbol.toLowerCase() ||
-              s.token == item.id,
-          orElse: () =>
-              SeedInstruments.findByToken(item.id) ?? SeedInstruments.all.first,
-        );
+        if (instrument == null) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Instrument ${item.symbol} not found on server.'),
+              backgroundColor: const Color(0xFFD32F2F),
+            ),
+          );
+          return;
+        }
 
         final idempotencyKey =
-            'oneclick_${DateTime.now().millisecondsSinceEpoch}_${seedInst.token}';
+            'oneclick_${DateTime.now().millisecondsSinceEpoch}_${instrument.symbol}';
 
-        final request = OrderRequest(
-          idempotencyKey: idempotencyKey,
-          instrumentToken: seedInst.token,
+        final lotMultiplier = instrument.lotSize > 0 ? instrument.lotSize : 1;
+        final rawQty = (lots * lotMultiplier).toInt();
+        final maxQty = instrument.freezeQty > 0 ? instrument.freezeQty : 100000;
+
+        final tradingRepo = ref.read(tradingRepositoryProvider);
+        final placedOrder = await tradingRepo.createOrder(
+          symbol: instrument.symbol,
           side: TransactionType.BUY,
-          product: isCommodity ? ProductType.NRML : ProductType.MIS,
-          kind: OrderKind.MARKET,
-          quantity: (lots * (seedInst.lotSize > 0 ? seedInst.lotSize : 1))
-              .toInt()
-              .clamp(1, seedInst.freezeQty > 0 ? seedInst.freezeQty : 100000),
-          validity: Validity.DAY,
+          orderType: OrderKind.MARKET,
+          quantity: rawQty.clamp(1, maxQty),
+          leverage: 5.0,
+          market: 'INDIAN',
+          idempotencyKey: idempotencyKey,
         );
-
-        final placedOrder = await engine.placeOrder(request);
 
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1216,6 +1070,14 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
                 : null,
           ),
         );
+      } catch (err) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Order failed: $err'),
+            backgroundColor: const Color(0xFFD32F2F),
+          ),
+        );
       } finally {
         if (mounted) {
           setState(() {
@@ -1230,15 +1092,21 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
     _isOpeningSheet = true;
 
     final colors = context.tradingColors;
-    final targetInst = SeedInstruments.findByToken(item.id) ??
-        SeedInstruments.all.where((i) => i.symbol.toLowerCase() == item.symbol.toLowerCase()).firstOrNull ??
-        Instrument(
-          token: item.id,
-          symbol: item.symbol,
-          name: item.symbol,
-          exchange: Exchange.MCX,
-          type: InstrumentType.FUT,
-        );
+    final repo = ref.read(marketRepositoryProvider);
+    final targetInst = repo.findBySymbol(item.symbol) ??
+        repo.findBySymbol(item.id);
+
+    if (targetInst == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Instrument ${item.symbol} not found.'),
+          backgroundColor: const Color(0xFFD32F2F),
+        ),
+      );
+      _isOpeningSheet = false;
+      return;
+    }
 
     try {
       await showModalBottomSheet(

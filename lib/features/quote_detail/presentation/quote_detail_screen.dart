@@ -6,15 +6,15 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/market_status_service.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/seed_instruments.dart';
-import '../../../data/mock/stock_fundamentals_repository.dart';
-import '../../../data/mock/ticker_service.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/exchange_chip.dart';
+import '../../market/data/real_market_repository.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import '../../watchlist/presentation/watchlist_controller.dart';
+import '../data/fundamentals_repository.dart';
 import 'widgets/financials_tab.dart';
 import 'widgets/fundamentals_tab.dart';
 import 'widgets/shareholding_tab.dart';
@@ -36,9 +36,9 @@ class _QuoteDetailScreenState extends ConsumerState<QuoteDetailScreen> {
     final colors = context.tradingColors;
     final tickerService = ref.watch(tickerServiceProvider);
 
-    final instrument = SeedInstruments.findByToken(widget.token) ??
-        SeedInstruments.findBySymbol(widget.token.replaceAll('_', ' ')) ??
-        SeedInstruments.findBySymbol(widget.token) ??
+    final repo = ref.watch(marketRepositoryProvider);
+
+    final instrument = repo.findBySymbol(widget.token) ??
         Instrument(
           token: widget.token,
           symbol: widget.token.toUpperCase().replaceAll('_', ' '),
@@ -122,7 +122,7 @@ class _QuoteDetailScreenState extends ConsumerState<QuoteDetailScreen> {
     final spreadPts = (askPrice - bidPrice).abs();
 
     final fundamentals = isEquity
-        ? ref.watch(stockFundamentalsProvider(instrument.symbol))
+        ? ref.watch(stockFundamentalsProvider(instrument.symbol)).valueOrNull
         : null;
 
     return Scaffold(

@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/trading_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../data/mock/seed_instruments.dart';
 import '../../../../data/models/models.dart';
 import '../../../../shared_widgets/shared_widgets.dart';
+import '../../../market/data/real_market_repository.dart';
 import '../../../order_entry/presentation/order_entry_sheet.dart';
 
-class StockQuickActionSheet extends StatelessWidget {
+class StockQuickActionSheet extends ConsumerWidget {
   final HeatmapStockItem stock;
   final HeatmapTimeframe timeframe;
 
@@ -35,9 +36,10 @@ class StockQuickActionSheet extends StatelessWidget {
     );
   }
 
-  Instrument _resolveInstrument() {
-    return SeedInstruments.findByToken(stock.token) ??
-        SeedInstruments.findBySymbol(stock.symbol) ??
+  Instrument _resolveInstrument(WidgetRef ref) {
+    final repo = ref.read(marketRepositoryProvider);
+    return repo.findBySymbol(stock.symbol) ??
+        repo.findBySymbol(stock.token) ??
         Instrument(
           token: stock.token,
           symbol: stock.symbol,
@@ -48,7 +50,7 @@ class StockQuickActionSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
     final effectiveChange = stock.getEffectiveChange(timeframe);
     final isBullish = effectiveChange >= 0;
@@ -280,7 +282,7 @@ class StockQuickActionSheet extends StatelessWidget {
                     Navigator.pop(context);
                     OrderEntrySheet.show(
                       context,
-                      instrument: _resolveInstrument(),
+                      instrument: _resolveInstrument(ref),
                       side: TransactionType.BUY,
                     );
                   },
@@ -315,7 +317,7 @@ class StockQuickActionSheet extends StatelessWidget {
                     Navigator.pop(context);
                     OrderEntrySheet.show(
                       context,
-                      instrument: _resolveInstrument(),
+                      instrument: _resolveInstrument(ref),
                       side: TransactionType.SELL,
                     );
                   },

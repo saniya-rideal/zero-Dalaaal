@@ -31,14 +31,14 @@ class OptionLeg {
   };
 
   factory OptionLeg.fromJson(Map<String, dynamic> json) => OptionLeg(
-    token: json['token'] as String,
-    ltp: (json['ltp'] as num).toDouble(),
-    change: (json['change'] as num).toDouble(),
-    changePercent: (json['changePercent'] as num).toDouble(),
-    oi: (json['oi'] as num).toInt(),
-    changeInOi: (json['changeInOi'] as num).toInt(),
-    iv: (json['iv'] as num).toDouble(),
-    volume: (json['volume'] as num).toInt(),
+    token: (json['token'] ?? json['symbol'] ?? '').toString(),
+    ltp: (json['ltp'] as num?)?.toDouble() ?? 0.0,
+    change: (json['change'] as num?)?.toDouble() ?? 0.0,
+    changePercent: (json['changePercent'] as num?)?.toDouble() ?? 0.0,
+    oi: (json['oi'] ?? json['openInterest'] as num?)?.toInt() ?? 0,
+    changeInOi: (json['changeInOi'] ?? json['oiChange'] as num?)?.toInt() ?? 0,
+    iv: (json['iv'] as num?)?.toDouble() ?? 0.0,
+    volume: (json['volume'] as num?)?.toInt() ?? 0,
   );
 }
 
@@ -63,9 +63,13 @@ class OptionChainRow {
   };
 
   factory OptionChainRow.fromJson(Map<String, dynamic> json) => OptionChainRow(
-    strike: (json['strike'] as num).toDouble(),
-    call: OptionLeg.fromJson(json['call'] as Map<String, dynamic>),
-    put: OptionLeg.fromJson(json['put'] as Map<String, dynamic>),
+    strike: (json['strike'] ?? json['strikePrice'] as num?)?.toDouble() ?? 0.0,
+    call: json['call'] is Map<String, dynamic>
+        ? OptionLeg.fromJson(json['call'] as Map<String, dynamic>)
+        : const OptionLeg(token: '', ltp: 0, change: 0, changePercent: 0, oi: 0, changeInOi: 0, iv: 0, volume: 0),
+    put: json['put'] is Map<String, dynamic>
+        ? OptionLeg.fromJson(json['put'] as Map<String, dynamic>)
+        : const OptionLeg(token: '', ltp: 0, change: 0, changePercent: 0, oi: 0, changeInOi: 0, iv: 0, volume: 0),
     isAtm: json['isAtm'] as bool? ?? false,
   );
 }

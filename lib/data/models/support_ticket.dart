@@ -202,25 +202,64 @@ class SupportTicket {
     'assignedAgent': assignedAgent,
   };
 
-  factory SupportTicket.fromJson(Map<String, dynamic> json) => SupportTicket(
-    id: json['id'] as String,
-    title: json['title'] as String,
-    description: json['description'] as String,
-    category: TicketCategory.values.byName(json['category'] as String),
-    priority: TicketPriority.values.byName(json['priority'] as String),
-    status: TicketStatus.values.byName(json['status'] as String),
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    updatedAt: DateTime.parse(json['updatedAt'] as String),
-    messages: (json['messages'] as List<dynamic>?)
-            ?.map((e) => TicketMessage.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        const [],
-    attachments: (json['attachments'] as List<dynamic>?)
-            ?.map((e) => TicketAttachment.fromJson(e as Map<String, dynamic>))
-            .toList() ??
-        const [],
-    assignedAgent: json['assignedAgent'] as String? ?? 'Zero Desk Officer',
-  );
+  factory SupportTicket.fromJson(Map<String, dynamic> json) {
+    final catStr = (json['category'] ?? 'tradingOrders').toString();
+    final prioStr = (json['priority'] ?? 'medium').toString();
+    final statStr = (json['status'] ?? 'open').toString();
+
+    TicketCategory category = TicketCategory.tradingOrders;
+    for (final c in TicketCategory.values) {
+      if (c.name.toLowerCase() == catStr.toLowerCase() ||
+          c.label.toLowerCase() == catStr.toLowerCase()) {
+        category = c;
+        break;
+      }
+    }
+
+    TicketPriority priority = TicketPriority.medium;
+    for (final p in TicketPriority.values) {
+      if (p.name.toLowerCase() == prioStr.toLowerCase() ||
+          p.label.toLowerCase() == prioStr.toLowerCase()) {
+        priority = p;
+        break;
+      }
+    }
+
+    TicketStatus status = TicketStatus.open;
+    for (final s in TicketStatus.values) {
+      if (s.name.toLowerCase() == statStr.toLowerCase() ||
+          s.label.toLowerCase() == statStr.toLowerCase()) {
+        status = s;
+        break;
+      }
+    }
+
+    return SupportTicket(
+      id: (json['id'] ?? json['_id'] ?? 'tk_${DateTime.now().millisecondsSinceEpoch}').toString(),
+      title: (json['title'] ?? json['subject'] ?? 'Support Ticket').toString(),
+      description: (json['description'] ?? json['message'] ?? '').toString(),
+      category: category,
+      priority: priority,
+      status: status,
+      createdAt: json['createdAt'] != null
+          ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? (DateTime.tryParse(json['updatedAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      messages: (json['messages'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((e) => TicketMessage.fromJson(e))
+              .toList() ??
+          const [],
+      attachments: (json['attachments'] as List<dynamic>?)
+              ?.whereType<Map<String, dynamic>>()
+              .map((e) => TicketAttachment.fromJson(e))
+              .toList() ??
+          const [],
+      assignedAgent: (json['assignedAgent'] ?? 'Zero Desk Officer').toString(),
+    );
+  }
 }
 
 class FaqItem {

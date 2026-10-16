@@ -7,8 +7,9 @@ import '../core/services/balance_privacy_service.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../core/utils/currency_formatter.dart';
-import '../data/mock/order_simulation_engine.dart';
-import '../data/models/enums.dart';
+import '../data/models/funds.dart';
+import '../features/auth/presentation/auth_controller.dart';
+import '../features/funds/data/real_funds_repository.dart';
 
 class ZeroBottomDock extends ConsumerWidget {
   final bool showRealValues;
@@ -18,9 +19,15 @@ class ZeroBottomDock extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final funds = engine.getFundsSummary(Segment.EQUITY);
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+    final funds = fundsAsync.valueOrNull ??
+        const FundsSummary(
+          availableMargin: 0,
+          usedMargin: 0,
+          openingBalance: 0,
+        );
     final isHidden = ref.watch(balancePrivacyProvider);
+    final profile = ref.watch(authControllerProvider).session?.profile;
 
     String fmt(double val) {
       if (isHidden) return '••••••';
@@ -41,25 +48,49 @@ class ZeroBottomDock extends ConsumerWidget {
         : (funds.usedMargin > 0
             ? '${funds.marginLevel.toStringAsFixed(1)}%'
             : 'N/A');
-    const account = '159537';
+    final account = (profile?.clientId != null && profile!.clientId.isNotEmpty)
+        ? profile.clientId
+        : 'Primary';
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: colors.dockBackground,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(
+          top: BorderSide(color: colors.divider.withValues(alpha: 0.6), width: 1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0, bottom: 8.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 6.0, bottom: 8.0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Elegant Drag Handle
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
+                color: colors.textSecondary.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           // Header Bar: Account Switcher + Eye Privacy Toggle
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               // Account Switcher Shortcut
               InkWell(
-                onTap: () => _showAccountSwitchSheet(context, colors),
+                onTap: () => _showAccountSwitchSheet(context, colors, account),
                 borderRadius: BorderRadius.circular(4),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -75,7 +106,7 @@ class ZeroBottomDock extends ConsumerWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Acc: 159537 (Primary)',
+                        'Acc: $account',
                         style: GoogleFonts.inter(
                           color: colors.textPrimary,
                           fontSize: 11,
@@ -188,7 +219,7 @@ class ZeroBottomDock extends ConsumerWidget {
     );
   }
 
-  void _showAccountSwitchSheet(BuildContext context, TradingColors colors) {
+  void _showAccountSwitchSheet(BuildContext context, TradingColors colors, String account) {
     showModalBottomSheet(
       context: context,
       backgroundColor: colors.cardBackground,
@@ -206,7 +237,7 @@ class ZeroBottomDock extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Switch Trading Account',
+                    'Trading Accounts',
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -232,41 +263,16 @@ class ZeroBottomDock extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
-                    child: Text('ZD', style: GoogleFonts.inter(color: colors.primary, fontWeight: FontWeight.w800)),
+                    child: Text(
+                      account.length >= 2 ? account.substring(0, 2).toUpperCase() : 'ZD',
+                      style: GoogleFonts.inter(color: colors.primary, fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ),
-                title: Text('159537 • Primary Account', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: colors.textPrimary)),
+                title: Text('$account • Primary Account', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: colors.textPrimary)),
                 subtitle: Text('Individual Equity & F&O', style: GoogleFonts.inter(fontSize: 12, color: colors.textSecondary)),
                 trailing: const Icon(LucideIcons.checkCircle2, color: Color(0xFF00A854), size: 20),
                 onTap: () => Navigator.pop(ctx),
-              ),
-              const Divider(height: 12),
-
-              // Account 2
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text('H2', style: GoogleFonts.inter(color: colors.textSecondary, fontWeight: FontWeight.w800)),
-                  ),
-                ),
-                title: Text('892014 • Hedge & MCX', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: colors.textPrimary)),
-                subtitle: Text('Commodity Derivatives Account', style: GoogleFonts.inter(fontSize: 12, color: colors.textSecondary)),
-                trailing: TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Switched to Account 892014')),
-                    );
-                  },
-                  child: const Text('Switch'),
-                ),
               ),
               const SizedBox(height: 12),
 

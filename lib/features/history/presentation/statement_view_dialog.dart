@@ -6,8 +6,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/models/transaction_record.dart';
+import '../../../data/models/funds.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../../funds/data/real_funds_repository.dart';
 
 class StatementViewDialog extends ConsumerStatefulWidget {
   final DateTime? initialStartDate;
@@ -40,7 +41,6 @@ class StatementViewDialog extends ConsumerStatefulWidget {
 class _StatementViewDialogState extends ConsumerState<StatementViewDialog> {
   late DateTime _startDate;
   late DateTime _endDate;
-  TransactionCategory? _selectedCategory;
   String _periodPreset = '30D'; // '7D', '30D', '90D', 'FY', 'CUSTOM'
 
   @override
@@ -63,10 +63,9 @@ class _StatementViewDialogState extends ConsumerState<StatementViewDialog> {
       } else if (preset == '90D') {
         _startDate = now.subtract(const Duration(days: 90));
       } else if (preset == 'FY') {
-        _startDate = DateTime(now.year, 4, 1);
-        if (_startDate.isAfter(now)) {
-          _startDate = DateTime(now.year - 1, 4, 1);
-        }
+        final currentYear = now.month >= 4 ? now.year : now.year - 1;
+        _startDate = DateTime(currentYear, 4, 1);
+        _endDate = DateTime(currentYear + 1, 3, 31, 23, 59, 59);
       }
     });
   }
@@ -87,37 +86,45 @@ class _StatementViewDialogState extends ConsumerState<StatementViewDialog> {
     }
   }
 
-  void _exportCsv(OrderSimulationEngine engine) {
-    final csvData = engine.generateStatementCsv(
-      fromDate: _startDate,
-      endDate: _endDate,
-      category: _selectedCategory,
-    );
-
+  void _exportCsv(List<LedgerEntry> entries) {
+    final buffer = StringBuffer();
+    buffer.writeln('Date,ID,Narration,Debit,Credit,RunningBalance');
+    for (final e in entries) {
+      buffer.writeln('${e.date.toIso8601String()},${e.id},"${e.narration}",${e.debit.toStringAsFixed(2)},${e.credit.toStringAsFixed(2)},${e.runningBalance.toStringAsFixed(2)}');
+    }
+    final csvData = buffer.toString();
     Clipboard.setData(ClipboardData(text: csvData));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Account statement (${csvData.split('\n').length - 2} records) copied to clipboard as CSV!'),
+        content: Text('Account statement (${entries.length} records) copied to clipboard as CSV!'),
         backgroundColor: context.tradingColors.bullish,
         duration: const Duration(seconds: 3),
       ),
     );
   }
 
-  void _shareReport(StatementSummary summary, int count, TradingColors colors) {
-    final reportText = '''
-ZeroDalali Account Statement
-Client: Anurag (ID: 1208160058291244)
-Period: ${DateFormatter.formatOrderDate(_startDate)} to ${DateFormatter.formatOrderDate(_endDate)}
-Opening Balance: ${CurrencyFormatter.format(summary.openingBalance)}
-Closing Balance: ${CurrencyFormatter.format(summary.closingBalance)}
-Total Credits: ${CurrencyFormatter.format(summary.totalCredits)}
-Total Debits: ${CurrencyFormatter.format(summary.totalDebits)}
-Taxes & Fees: ${CurrencyFormatter.format(summary.totalCharges)}
-Net Cash Flow: ${CurrencyFormatter.format(summary.netCashFlow)}
-Total Transactions: $count
+  void _shareReport({
+    required double opening,
+    required double closing,
+    required double credits,
+    required double debits,
+    required int count,
+    required TradingColors colors,
+  }) {
+    final profile = ref.read(authControllerProvider).session?.profile;
+    final clientName = (profile?.name.isNotEmpty ?? false) ? profile!.name : 'Client';
+    final clientId = profile?.userId ?? '-';
 
-ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
+    final reportText = '''
+ZeroDalali Digital Account Statement
+Client: $clientName (ID: $clientId)
+Period: ${DateFormatter.formatOrderDate(_startDate)} to ${DateFormatter.formatOrderDate(_endDate)}
+Opening Balance: ${CurrencyFormatter.format(opening)}
+Closing Balance: ${CurrencyFormatter.format(closing)}
+Total Credits: ${CurrencyFormatter.format(credits)}
+Total Debits: ${CurrencyFormatter.format(debits)}
+Net Flow: ${CurrencyFormatter.format(credits - debits)}
+Total Ledger Entries: $count
 ''';
 
     showModalBottomSheet(
@@ -195,18 +202,7 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final summary = engine.generateStatementSummary(
-      fromDate: _startDate,
-      toDate: _endDate,
-    );
-
-    final transactions = engine.getUnifiedTransactions(
-      startDate: _startDate,
-      endDate: _endDate,
-      category: _selectedCategory,
-      sortBy: 'DATE_ASC',
-    );
+    final ledgerAsync = ref.watch(walletLedgerProvider);
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -234,12 +230,20 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
                         fontSize: 18,
                       ),
                     ),
-                    Text(
-                      'Anurag • Demat Client ID: 1208160058291244',
-                      style: GoogleFonts.inter(
-                        color: colors.textSecondary,
-                        fontSize: 11.5,
-                      ),
+                    Builder(
+                      builder: (_) {
+                        final profile = ref.watch(authControllerProvider).session?.profile;
+                        final sub = (profile != null && profile.name.isNotEmpty)
+                            ? '${profile.name} • Client ID: ${profile.userId}'
+                            : (profile != null ? 'Client ID: ${profile.userId}' : 'Account Statement');
+                        return Text(
+                          sub,
+                          style: GoogleFonts.inter(
+                            color: colors.textSecondary,
+                            fontSize: 11.5,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -285,194 +289,204 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
 
             const SizedBox(height: 12),
 
-            // Summary Metric Banner Cards
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colors.surface,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: colors.divider, width: 0.5),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildSummaryStat('Opening Balance', summary.openingBalance, colors.textSecondary, colors),
-                      _buildSummaryStat('Total Credits', summary.totalCredits, colors.bullish, colors),
-                      _buildSummaryStat('Total Debits', summary.totalDebits, colors.bearish, colors),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  const Divider(height: 1),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildSummaryStat('Taxes & Charges', summary.totalCharges, colors.textSecondary, colors),
-                      _buildSummaryStat('Net Flow', summary.netCashFlow, summary.netCashFlow >= 0 ? colors.bullish : colors.bearish, colors),
-                      _buildSummaryStat('Closing Balance', summary.closingBalance, colors.primary, colors, isBold: true),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Category Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildCategoryChip(null, 'All Types', colors),
-                  const SizedBox(width: 6),
-                  _buildCategoryChip(TransactionCategory.TRADE, 'Trades', colors),
-                  const SizedBox(width: 6),
-                  _buildCategoryChip(TransactionCategory.DEPOSIT, 'Deposits', colors),
-                  const SizedBox(width: 6),
-                  _buildCategoryChip(TransactionCategory.WITHDRAWAL, 'Withdrawals', colors),
-                  const SizedBox(width: 6),
-                  _buildCategoryChip(TransactionCategory.FEE_CHARGE, 'Fees & Charges', colors),
-                  const SizedBox(width: 6),
-                  _buildCategoryChip(TransactionCategory.DIVIDEND, 'Dividends', colors),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-
-            // Itemized Transaction Table / List
             Expanded(
-              child: transactions.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No transactions recorded for selected period & filters.',
-                        style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13),
+              child: ledgerAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, _) => Center(
+                  child: Text('Failed to load ledger: $err', style: TextStyle(color: colors.loss)),
+                ),
+                data: (allEntries) {
+                  // Filter by date range
+                  final entries = allEntries.where((e) {
+                    final inRange = e.date.isAfter(_startDate.subtract(const Duration(seconds: 1))) &&
+                        e.date.isBefore(_endDate.add(const Duration(seconds: 1)));
+                    return inRange;
+                  }).toList();
+
+                  double totalCredits = 0.0;
+                  double totalDebits = 0.0;
+                  for (final e in entries) {
+                    totalCredits += e.credit;
+                    totalDebits += e.debit;
+                  }
+                  final opening = entries.isNotEmpty ? (entries.last.runningBalance - entries.last.credit + entries.last.debit) : 0.0;
+                  final closing = entries.isNotEmpty ? entries.first.runningBalance : 0.0;
+
+                  return Column(
+                    children: [
+                      // Summary Metric Banner Cards
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: colors.divider, width: 0.5),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildSummaryStat('Opening Balance', opening, colors.textSecondary, colors),
+                                _buildSummaryStat('Total Credits', totalCredits, colors.bullish, colors),
+                                _buildSummaryStat('Total Debits', totalDebits, colors.bearish, colors),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            const Divider(height: 1),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                _buildSummaryStat('Net Flow', totalCredits - totalDebits, totalCredits >= totalDebits ? colors.bullish : colors.bearish, colors),
+                                _buildSummaryStat('Closing Balance', closing, colors.primary, colors, isBold: true),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: transactions.length,
-                      separatorBuilder: (_, __) => Divider(height: 1, color: colors.divider.withValues(alpha: 0.3)),
-                      itemBuilder: (context, index) {
-                        final txn = transactions[index];
-                        final isCredit = txn.isCredit;
-                        final amtColor = isCredit ? colors.bullish : colors.bearish;
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Date column
-                              SizedBox(
-                                width: 75,
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+
+                      // Itemized Ledger List
+                      Expanded(
+                        child: entries.isEmpty
+                            ? Center(
                                 child: Text(
-                                  DateFormatter.formatOrderDate(txn.timestamp),
-                                  style: GoogleFonts.inter(
-                                    color: colors.textSecondary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  'No transactions recorded for selected period.',
+                                  style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 13),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                itemCount: entries.length,
+                                separatorBuilder: (_, __) => Divider(height: 1, color: colors.divider.withValues(alpha: 0.3)),
+                                itemBuilder: (context, index) {
+                                  final item = entries[index];
+                                  final isCredit = item.credit > 0;
+                                  final amtColor = isCredit ? colors.bullish : colors.bearish;
+                                  final amt = isCredit ? item.credit : item.debit;
 
-                              // Narration & ID
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      txn.title,
-                                      style: GoogleFonts.inter(
-                                        color: colors.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12.5,
-                                      ),
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(
+                                          width: 75,
+                                          child: Text(
+                                            DateFormatter.formatOrderDate(item.date),
+                                            style: GoogleFonts.inter(
+                                              color: colors.textSecondary,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item.narration.isNotEmpty ? item.narration : 'Transaction',
+                                                style: GoogleFonts.inter(
+                                                  color: colors.textPrimary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12.5,
+                                                ),
+                                              ),
+                                              Text(
+                                                item.id,
+                                                style: GoogleFonts.inter(
+                                                  color: colors.textSecondary,
+                                                  fontSize: 11,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '${isCredit ? '+' : '-'}${CurrencyFormatter.format(amt)}',
+                                              style: GoogleFonts.inter(
+                                                color: amtColor,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12.5,
+                                                fontFeatures: const [FontFeature.tabularFigures()],
+                                              ),
+                                            ),
+                                            Text(
+                                              'Bal: ${CurrencyFormatter.format(item.runningBalance)}',
+                                              style: GoogleFonts.inter(
+                                                color: colors.textSecondary,
+                                                fontSize: 10.5,
+                                                fontFeatures: const [FontFeature.tabularFigures()],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                    Text(
-                                      '${txn.id} • ${txn.narration}',
-                                      style: GoogleFonts.inter(
-                                        color: colors.textSecondary,
-                                        fontSize: 11,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
+                                  );
+                                },
                               ),
-                              const SizedBox(width: 8),
+                      ),
 
-                              // Amount & Running Balance
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${isCredit ? '+' : '-'}${CurrencyFormatter.format(txn.amount)}',
-                                    style: GoogleFonts.inter(
-                                      color: amtColor,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 12.5,
-                                      fontFeatures: const [FontFeature.tabularFigures()],
-                                    ),
-                                  ),
-                                  Text(
-                                    'Bal: ${CurrencyFormatter.format(txn.runningBalance)}',
-                                    style: GoogleFonts.inter(
-                                      color: colors.textSecondary,
-                                      fontSize: 10.5,
-                                      fontFeatures: const [FontFeature.tabularFigures()],
-                                    ),
-                                  ),
-                                ],
+                      const SizedBox(height: 12),
+                      const Divider(height: 1),
+                      const SizedBox(height: 10),
+
+                      // Action Buttons (Export CSV, Share Statement)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _exportCsv(entries),
+                              icon: const Icon(LucideIcons.download, size: 18),
+                              label: const Text('Export CSV'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: colors.primary,
+                                side: BorderSide(color: colors.primary),
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
-                            ],
+                            ),
                           ),
-                        );
-                      },
-                    ),
-            ),
-
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 10),
-
-            // Action Buttons (Export CSV, Share Statement)
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _exportCsv(engine),
-                    icon: const Icon(LucideIcons.download, size: 18),
-                    label: const Text('Export CSV'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colors.primary,
-                      side: BorderSide(color: colors.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _shareReport(summary, transactions.length, colors),
-                    icon: const Icon(LucideIcons.share2, size: 18),
-                    label: const Text('Share Report'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 11),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _shareReport(
+                                opening: opening,
+                                closing: closing,
+                                credits: totalCredits,
+                                debits: totalDebits,
+                                count: entries.length,
+                                colors: colors,
+                              ),
+                              icon: const Icon(LucideIcons.share2, size: 18),
+                              label: const Text('Share Report'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colors.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                elevation: 0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -492,21 +506,6 @@ ZeroDalali Broking Ltd • SEBI Reg: INZ000031633
         fontSize: 11.5,
       ),
       onSelected: (_) => _applyPeriodPreset(key),
-    );
-  }
-
-  Widget _buildCategoryChip(TransactionCategory? cat, String label, TradingColors colors) {
-    final isSelected = _selectedCategory == cat;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: colors.primary.withValues(alpha: 0.15),
-      labelStyle: GoogleFonts.inter(
-        color: isSelected ? colors.primary : colors.textSecondary,
-        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        fontSize: 11.5,
-      ),
-      onSelected: (_) => setState(() => _selectedCategory = cat),
     );
   }
 

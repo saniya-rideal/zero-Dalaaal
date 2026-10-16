@@ -128,23 +128,81 @@ class Position {
     'openTime': openTime.toIso8601String(),
   };
 
-  factory Position.fromJson(Map<String, dynamic> json) => Position(
-    id: json['id'] as String,
-    instrument: Instrument.fromJson(json['instrument'] as Map<String, dynamic>),
-    product: ProductType.values.byName(json['product'] as String),
-    buyQty: (json['buyQty'] as num).toInt(),
-    sellQty: (json['sellQty'] as num).toInt(),
-    netQty: (json['netQty'] as num).toInt(),
-    buyAvg: (json['buyAvg'] as num).toDouble(),
-    sellAvg: (json['sellAvg'] as num).toDouble(),
-    ltp: (json['ltp'] as num).toDouble(),
-    realizedPnl: (json['realizedPnl'] as num).toDouble(),
-    unrealizedPnl: (json['unrealizedPnl'] as num).toDouble(),
-    isDayPosition: json['isDayPosition'] as bool? ?? true,
-    stopLoss: (json['stopLoss'] as num?)?.toDouble(),
-    takeProfit: (json['takeProfit'] as num?)?.toDouble(),
-    leverage: (json['leverage'] as num?)?.toDouble() ?? 5.0,
-    usedMargin: (json['usedMargin'] as num?)?.toDouble() ?? 0.0,
-    openTime: json['openTime'] != null ? DateTime.parse(json['openTime'] as String) : DateTime.now(),
-  );
+  factory Position.fromJson(Map<String, dynamic> json) {
+    final pId = (json['id'] ?? json['_id'] ?? '').toString();
+
+    // Instrument parsing
+    Instrument inst;
+    if (json['instrument'] is Map<String, dynamic>) {
+      inst = Instrument.fromJson(json['instrument'] as Map<String, dynamic>);
+    } else {
+      final sym = (json['symbol'] ?? json['instrumentToken'] ?? '').toString();
+      inst = Instrument(
+        symbol: sym,
+        token: sym,
+        name: sym,
+        exchange: Exchange.NSE,
+        type: InstrumentType.EQ,
+      );
+    }
+
+    // Product parsing
+    ProductType prod = ProductType.MIS;
+    final prodRaw = (json['product'] ?? '').toString().toUpperCase();
+    for (final val in ProductType.values) {
+      if (val.name == prodRaw) {
+        prod = val;
+        break;
+      }
+    }
+
+    // Quantities
+    int net = (json['netQty'] ?? json['quantity'] as num?)?.toInt() ?? 0;
+    final sideRaw = (json['side'] ?? '').toString().toUpperCase();
+    if (sideRaw == 'SELL' && net > 0) {
+      net = -net;
+    }
+
+    final bQty = (json['buyQty'] as num?)?.toInt() ?? (net > 0 ? net : 0);
+    final sQty = (json['sellQty'] as num?)?.toInt() ?? (net < 0 ? net.abs() : 0);
+
+    final entry = (json['entryPrice'] ?? json['avgPrice'] ?? json['buyAvg'] as num?)?.toDouble() ?? 0.0;
+    final bAvg = (json['buyAvg'] as num?)?.toDouble() ?? (net > 0 ? entry : 0.0);
+    final sAvg = (json['sellAvg'] as num?)?.toDouble() ?? (net < 0 ? entry : 0.0);
+
+    final lastPrice = (json['ltp'] ?? json['currentPrice'] ?? json['markPrice'] as num?)?.toDouble() ?? entry;
+    final rPnl = (json['realizedPnl'] as num?)?.toDouble() ?? 0.0;
+    final uPnl = (json['unrealizedPnl'] as num?)?.toDouble() ?? 0.0;
+
+    final lev = (json['leverage'] as num?)?.toDouble() ?? inst.maxLeverage;
+    final margin = (json['usedMargin'] ?? json['margin'] as num?)?.toDouble() ?? 0.0;
+
+    DateTime ot;
+    final rawDate = json['openTime'] ?? json['createdAt'] ?? json['timestamp'];
+    if (rawDate != null) {
+      ot = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+    } else {
+      ot = DateTime.now();
+    }
+
+    return Position(
+      id: pId,
+      instrument: inst,
+      product: prod,
+      buyQty: bQty,
+      sellQty: sQty,
+      netQty: net,
+      buyAvg: bAvg,
+      sellAvg: sAvg,
+      ltp: lastPrice,
+      realizedPnl: rPnl,
+      unrealizedPnl: uPnl,
+      isDayPosition: json['isDayPosition'] as bool? ?? true,
+      stopLoss: (json['stopLoss'] as num?)?.toDouble(),
+      takeProfit: (json['takeProfit'] as num?)?.toDouble(),
+      leverage: lev,
+      usedMargin: margin,
+      openTime: ot,
+    );
+  }
 }

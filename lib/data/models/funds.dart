@@ -19,9 +19,12 @@ class FundsSummary {
   final double spanMargin;
   final double exposureMargin;
   final double unrealizedPnl;
+  final double cash;
+  final double bonus;
+  final double withdrawable;
 
   const FundsSummary({
-    required this.segment,
+    this.segment = Segment.EQUITY,
     required this.availableMargin,
     required this.usedMargin,
     required this.openingBalance,
@@ -30,7 +33,17 @@ class FundsSummary {
     this.spanMargin = 0.0,
     this.exposureMargin = 0.0,
     this.unrealizedPnl = 0.0,
-  });
+    double? cash,
+    this.bonus = 0.0,
+    double? withdrawable,
+  })  : cash = cash ?? (availableMargin + usedMargin),
+        withdrawable = withdrawable ?? availableMargin;
+
+  factory FundsSummary.zero() => const FundsSummary(
+    availableMargin: 0.0,
+    usedMargin: 0.0,
+    openingBalance: 0.0,
+  );
 
   double get totalMargin => availableMargin + usedMargin;
 
@@ -38,7 +51,7 @@ class FundsSummary {
   double get freeMargin => availableMargin;
 
   /// Current cash balance (Available Cash + Margin Blocked for Orders/Positions)
-  double get balance => availableMargin + usedMargin;
+  double get balance => cash;
 
   /// Net Liquidation Value / Total Account Equity = Balance + Unrealized P&L
   double get equity => balance + unrealizedPnl;
@@ -80,6 +93,9 @@ class FundsSummary {
     double? spanMargin,
     double? exposureMargin,
     double? unrealizedPnl,
+    double? cash,
+    double? bonus,
+    double? withdrawable,
   }) {
     return FundsSummary(
       segment: segment ?? this.segment,
@@ -91,6 +107,9 @@ class FundsSummary {
       spanMargin: spanMargin ?? this.spanMargin,
       exposureMargin: exposureMargin ?? this.exposureMargin,
       unrealizedPnl: unrealizedPnl ?? this.unrealizedPnl,
+      cash: cash ?? this.cash,
+      bonus: bonus ?? this.bonus,
+      withdrawable: withdrawable ?? this.withdrawable,
     );
   }
 
@@ -104,19 +123,46 @@ class FundsSummary {
     'spanMargin': spanMargin,
     'exposureMargin': exposureMargin,
     'unrealizedPnl': unrealizedPnl,
+    'cash': cash,
+    'bonus': bonus,
+    'withdrawable': withdrawable,
   };
 
-  factory FundsSummary.fromJson(Map<String, dynamic> json) => FundsSummary(
-    segment: Segment.values.byName(json['segment'] as String),
-    availableMargin: (json['availableMargin'] as num).toDouble(),
-    usedMargin: (json['usedMargin'] as num).toDouble(),
-    openingBalance: (json['openingBalance'] as num).toDouble(),
-    payin: (json['payin'] as num?)?.toDouble() ?? 0.0,
-    payout: (json['payout'] as num?)?.toDouble() ?? 0.0,
-    spanMargin: (json['spanMargin'] as num?)?.toDouble() ?? 0.0,
-    exposureMargin: (json['exposureMargin'] as num?)?.toDouble() ?? 0.0,
-    unrealizedPnl: (json['unrealizedPnl'] as num?)?.toDouble() ?? 0.0,
-  );
+  factory FundsSummary.fromJson(Map<String, dynamic> json) {
+    Segment seg = Segment.EQUITY;
+    if (json['segment'] != null) {
+      final segStr = json['segment'].toString().toUpperCase();
+      for (final s in Segment.values) {
+        if (s.name == segStr) {
+          seg = s;
+          break;
+        }
+      }
+    }
+
+    final rawCash = (json['cash'] as num?)?.toDouble();
+    final rawFree = (json['freeMargin'] as num?)?.toDouble();
+    final avail = (json['availableMargin'] as num?)?.toDouble() ?? rawFree ?? rawCash ?? 0.0;
+    final used = (json['usedMargin'] as num?)?.toDouble() ?? 0.0;
+    final opening = (json['openingBalance'] as num?)?.toDouble() ?? (avail + used);
+    final withdr = (json['withdrawable'] as num?)?.toDouble() ?? avail;
+    final bns = (json['bonus'] as num?)?.toDouble() ?? 0.0;
+
+    return FundsSummary(
+      segment: seg,
+      availableMargin: avail,
+      usedMargin: used,
+      openingBalance: opening,
+      payin: (json['payin'] as num?)?.toDouble() ?? 0.0,
+      payout: (json['payout'] as num?)?.toDouble() ?? 0.0,
+      spanMargin: (json['spanMargin'] as num?)?.toDouble() ?? 0.0,
+      exposureMargin: (json['exposureMargin'] as num?)?.toDouble() ?? 0.0,
+      unrealizedPnl: (json['unrealizedPnl'] as num?)?.toDouble() ?? 0.0,
+      cash: rawCash ?? (avail + used),
+      bonus: bns,
+      withdrawable: withdr,
+    );
+  }
 }
 
 class LedgerEntry {
@@ -145,14 +191,24 @@ class LedgerEntry {
     'runningBalance': runningBalance,
   };
 
-  factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
-    id: json['id'] as String,
-    date: DateTime.parse(json['date'] as String),
-    narration: json['narration'] as String,
-    credit: (json['credit'] as num).toDouble(),
-    debit: (json['debit'] as num).toDouble(),
-    runningBalance: (json['runningBalance'] as num).toDouble(),
-  );
+  factory LedgerEntry.fromJson(Map<String, dynamic> json) {
+    DateTime d;
+    final rawDate = json['date'] ?? json['createdAt'] ?? json['timestamp'];
+    if (rawDate != null) {
+      d = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+    } else {
+      d = DateTime.now();
+    }
+
+    return LedgerEntry(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      date: d,
+      narration: (json['narration'] ?? json['description'] ?? '').toString(),
+      credit: (json['credit'] as num?)?.toDouble() ?? 0.0,
+      debit: (json['debit'] as num?)?.toDouble() ?? 0.0,
+      runningBalance: (json['runningBalance'] ?? json['balance'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 enum WalletTransactionType {
@@ -198,10 +254,10 @@ class LinkedBankAccount {
   };
 
   factory LinkedBankAccount.fromJson(Map<String, dynamic> json) => LinkedBankAccount(
-    id: json['id'] as String,
-    bankName: json['bankName'] as String,
-    accountNumberMasked: json['accountNumberMasked'] as String,
-    ifsc: json['ifsc'] as String,
+    id: (json['id'] ?? json['_id'] ?? '').toString(),
+    bankName: (json['bankName'] ?? 'Bank Account').toString(),
+    accountNumberMasked: (json['accountNumberMasked'] ?? '••••').toString(),
+    ifsc: (json['ifsc'] ?? '').toString(),
     isPrimary: json['isPrimary'] as bool? ?? false,
     isVerified: json['isVerified'] as bool? ?? true,
   );
@@ -283,19 +339,62 @@ class WalletTransaction {
     'failureReason': failureReason,
   };
 
-  factory WalletTransaction.fromJson(Map<String, dynamic> json) => WalletTransaction(
-    id: json['id'] as String,
-    referenceId: json['referenceId'] as String,
-    type: WalletTransactionType.values.byName(json['type'] as String),
-    amount: (json['amount'] as num).toDouble(),
-    status: WalletTransactionStatus.values.byName(json['status'] as String),
-    method: PaymentMethod.values.byName(json['method'] as String),
-    bankAccount: json['bankAccount'] as String?,
-    upiId: json['upiId'] as String?,
-    createdAt: DateTime.parse(json['createdAt'] as String),
-    updatedAt: DateTime.parse(json['updatedAt'] as String),
-    failureReason: json['failureReason'] as String?,
-  );
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) {
+    WalletTransactionType t = WalletTransactionType.DEPOSIT;
+    final tRaw = (json['type'] ?? '').toString().toUpperCase();
+    if (tRaw == 'WITHDRAWAL' || tRaw == 'WITHDRAW') {
+      t = WalletTransactionType.WITHDRAWAL;
+    }
+
+    WalletTransactionStatus s = WalletTransactionStatus.PENDING;
+    final sRaw = (json['status'] ?? '').toString().toUpperCase();
+    for (final val in WalletTransactionStatus.values) {
+      if (val.name == sRaw) {
+        s = val;
+        break;
+      }
+    }
+
+    PaymentMethod m = PaymentMethod.UPI;
+    final mRaw = (json['method'] ?? '').toString().toUpperCase();
+    for (final val in PaymentMethod.values) {
+      if (val.name == mRaw) {
+        m = val;
+        break;
+      }
+    }
+
+    DateTime cr;
+    if (json['createdAt'] != null) {
+      cr = DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now();
+    } else {
+      cr = DateTime.now();
+    }
+
+    DateTime up;
+    if (json['updatedAt'] != null) {
+      up = DateTime.tryParse(json['updatedAt'].toString()) ?? cr;
+    } else {
+      up = cr;
+    }
+
+    final id = (json['id'] ?? json['_id'] ?? '').toString();
+    final refId = (json['referenceId'] ?? json['refId'] ?? id).toString();
+
+    return WalletTransaction(
+      id: id,
+      referenceId: refId,
+      type: t,
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      status: s,
+      method: m,
+      bankAccount: json['bankAccount']?.toString(),
+      upiId: json['upiId']?.toString(),
+      createdAt: cr,
+      updatedAt: up,
+      failureReason: json['failureReason']?.toString(),
+    );
+  }
 }
 
 class BalanceBreakdown {

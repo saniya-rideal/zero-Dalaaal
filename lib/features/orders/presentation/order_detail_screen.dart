@@ -6,7 +6,7 @@ import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../data/real_trading_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
@@ -18,8 +18,8 @@ class OrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final Order? order = engine.orders.where((o) => o.orderId == orderId).firstOrNull;
+    final ordersAsync = ref.watch(ordersListProvider);
+    final Order? order = ordersAsync.value?.where((o) => o.orderId == orderId || o.id == orderId).firstOrNull;
 
     if (order == null) {
       return Scaffold(
@@ -193,7 +193,7 @@ class OrderDetailScreen extends ConsumerWidget {
               ),
             ),
 
-            // Zerodha-style Charges Breakdown Card (₹0 Brokerage Highlight)
+            // Charges Breakdown Card (₹0 Brokerage Highlight)
             SectionCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,7 +273,8 @@ class OrderDetailScreen extends ConsumerWidget {
                       ),
                     );
                     if (confirmed == true && context.mounted) {
-                      await engine.cancelOrder(order.orderId);
+                      await ref.read(tradingRepositoryProvider).cancelOrder(order.id);
+                      ref.invalidate(ordersListProvider);
                       if (context.mounted) Navigator.pop(context);
                     }
                   },

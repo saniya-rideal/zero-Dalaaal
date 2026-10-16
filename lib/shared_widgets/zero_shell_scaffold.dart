@@ -16,7 +16,7 @@ class ZeroShellScaffold extends StatefulWidget {
 }
 
 class _ZeroShellScaffoldState extends State<ZeroShellScaffold> with SingleTickerProviderStateMixin {
-  bool _isMarginExpanded = true;
+  bool _isMarginExpanded = false;
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
 
@@ -26,7 +26,7 @@ class _ZeroShellScaffoldState extends State<ZeroShellScaffold> with SingleTicker
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 280),
-      value: 1.0, // Initially expanded as in screenshots
+      value: 0.0, // Initially collapsed to give maximum breathing room
     );
     _expandAnimation = CurvedAnimation(
       parent: _animationController,

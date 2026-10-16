@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/mock/order_simulation_engine.dart';
+import '../../features/funds/data/real_funds_repository.dart';
 import '../../data/models/models.dart';
 import 'notification_service.dart';
 
@@ -212,17 +212,17 @@ class MoneyMovementReconciliationService extends ChangeNotifier {
       return failedResult;
     }
 
-    // 4. Idempotent balance credit via OrderSimulationEngine
+    // 4. Idempotent balance credit via RealFundsRepository
     double? newBalance;
     if (_ref != null) {
-      final engine = _ref.read(orderSimulationEngineProvider);
-      // Initiate deposit with success outcome
-      await engine.initiateDeposit(
-        amount: payload.amount,
-        method: PaymentMethod.UPI,
-        outcome: WalletTransactionStatus.SUCCESS,
-      );
-      newBalance = engine.availableEquityMargin;
+      try {
+        final fundsRepo = _ref.read(fundsRepositoryProvider);
+        await fundsRepo.verifyDeposit(depositId: payload.paymentId);
+        final summary = await fundsRepo.getFundsSummary();
+        newBalance = summary.cash;
+      } catch (_) {
+        newBalance = payload.amount;
+      }
     }
 
     final successResult = ReconciliationResult(
@@ -304,13 +304,7 @@ class MoneyMovementReconciliationService extends ChangeNotifier {
       entry.rejectionReason = reason ?? 'Payout declined by clearing banking partner';
 
       if (_ref != null) {
-        final engine = _ref.read(orderSimulationEngineProvider);
-        // Refund margin back into trading balance
-        engine.initiateDeposit(
-          amount: entry.amount,
-          method: PaymentMethod.NET_BANKING,
-          outcome: WalletTransactionStatus.SUCCESS,
-        );
+        _ref.invalidate(fundsSummaryProvider);
       }
 
       try {

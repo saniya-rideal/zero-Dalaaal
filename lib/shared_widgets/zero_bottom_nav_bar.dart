@@ -107,31 +107,38 @@ class ZeroBottomNavBar extends StatelessWidget {
           // Center Pink Floating Button inside the grey downward curved dip
           Positioned(
             top: 4,
-            child: GestureDetector(
-              onTap: onCenterToggle,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: colors.primary.withValues(alpha: 0.30),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
+            child: Tooltip(
+              message: isExpanded ? 'Hide Margin Dock' : 'Show Margin Dock',
+              child: Semantics(
+                button: true,
+                label: isExpanded ? 'Hide Margin Dock' : 'Show Margin Dock',
+                child: GestureDetector(
+                  onTap: onCenterToggle,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.primary.withValues(alpha: 0.30),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Center(
-                  child: AnimatedRotation(
-                    turns: isExpanded ? 0.0 : 0.5,
-                    duration: const Duration(milliseconds: 250),
-                    child: const Icon(
-                      LucideIcons.chevronDown,
-                      color: Colors.white,
-                      size: 22,
+                    child: Center(
+                      child: AnimatedRotation(
+                        turns: isExpanded ? 0.0 : 0.5,
+                        duration: const Duration(milliseconds: 250),
+                        child: const Icon(
+                          LucideIcons.chevronDown,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
                     ),
                   ),
                 ),

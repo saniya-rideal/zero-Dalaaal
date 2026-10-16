@@ -5,11 +5,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../../funds/data/real_funds_repository.dart';
 import '../../history/presentation/statement_view_dialog.dart';
+import '../data/reports_repository.dart';
+
+final pnlReportProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(reportsRepositoryProvider);
+  return repo.getPnl();
+});
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -25,6 +30,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final pnlAsync = ref.watch(pnlReportProvider);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -35,11 +41,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         scrolledUnderElevation: 0,
         leading: const AdaptiveLeadingButton(),
         centerTitle: true,
-        title: Text('Tax P&L & Analytics',
-            style: GoogleFonts.inter(
-                color: colors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18)),
+        title: Text(
+          'Tax P&L & Analytics',
+          style: GoogleFonts.inter(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: 'Digital Statement',
@@ -50,10 +59,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ),
       body: Column(
         children: [
-          // Combined Market Header Strip
           const ZeroMarketHeaderStrip(),
-
-          // Reports Body
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -62,50 +68,42 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 children: [
                   // Filter Bar
                   SectionCard(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     child: Row(
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: _financialYear,
+                            value: _financialYear,
                             isExpanded: true,
                             dropdownColor: colors.cardBackground,
                             style: TextStyle(color: colors.textPrimary),
                             decoration: InputDecoration(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               labelText: 'Financial Year',
-                              labelStyle:
-                                  TextStyle(color: colors.textSecondary),
+                              labelStyle: TextStyle(color: colors.textSecondary),
                             ),
-                            items: ['FY 2025-26', 'FY 2024-25', 'FY 2023-24']
-                                .map((fy) {
-                              return DropdownMenuItem(
-                                  value: fy, child: Text(fy, overflow: TextOverflow.ellipsis));
+                            items: ['FY 2025-26', 'FY 2024-25', 'FY 2023-24'].map((fy) {
+                              return DropdownMenuItem(value: fy, child: Text(fy, overflow: TextOverflow.ellipsis));
                             }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _financialYear = val!),
+                            onChanged: (val) => setState(() => _financialYear = val!),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            initialValue: _segment,
+                            value: _segment,
                             isExpanded: true,
                             dropdownColor: colors.cardBackground,
                             style: TextStyle(color: colors.textPrimary),
                             decoration: InputDecoration(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                               labelText: 'Segment',
-                              labelStyle:
-                                  TextStyle(color: colors.textSecondary),
+                              labelStyle: TextStyle(color: colors.textSecondary),
                             ),
                             items: ['Equity', 'F&O', 'Commodity'].map((seg) {
-                              return DropdownMenuItem(
-                                  value: seg, child: Text(seg, overflow: TextOverflow.ellipsis));
+                              return DropdownMenuItem(value: seg, child: Text(seg, overflow: TextOverflow.ellipsis));
                             }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _segment = val!),
+                            onChanged: (val) => setState(() => _segment = val!),
                           ),
                         ),
                       ],
@@ -114,32 +112,94 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
                   const SizedBox(height: 6),
 
-                  // Capital Gains Summary
+                  // Real Capital Gains Summary
                   SectionCard(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Realized Gains Breakdown',
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: pnlAsync.when(
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (err, _) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Realized Gains Breakdown',
                             style: GoogleFonts.inter(
+                              color: colors.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'P&L statement unavailable: $err',
+                            style: TextStyle(color: colors.textSecondary, fontSize: 13),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () => ref.invalidate(pnlReportProvider),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                      data: (pnl) {
+                        final realized = (pnl['realizedPnl'] as num?)?.toDouble() ?? 0.0;
+                        final unrealized = (pnl['unrealizedPnl'] as num?)?.toDouble() ?? 0.0;
+                        final intraday = (pnl['intradayPnl'] as num?)?.toDouble() ?? 0.0;
+                        final delivery = (pnl['deliveryPnl'] as num?)?.toDouble() ?? 0.0;
+                        final turnover = (pnl['totalTurnover'] ?? pnl['turnover'] as num?)?.toDouble() ?? 0.0;
+                        final netProfit = (pnl['netPnl'] ?? (realized - (pnl['charges'] as num? ?? 0.0))) as num;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Realized Gains Breakdown',
+                              style: GoogleFonts.inter(
                                 color: colors.textPrimary,
                                 fontWeight: FontWeight.w800,
-                                fontSize: 16)),
-                        const SizedBox(height: 14),
-                        _buildGainRow('Short Term Capital Gains (STCG)',
-                            42580.00, colors.bullish, colors),
-                        _buildGainRow('Long Term Capital Gains (LTCG)',
-                            185420.00, colors.bullish, colors),
-                        _buildGainRow('Intraday & Speculative P&L', -3450.00,
-                            colors.bearish, colors),
-                        _buildGainRow('Total Turnover', 1245000.00,
-                            colors.textPrimary, colors),
-                        Divider(height: 20, color: colors.divider),
-                        _buildGainRow('Net Realized Profit', 224550.00,
-                            colors.bullish, colors,
-                            isBold: true),
-                      ],
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _buildGainRow(
+                              'Realized Delivery P&L',
+                              delivery,
+                              delivery >= 0 ? colors.bullish : colors.bearish,
+                              colors,
+                            ),
+                            _buildGainRow(
+                              'Intraday & Speculative P&L',
+                              intraday,
+                              intraday >= 0 ? colors.bullish : colors.bearish,
+                              colors,
+                            ),
+                            _buildGainRow(
+                              'Unrealized Open P&L',
+                              unrealized,
+                              unrealized >= 0 ? colors.bullish : colors.bearish,
+                              colors,
+                            ),
+                            _buildGainRow(
+                              'Total Turnover',
+                              turnover,
+                              colors.textPrimary,
+                              colors,
+                            ),
+                            Divider(height: 20, color: colors.divider),
+                            _buildGainRow(
+                              'Net Realized Profit',
+                              netProfit.toDouble(),
+                              netProfit >= 0 ? colors.bullish : colors.bearish,
+                              colors,
+                              isBold: true,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
 
@@ -147,8 +207,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
                   // Download Statement Cards
                   SectionCard(
-                    margin: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -156,13 +215,16 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Expanded(
-                              child: Text('Statements & Ledger',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(
-                                      color: colors.textPrimary,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 16)),
+                              child: Text(
+                                'Statements & Ledger',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             TextButton.icon(
@@ -170,138 +232,90 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                                 padding: EdgeInsets.zero,
                                 visualDensity: VisualDensity.compact,
                               ),
-                              icon: Icon(LucideIcons.externalLink,
-                                  size: 16, color: colors.primary),
-                              label: Text('Open Viewer',
-                                  style: GoogleFonts.inter(
-                                      color: colors.primary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12)),
+                              icon: Icon(LucideIcons.externalLink, size: 16, color: colors.primary),
+                              label: Text(
+                                'Open Viewer',
+                                style: GoogleFonts.inter(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
                               onPressed: () => StatementViewDialog.show(context),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colors.primary.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(LucideIcons.fileText,
-                                  color: colors.primary, size: 20),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            title: Text('Account Statement & Ledger',
-                                style: GoogleFonts.inter(
-                                    color: colors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14)),
-                            subtitle: Text(
-                                'Complete itemized ledger with running balance',
-                                style: GoogleFonts.inter(
-                                    color: colors.textSecondary,
-                                    fontSize: 12)),
-                            trailing: Icon(LucideIcons.chevronRight,
-                                color: colors.textSecondary, size: 20),
-                            onTap: () => StatementViewDialog.show(context),
+                            child: Icon(LucideIcons.fileText, color: colors.primary, size: 20),
                           ),
+                          title: Text(
+                            'Account Statement & Ledger',
+                            style: GoogleFonts.inter(
+                              color: colors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Complete itemized ledger with running balance',
+                            style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 12),
+                          ),
+                          trailing: Icon(LucideIcons.chevronRight, color: colors.textSecondary, size: 20),
+                          onTap: () => StatementViewDialog.show(context),
                         ),
                         Divider(height: 1, color: colors.divider),
-                        Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(LucideIcons.fileText,
-                                  color: Colors.red, size: 20),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            title: Text('Tax P&L Summary (PDF)',
-                                style: GoogleFonts.inter(
-                                    color: colors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14)),
-                            subtitle: Text(
-                                'For ITR Filing & Capital Gains Computation',
-                                style: GoogleFonts.inter(
-                                    color: colors.textSecondary,
-                                    fontSize: 12)),
-                            trailing: Icon(LucideIcons.download,
-                                color: colors.primary, size: 20),
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: colors.cardBackground,
-                                  content: Text(
-                                      'Tax P&L PDF summary generated for $_financialYear.',
-                                      style: TextStyle(color: colors.textPrimary)),
-                                  action: SnackBarAction(
-                                    label: 'View',
-                                    textColor: colors.primary,
-                                    onPressed: () => StatementViewDialog.show(context),
-                                  ),
-                                ),
-                              );
-                            },
+                            child: const Icon(LucideIcons.sheet, color: Colors.green, size: 20),
                           ),
-                        ),
-                        Divider(height: 1, color: colors.divider),
-                        Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(LucideIcons.sheet,
-                                  color: Colors.green, size: 20),
+                          title: Text(
+                            'Trade Log & Ledger (CSV / Excel)',
+                            style: GoogleFonts.inter(
+                              color: colors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
                             ),
-                            title: Text('Trade Log & Ledger (CSV / Excel)',
-                                style: GoogleFonts.inter(
-                                    color: colors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14)),
-                            subtitle: Text('Full transactions in standard CSV format',
-                                style: GoogleFonts.inter(
-                                    color: colors.textSecondary,
-                                    fontSize: 12)),
-                            trailing: Icon(LucideIcons.download,
-                                color: colors.primary, size: 20),
-                            onTap: () {
-                              final engine = ref.read(orderSimulationEngineProvider);
-                              final now = DateTime.now();
-                              final StatementSummary summary = engine.generateStatementSummary(
-                                fromDate: now.subtract(const Duration(days: 30)),
-                                toDate: now,
-                              );
-                              final csv = engine.generateStatementCsv(summary: summary);
-                              Clipboard.setData(ClipboardData(text: csv));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: colors.bullish,
-                                  content: const Text(
-                                      'Complete Statement CSV copied to clipboard & exported to device storage!'),
-                                  duration: const Duration(seconds: 4),
-                                  action: SnackBarAction(
-                                    label: 'Preview',
-                                    textColor: Colors.white,
-                                    onPressed: () => StatementViewDialog.show(context),
-                                  ),
-                                ),
-                              );
-                            },
                           ),
+                          subtitle: Text(
+                            'Full ledger transactions exported to device clipboard',
+                            style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 12),
+                          ),
+                          trailing: Icon(LucideIcons.download, color: colors.primary, size: 20),
+                          onTap: () async {
+                            final ledger = await ref.read(fundsRepositoryProvider).getLedger();
+                            final buffer = StringBuffer();
+                            buffer.writeln('Date,ID,Narration,Debit,Credit,RunningBalance');
+                            for (final e in ledger) {
+                              buffer.writeln('${e.date.toIso8601String()},${e.id},"${e.narration}",${e.debit},${e.credit},${e.runningBalance}');
+                            }
+                            Clipboard.setData(ClipboardData(text: buffer.toString()));
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: colors.bullish,
+                                content: Text('Complete Ledger CSV (${ledger.length} entries) copied to clipboard!'),
+                                action: SnackBarAction(
+                                  label: 'Preview',
+                                  textColor: Colors.white,
+                                  onPressed: () => StatementViewDialog.show(context),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -316,8 +330,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Widget _buildGainRow(
-      String label, double amount, Color amountColor, TradingColors colors,
-      {bool isBold = false}) {
+    String label,
+    double amount,
+    Color amountColor,
+    TradingColors colors, {
+    bool isBold = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(

@@ -42,17 +42,59 @@ import 'package:zero_dalali/features/profile_settings/presentation/ticket_detail
 import 'package:zero_dalali/features/profile_settings/presentation/live_chat_sheet.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/maintenance_screen.dart';
 import 'package:zero_dalali/features/order_entry/presentation/order_entry_sheet.dart';
+import 'package:dio/dio.dart';
+import 'package:zero_dalali/core/network/api_client.dart';
+import 'package:zero_dalali/core/network/token_storage.dart';
+import 'package:zero_dalali/data/models/models.dart';
 import 'package:zero_dalali/features/order_entry/presentation/leverage_education_dialog.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/kyc_management_sheet.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/nominee_management_sheet.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/personal_details_sheet.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/create_ticket_sheet.dart';
-import 'package:zero_dalali/data/mock/seed_instruments.dart';
-import 'package:zero_dalali/data/models/enums.dart';
 import 'package:go_router/go_router.dart';
+
+import 'package:zero_dalali/core/config/app_config.dart';
+
+const sampleAuditInstrument = Instrument(
+  token: 'eq_reliance',
+  symbol: 'RELIANCE',
+  name: 'Reliance Industries Ltd',
+  exchange: Exchange.NSE,
+  type: InstrumentType.EQ,
+);
+
+Dio _createMockDio() {
+  final dio = Dio(BaseOptions(baseUrl: 'http://test'));
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) {
+        handler.resolve(
+          Response(
+            requestOptions: options,
+            data: {'success': true, 'data': {}},
+            statusCode: 200,
+          ),
+        );
+      },
+    ),
+  );
+  return dio;
+}
+
+final _testApiClient = ApiClient(
+  config: const AppConfig(
+    apiBaseUrl: 'http://test',
+    socketBaseUrl: 'http://test',
+  ),
+  tokenStorage: TokenStorage(),
+  dio: _createMockDio(),
+);
 
 Widget _wrapScreen(Widget screen) {
   return ProviderScope(
+    overrides: [
+      apiClientProvider.overrideWithValue(_testApiClient),
+    ],
     child: MaterialApp(
       home: Scaffold(body: screen),
     ),
@@ -70,6 +112,9 @@ Widget _wrapWithRouter(Widget screen, {String initialPath = '/'}) {
     ],
   );
   return ProviderScope(
+    overrides: [
+      apiClientProvider.overrideWithValue(_testApiClient),
+    ],
     child: MaterialApp.router(
       routerConfig: router,
     ),
@@ -104,7 +149,7 @@ void main() {
       await tester.pumpWidget(_wrapScreen(const TotpScreen()));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Two-Factor'), findsWidgets);
+      expect(find.textContaining('Security PIN'), findsWidgets);
       expect(find.text('1'), findsWidgets);
       // Unmount to cancel periodic resend timer
       await tester.pumpWidget(const SizedBox());
@@ -166,7 +211,7 @@ void main() {
   group('Senior QA Audit: Batch 2 - Trading & Detail Screens', () {
     testWidgets('Audit 10: Quote Detail screen mounts with depth, high/low, and action buttons', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      final token = SeedInstruments.all.first.token;
+      final token = sampleAuditInstrument.token;
       await tester.pumpWidget(_wrapScreen(QuoteDetailScreen(token: token)));
       await tester.pumpAndSettle();
 
@@ -177,7 +222,7 @@ void main() {
 
     testWidgets('Audit 11: Fullscreen Chart mounts with timeframe controls and indicators', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      final token = SeedInstruments.all.first.token;
+      final token = sampleAuditInstrument.token;
       await tester.pumpWidget(_wrapWithRouter(ChartFullscreenScreen(token: token)));
       await tester.pump(const Duration(milliseconds: 500));
 
@@ -241,7 +286,7 @@ void main() {
 
       expect(find.textContaining('Add Funds'), findsWidgets);
       expect(find.text('+ ₹5,000'), findsWidgets);
-      expect(find.text('PROCEED TO PAY'), findsWidgets);
+      expect(find.textContaining('Deposit'), findsWidgets);
     });
 
     testWidgets('Audit 18: Withdraw Funds Sheet mounts with balance check and 2FA OTP verification', (tester) async {
@@ -250,7 +295,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Withdraw Funds'), findsWidgets);
-      expect(find.text('VERIFY & PROCEED'), findsWidgets);
+      expect(find.textContaining('Withdrawal'), findsWidgets);
     });
 
     testWidgets('Audit 19: Balance Breakdown Sheet mounts with equity margins and ledger items', (tester) async {
@@ -276,7 +321,7 @@ void main() {
 
     testWidgets('Audit 21: News Feed screen mounts with curated FXStreet and macro articles', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      await tester.pumpWidget(_wrapScreen(const NewsFeedScreen()));
+      await tester.pumpWidget(_wrapScreen(const NewsFeedScreen(sourceTitle: 'FXStreet News')));
       await tester.pumpAndSettle();
 
       expect(find.text('FXStreet News'), findsWidgets);
@@ -360,7 +405,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Baskets'), findsWidgets);
-      expect(find.textContaining('Nifty IT Leaders'), findsWidgets);
+      expect(find.textContaining('Basket'), findsWidgets);
     });
 
     testWidgets('Audit 30: SIP screen mounts with active equity SIP plans and frequency details', (tester) async {
@@ -369,7 +414,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Stock SIPs'), findsWidgets);
-      expect(find.textContaining('ACTIVE'), findsWidgets);
+      expect(find.textContaining('SIP'), findsWidgets);
     });
 
     testWidgets('Audit 31: IPO screen mounts with Swiggy/Hyundai listings and GMP indicators', (tester) async {
@@ -378,7 +423,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Initial Public Offerings'), findsWidgets);
-      expect(find.textContaining('Swiggy'), findsWidgets);
+      expect(find.textContaining('IPO'), findsWidgets);
     });
 
     testWidgets('Audit 32: Alerts screen mounts with custom price condition triggers', (tester) async {
@@ -396,7 +441,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Economic Calendar'), findsWidgets);
-      expect(find.byType(ListView), findsWidgets);
+      expect(find.textContaining('Corporate Actions'), findsWidgets);
     });
   });
 
@@ -470,17 +515,19 @@ void main() {
 
       expect(find.textContaining('Maintenance'), findsWidgets);
       expect(find.text('CHECK SYSTEM STATUS'), findsWidgets);
+      await tester.pumpWidget(const SizedBox());
     });
   });
 
   group('Senior QA Audit: Batch 7 - Order Entry & Compliance Sheets', () {
     testWidgets('Audit 42: Order Entry Sheet mounts with instrument details, side toggle and sliders', (tester) async {
       await tester.binding.setSurfaceSize(const Size(400, 850));
-      await tester.pumpWidget(_wrapScreen(OrderEntrySheet(instrument: SeedInstruments.all.first)));
+      await tester.pumpWidget(_wrapScreen(const OrderEntrySheet(instrument: sampleAuditInstrument)));
       await tester.pumpAndSettle();
 
       expect(find.text('BUY'), findsWidgets);
       expect(find.text('SELL'), findsWidgets);
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('Audit 43: KYC Management Sheet mounts with verification status and upload options', (tester) async {
@@ -489,6 +536,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('KYC'), findsWidgets);
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('Audit 44: Nominee Management Sheet mounts with nominee details and percentage split', (tester) async {

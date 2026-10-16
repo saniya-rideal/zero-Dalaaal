@@ -45,7 +45,6 @@ class WebsiteClaimsData {
   final bool hasFraudDetection;
   final bool has24x7Support;
   final bool hasLearningAcademy;
-  final bool hasDemoAccountAccess;
 
   const WebsiteClaimsData({
     required this.zeroBrokerage,
@@ -55,7 +54,6 @@ class WebsiteClaimsData {
     required this.hasFraudDetection,
     required this.has24x7Support,
     required this.hasLearningAcademy,
-    required this.hasDemoAccountAccess,
   });
 }
 
@@ -96,7 +94,6 @@ class SourceVerificationService {
     hasFraudDetection: true, // Device/IP anomaly detection, lockout protection
     has24x7Support: true, // 4-tier ticket redressal, live chat, FAQ knowledgebase
     hasLearningAcademy: true, // Structured modules, 40+ glossary terms
-    hasDemoAccountAccess: true, // Seamless sandbox demo vs live gateway execution
   );
 
   // ─── 3. Final Rule: 8-Pillar Completeness QA Audit ──────────────────────────

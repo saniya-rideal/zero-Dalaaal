@@ -1,3 +1,7 @@
+import '../network/api_client.dart';
+import '../network/api_paths.dart';
+import '../network/response_reader.dart';
+
 class EntityDetails {
   final String entityName;
   final String operatingStructure;
@@ -16,6 +20,26 @@ class EntityDetails {
     required this.registeredOffice,
     required this.corporateOffice,
   });
+
+  factory EntityDetails.fromJson(Map<String, dynamic> json) => EntityDetails(
+    entityName: json['entityName']?.toString() ?? 'Unavailable',
+    operatingStructure: json['operatingStructure']?.toString() ?? 'Unavailable',
+    cin: json['cin']?.toString() ?? 'Unavailable',
+    pan: json['pan']?.toString() ?? 'Unavailable',
+    gstin: json['gstin']?.toString() ?? 'Unavailable',
+    registeredOffice: json['registeredOffice']?.toString() ?? 'Unavailable',
+    corporateOffice: json['corporateOffice']?.toString() ?? 'Unavailable',
+  );
+
+  Map<String, dynamic> toJson() => {
+    'entityName': entityName,
+    'operatingStructure': operatingStructure,
+    'cin': cin,
+    'pan': pan,
+    'gstin': gstin,
+    'registeredOffice': registeredOffice,
+    'corporateOffice': corporateOffice,
+  };
 }
 
 class BrokerLicenses {
@@ -36,6 +60,26 @@ class BrokerLicenses {
     required this.nsdlDpId,
     required this.sebiRaReg,
   });
+
+  factory BrokerLicenses.fromJson(Map<String, dynamic> json) => BrokerLicenses(
+    sebiBrokerReg: json['sebiBrokerReg']?.toString() ?? 'Unavailable',
+    nseMemberId: json['nseMemberId']?.toString() ?? 'Unavailable',
+    bseMemberId: json['bseMemberId']?.toString() ?? 'Unavailable',
+    mcxMemberId: json['mcxMemberId']?.toString() ?? 'Unavailable',
+    cdslDpId: json['cdslDpId']?.toString() ?? 'Unavailable',
+    nsdlDpId: json['nsdlDpId']?.toString() ?? 'Unavailable',
+    sebiRaReg: json['sebiRaReg']?.toString() ?? 'Unavailable',
+  );
+
+  Map<String, dynamic> toJson() => {
+    'sebiBrokerReg': sebiBrokerReg,
+    'nseMemberId': nseMemberId,
+    'bseMemberId': bseMemberId,
+    'mcxMemberId': mcxMemberId,
+    'cdslDpId': cdslDpId,
+    'nsdlDpId': nsdlDpId,
+    'sebiRaReg': sebiRaReg,
+  };
 }
 
 class AmlTransactionAlert {
@@ -106,32 +150,82 @@ class TradeAuditLogEntry {
 class RealMoneyComplianceService {
   RealMoneyComplianceService._();
 
+  static String disclaimer = 'Compliance disclaimer unavailable';
+
   // ─── 1. Legal Entity & Operating Structure ──────────────────────────────────
-  static const EntityDetails corporateEntity = EntityDetails(
-    entityName: 'Zero Dalali Securities Private Limited',
-    operatingStructure: 'Private Limited Brokerage & Depository Participant',
-    cin: 'U67120MH2020PTC342819',
-    pan: 'AAACZ9821K',
-    gstin: '27AAACZ9821K1ZZ',
-    registeredOffice: 'Level 14, Tower 2, One International Center, Prabhadevi, Mumbai - 400013, Maharashtra, India',
-    corporateOffice: 'Block B, Nesco IT Park, Western Express Highway, Goregaon East, Mumbai - 400063, Maharashtra, India',
+  static EntityDetails corporateEntity = const EntityDetails(
+    entityName: 'Unavailable',
+    operatingStructure: 'Unavailable',
+    cin: 'Unavailable',
+    pan: 'Unavailable',
+    gstin: 'Unavailable',
+    registeredOffice: 'Unavailable',
+    corporateOffice: 'Unavailable',
   );
 
   // ─── 2. Permissions & Licenses ──────────────────────────────────────────────
-  static const BrokerLicenses licenses = BrokerLicenses(
-    sebiBrokerReg: 'INZ000031633',
-    nseMemberId: '14288',
-    bseMemberId: '6312',
-    mcxMemberId: '56820',
-    cdslDpId: '12081600',
-    nsdlDpId: 'IN300126',
-    sebiRaReg: 'INH000008412',
+  static BrokerLicenses licenses = const BrokerLicenses(
+    sebiBrokerReg: 'Unavailable',
+    nseMemberId: 'Unavailable',
+    bseMemberId: 'Unavailable',
+    mcxMemberId: 'Unavailable',
+    cdslDpId: 'Unavailable',
+    nsdlDpId: 'Unavailable',
+    sebiRaReg: 'Unavailable',
   );
 
   // ─── 3. Market Data Licensing & Vendor Agreements ───────────────────────────
-  static const String marketDataLicenseAgreementRef = 'NSE-MKT-FEED-2026-L2-8921';
-  static const String clearingMemberAgreementRef = 'NCL-CM-AGR-M51842';
+  static String marketDataLicenseAgreementRef = 'Unavailable';
+  static String clearingMemberAgreementRef = 'Unavailable';
   static const bool allowsRedistributionWithoutLicense = false;
+
+  /// Dynamically fetch and update corporate, regulatory, and licensing metadata from the backend API
+  static Future<void> fetchFromApi({required ApiClient apiClient}) async {
+    try {
+      // 1. Fetch Legal Terms and Conditions
+      final legalTerms = await apiClient.get(ApiPaths.legal('terms-and-conditions'));
+      final termsObj = ResponseReader.object(legalTerms, 'document');
+      final termsContent = (termsObj['content'] ?? '').toString();
+      if (termsContent.isNotEmpty) {
+        disclaimer = termsContent.split('\n').firstWhere((line) => line.trim().isNotEmpty, orElse: () => 'Compliance disclaimer unavailable');
+      }
+
+      // 2. Fetch Risk Disclosure Document
+      final riskDoc = await apiClient.get(ApiPaths.legal('risk-disclosure'));
+      final riskObj = ResponseReader.object(riskDoc, 'document');
+      final riskContent = (riskObj['content'] ?? '').toString();
+      if (riskContent.isNotEmpty) {
+        final fnoLine = riskContent.split('\n').firstWhere(
+          (line) => line.contains('9 out of 10') || line.toLowerCase().contains('risk'),
+          orElse: () => 'Regulatory warning unavailable',
+        );
+        sebiFoLossWarning = fnoLine;
+      }
+
+      // 3. Fetch App Configuration & System Settings
+      final configRes = await apiClient.get(ApiPaths.appConfig);
+      final cfgMap = ResponseReader.object(configRes, 'config');
+      if (cfgMap.containsKey('entity') && cfgMap['entity'] is Map<String, dynamic>) {
+        corporateEntity = EntityDetails.fromJson(cfgMap['entity'] as Map<String, dynamic>);
+      }
+      if (cfgMap.containsKey('licenses') && cfgMap['licenses'] is Map<String, dynamic>) {
+        licenses = BrokerLicenses.fromJson(cfgMap['licenses'] as Map<String, dynamic>);
+      }
+      if (cfgMap.containsKey('disclaimer') && cfgMap['disclaimer'] != null) {
+        disclaimer = cfgMap['disclaimer'].toString();
+      }
+      if (cfgMap.containsKey('marketDataLicenseRef') && cfgMap['marketDataLicenseRef'] != null) {
+        marketDataLicenseAgreementRef = cfgMap['marketDataLicenseRef'].toString();
+      }
+      if (cfgMap.containsKey('clearingMemberRef') && cfgMap['clearingMemberRef'] != null) {
+        clearingMemberAgreementRef = cfgMap['clearingMemberRef'].toString();
+      }
+    } catch (_) {
+      // When API is unavailable, maintain honest unavailable state
+      disclaimer = 'Compliance disclaimer unavailable';
+      sebiFoLossWarning = 'Regulatory warning unavailable';
+    }
+  }
 
   // ─── 4. KYC, Identity, Age & Residency ──────────────────────────────────────
   static bool validateEligibility({
@@ -255,5 +349,5 @@ class RealMoneyComplianceService {
   static const bool allowsGuaranteedReturnClaims = false;
   static const double sebiPeakIntradayMarginMultiplier = 5.0; // Max 5x for equity intraday
   static const double mtfMinimumClientContributionPercent = 20.0; // 20% minimum cash margin
-  static const String sebiFoLossWarning = '9 out of 10 individual traders in equity Futures and Options Segment incurred net losses.';
+  static String sebiFoLossWarning = '9 out of 10 individual traders in equity Futures and Options Segment incurred net losses.';
 }

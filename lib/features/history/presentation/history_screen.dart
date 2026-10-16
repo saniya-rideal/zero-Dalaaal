@@ -6,10 +6,9 @@ import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../../funds/data/real_funds_repository.dart';
+import '../../orders/data/real_trading_repository.dart';
 import '../../../data/models/models.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import 'statement_view_dialog.dart';
@@ -31,14 +30,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   HistoryDateFilter _selectedDateFilter = HistoryDateFilter.all;
   DateTime? _customStartDate;
   DateTime? _customEndDate;
-  final TransactionCategory? _selectedCategory = null;
-  final String _selectedStatus = 'ALL'; // 'ALL', 'COMPLETE', 'PENDING', 'FAILED', 'CANCELLED'
-  String _sortBy = 'DATE_DESC'; // 'DATE_DESC', 'DATE_ASC', 'AMOUNT_DESC', 'AMOUNT_ASC', 'ALPHA_ASC', 'ALPHA_DESC'
   bool _isSortAscending = true;
 
   // Pagination state
-  int _currentPage = 1;
-  static const int _pageSize = 15;
   final List<TransactionRecord> _loadedTransactions = [];
   bool _hasMore = true;
   bool _isLoadingMore = false;
@@ -70,54 +64,41 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     }
   }
 
-  void _resetAndLoadTransactions() {
-    final engine = ref.read(orderSimulationEngineProvider);
-    _currentPage = 1;
-    final result = engine.getPaginatedTransactions(
-      page: 1,
-      pageSize: _pageSize,
-      query: _searchController.text,
-      category: _selectedCategory,
-      status: _selectedStatus,
-      startDate: _customStartDate,
-      endDate: _customEndDate,
-      sortBy: _sortBy,
-    );
+  Future<void> _resetAndLoadTransactions() async {
+    try {
+      final ledger = await ref.read(fundsRepositoryProvider).getLedger();
+      final records = ledger.map((e) => TransactionRecord(
+        id: e.id,
+        category: e.credit > 0 ? TransactionCategory.DEPOSIT : TransactionCategory.TRANSFER,
+        title: e.narration.isNotEmpty ? e.narration : 'Ledger Entry',
+        narration: e.narration,
+        amount: e.credit > 0 ? e.credit : e.debit,
+        isCredit: e.credit > 0,
+        runningBalance: e.runningBalance,
+        timestamp: e.date,
+        status: 'COMPLETED',
+        account: 'Trading Ledger',
+      )).toList();
 
-    setState(() {
-      _loadedTransactions.clear();
-      _loadedTransactions.addAll(result.items);
-      _hasMore = result.hasMore;
-      _isLoadingMore = false;
-    });
-  }
-
-  Future<void> _loadNextPage() async {
-    if (_isLoadingMore || !_hasMore) return;
-    setState(() => _isLoadingMore = true);
-    await Future.delayed(const Duration(milliseconds: 300));
-    final engine = ref.read(orderSimulationEngineProvider);
-    final nextPage = _currentPage + 1;
-    final result = engine.getPaginatedTransactions(
-      page: nextPage,
-      pageSize: _pageSize,
-      query: _searchController.text,
-      category: _selectedCategory,
-      status: _selectedStatus,
-      startDate: _customStartDate,
-      endDate: _customEndDate,
-      sortBy: _sortBy,
-    );
-
-    if (mounted) {
-      setState(() {
-        _currentPage = nextPage;
-        _loadedTransactions.addAll(result.items);
-        _hasMore = result.hasMore;
-        _isLoadingMore = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadedTransactions.clear();
+          _loadedTransactions.addAll(records);
+          _hasMore = false;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _hasMore = false;
+          _isLoadingMore = false;
+        });
+      }
     }
   }
+
+  Future<void> _loadNextPage() async {}
 
   Future<void> _pickCustomDateRange() async {
     final picked = await showDateRangePicker(
@@ -165,12 +146,26 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final funds = engine.getFundsSummary(Segment.COMMODITY);
+    final ordersAsync = ref.watch(ordersListProvider);
+    final positionsAsync = ref.watch(positionsListProvider);
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+
+    final allOrders = ordersAsync.value ?? [];
+    final allPositions = positionsAsync.value ?? [];
+    final funds = fundsAsync.value ?? const FundsSummary(
+      availableMargin: 0,
+      usedMargin: 0,
+      openingBalance: 0,
+      payin: 0,
+      payout: 0,
+      spanMargin: 0,
+      exposureMargin: 0,
+      unrealizedPnl: 0,
+    );
 
     var executedOrders = List<Order>.from(
-        engine.orders.where((o) => o.status == OrderStatus.COMPLETE));
-    var closedPositions = List<Position>.from(engine.positions);
+        allOrders.where((o) => o.status == OrderStatus.COMPLETE));
+    var closedPositions = List<Position>.from(allPositions);
 
     // Apply Legacy Sub-tab Date Filter
     final now = DateTime.now();
@@ -233,7 +228,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         onSortTap: () {
           setState(() {
             _isSortAscending = !_isSortAscending;
-            _sortBy = _isSortAscending ? 'DATE_ASC' : 'DATE_DESC';
           });
           _resetAndLoadTransactions();
         },
@@ -251,12 +245,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
-
           // Universal Search Bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
@@ -331,7 +319,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTransactionsView(colors, engine),
+                _buildTransactionsView(colors),
                 _buildClassicView(
                   colors,
                   profit: totalRealizedProfit,
@@ -372,7 +360,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   }
 
   // ─── Unified Transactions Tab View (with Pagination) ───────
-  Widget _buildTransactionsView(TradingColors colors, OrderSimulationEngine engine) {
+  Widget _buildTransactionsView(TradingColors colors) {
     return Column(
       children: [
         // Infinite Scroll / Paginated List

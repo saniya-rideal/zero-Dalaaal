@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,175 +8,25 @@ import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_bottom_nav_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../data/calendar_repository.dart';
 import 'widgets/corporate_actions_view.dart';
 
-class EconomicCalendarScreen extends StatefulWidget {
+class EconomicCalendarScreen extends ConsumerStatefulWidget {
   const EconomicCalendarScreen({super.key});
 
   @override
-  State<EconomicCalendarScreen> createState() => _EconomicCalendarScreenState();
+  ConsumerState<EconomicCalendarScreen> createState() => _EconomicCalendarScreenState();
 }
 
-class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
-  final Set<int> _expandedIndices = {};
+class _EconomicCalendarScreenState extends ConsumerState<EconomicCalendarScreen> {
+  final Set<String> _expandedEventIds = {};
   int _selectedTabIndex = 0; // 0: Macro Events, 1: Corporate Actions
-
-  final List<Map<String, dynamic>> _events = [
-    {
-      'time': '',
-      'isBadge': false,
-      'flag': '🇦🇪',
-      'signal': 2,
-      'title': '',
-      'actual': '56.9',
-      'actualUnit': 'Index (diffusion)',
-      'forecast': '—',
-      'forecastUnit': '',
-      'previous': '53.6',
-      'previousUnit': 'Index (diffusion)',
-      'country': 'United Arab Emirates',
-      'description': 'Measures the performance of the non-oil private sector economy.',
-    },
-    {
-      'time': '10:30',
-      'isBadge': true,
-      'flag': '🇮🇳',
-      'signal': 3,
-      'title': 'HSBC Composite Final PMI',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '',
-      'forecastUnit': '',
-      'previous': '54.3',
-      'previousUnit': 'Index (diffusion)',
-      'country': 'India',
-      'description': 'Composite purchasing managers index tracking manufacturing and services output in India.',
-    },
-    {
-      'time': '10:30',
-      'isBadge': true,
-      'flag': '🇮🇳',
-      'signal': 3,
-      'title': 'HSBC: SERVICES - BUSINESS ACTIVITY',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '54.5',
-      'forecastUnit': 'Index (diffusion)',
-      'previous': '53.3',
-      'previousUnit': 'Index (diffusion)',
-      'country': 'India',
-      'description': 'Measures business activity and new orders in Indian services sector.',
-    },
-    {
-      'time': '11:30',
-      'isBadge': false,
-      'flag': '🇷🇺',
-      'signal': 2,
-      'title': 'S&P Global Services PMI',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '',
-      'forecastUnit': '',
-      'previous': '49',
-      'previousUnit': 'Index (diffusion)',
-      'country': 'Russia',
-      'description': 'Survey of executive sentiment across private services firms in Russia.',
-    },
-    {
-      'time': '12:00',
-      'isBadge': false,
-      'flag': '🇨🇭',
-      'signal': 3,
-      'title': 'CPI MM',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '0%',
-      'forecastUnit': '',
-      'previous': '-0.1%',
-      'previousUnit': '',
-      'country': 'Switzerland',
-      'description': 'Month-over-month consumer price index measuring changes in Swiss retail prices.',
-    },
-    {
-      'time': '12:00',
-      'isBadge': false,
-      'flag': '🇨🇭',
-      'signal': 3,
-      'title': 'CPI NSA*',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '',
-      'forecastUnit': '',
-      'previous': '101.1',
-      'previousUnit': 'Index',
-      'country': 'Switzerland',
-      'description': 'Non-seasonally adjusted consumer price index headline level.',
-    },
-    {
-      'time': '12:00',
-      'isBadge': false,
-      'flag': '🇨🇭',
-      'signal': 3,
-      'title': 'CPI YY',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '0.5%',
-      'forecastUnit': '',
-      'previous': '0.4%',
-      'previousUnit': '',
-      'country': 'Switzerland',
-      'description': 'Year-over-year Swiss inflation rate benchmark.',
-    },
-    {
-      'time': '12:00',
-      'isBadge': false,
-      'flag': '🇸🇪',
-      'signal': 2,
-      'title': 'PMI Services*',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '',
-      'forecastUnit': '',
-      'previous': '54.2',
-      'previousUnit': 'Index (diffusion)',
-      'country': 'Sweden',
-      'description': 'Purchasing managers index indicating Swedish services sector growth above 50.',
-    },
-    {
-      'time': '12:30',
-      'isBadge': false,
-      'flag': '🇹🇷',
-      'signal': 3,
-      'title': 'Core Inflation*',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '',
-      'forecastUnit': '',
-      'previous': '130.97',
-      'previousUnit': 'Index',
-      'country': 'Turkey',
-      'description': 'Core inflation index excluding volatile food and energy components.',
-    },
-    {
-      'time': '12:30',
-      'isBadge': false,
-      'flag': '🇹🇷',
-      'signal': 3,
-      'title': 'CPI Ex E,F,B,T&G MM *',
-      'actual': '',
-      'actualUnit': '',
-      'forecast': '',
-      'forecastUnit': '',
-      'previous': '1.9%',
-      'previousUnit': '',
-      'country': 'Turkey',
-      'description': 'Turkish CPI month-on-month index excluding energy, food, beverages and tobacco.',
-    },
-  ];
+  String _impactFilter = 'ALL'; // ALL, HIGH, MEDIUM, LOW
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final eventsAsync = ref.watch(calendarEventsProvider);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -252,7 +103,7 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           Divider(height: 1, thickness: 1, color: colors.divider),
 
           if (_selectedTabIndex == 0) ...[
-            // Filter Header Icons Row (Globe + Bar Chart)
+            // Filter Header Icons Row
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               decoration: BoxDecoration(
@@ -261,400 +112,354 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
                   bottom: BorderSide(color: colors.divider, width: 1),
                 ),
               ),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Filter by country/region')),
-                      );
-                    },
-                    child: Icon(Icons.language, size: 22, color: colors.textPrimary),
-                  ),
-                  const SizedBox(width: 16),
-                  InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Filter by volatility impact')),
-                      );
-                    },
-                    child: Icon(Icons.bar_chart, size: 22, color: colors.textPrimary),
-                  ),
-                ],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    Icon(Icons.filter_list, size: 18, color: colors.textSecondary),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Impact:',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: colors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip('ALL', colors),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('HIGH', colors),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('MEDIUM', colors),
+                    const SizedBox(width: 6),
+                    _buildFilterChip('LOW', colors),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: Icon(Icons.refresh, size: 18, color: colors.textSecondary),
+                      onPressed: () => ref.refresh(calendarEventsProvider),
+                      tooltip: 'Refresh calendar',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
 
           if (_selectedTabIndex == 0)
             Expanded(
-              child: ListView.separated(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                itemCount: _events.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, thickness: 0.8, color: colors.divider),
-              itemBuilder: (context, index) {
-                final e = _events[index];
-                final isExpanded = _expandedIndices.contains(index);
-
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      if (isExpanded) {
-                        _expandedIndices.remove(index);
-                      } else {
-                        _expandedIndices.add(index);
-                      }
-                    });
-                  },
+              child: eventsAsync.when(
+                loading: () => Center(
+                  child: CircularProgressIndicator(color: colors.primary),
+                ),
+                error: (err, stack) => Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 10.0),
+                    padding: const EdgeInsets.all(24.0),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 1. Left Time / Badge Area
-                            SizedBox(
-                              width: 64,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (e['time'].toString().isNotEmpty) ...[
-                                    if (e['isBadge'] == true)
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 7, vertical: 2.5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE82B57),
-                                          borderRadius:
-                                              BorderRadius.circular(5),
-                                        ),
-                                        child: Text(
-                                          e['time'],
-                                          style: GoogleFonts.inter(
-                                            color: Colors.white,
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w700,
-                                            fontFeatures: const [
-                                              FontFeature.tabularFigures()
-                                            ],
-                                          ),
-                                        ),
-                                      )
-                                    else
-                                      Text(
-                                        e['time'],
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w600,
-                                          color: colors.textSecondary,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures()
-                                          ],
-                                        ),
-                                      ),
-                                    const SizedBox(height: 4),
-                                  ],
-
-                                  // Flag & Signal Bars
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        e['flag'],
-                                        style: const TextStyle(fontSize: 15),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      _buildSignalBars(e['signal'] as int, colors),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(width: 8),
-
-                            // 2. Center/Right Title & Economic Metrics
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (e['title'].toString().isNotEmpty)
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            e['title'],
-                                            style: GoogleFonts.inter(
-                                              fontSize: 12.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: colors.textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                        Icon(
-                                          isExpanded
-                                              ? Icons.keyboard_arrow_up
-                                              : Icons.keyboard_arrow_down,
-                                          size: 16,
-                                          color: colors.textSecondary,
-                                        ),
-                                      ],
-                                    ),
-
-                                  const SizedBox(height: 4),
-
-                                  // Metrics Row (A: Actual, F: Forecast, P: Previous)
-                                  Wrap(
-                                    spacing: 10,
-                                    runSpacing: 4,
-                                    children: [
-                                      // Actual
-                                      if (e['actual'].toString().isNotEmpty)
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'A: ',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11,
-                                                color: colors.textSecondary,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            Text(
-                                              e['actual'],
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w800,
-                                                color: colors.textPrimary,
-                                              ),
-                                            ),
-                                            if (e['actualUnit'].toString().isNotEmpty)
-                                              Text(
-                                                ' ${e['actualUnit']}',
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 10,
-                                                  color: colors.textSecondary,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-
-                                      // Forecast
-                                      if (e['forecast'].toString().isNotEmpty)
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'F: ',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11,
-                                                color: colors.textSecondary,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            Text(
-                                              e['forecast'],
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: colors.textPrimary,
-                                              ),
-                                            ),
-                                            if (e['forecastUnit'].toString().isNotEmpty)
-                                              Text(
-                                                ' ${e['forecastUnit']}',
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 10,
-                                                  color: colors.textSecondary,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-
-                                      // Previous
-                                      if (e['previous'].toString().isNotEmpty)
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'P: ',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11,
-                                                color: colors.textSecondary,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            Text(
-                                              e['previous'],
-                                              style: GoogleFonts.inter(
-                                                fontSize: 11.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: colors.textPrimary,
-                                              ),
-                                            ),
-                                            if (e['previousUnit'].toString().isNotEmpty)
-                                              Text(
-                                                ' ${e['previousUnit']}',
-                                                style: GoogleFonts.inter(
-                                                  fontSize: 10,
-                                                  color: colors.textSecondary,
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        // Expanded Information
-                        if (isExpanded) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                  color: colors.divider, width: 1),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Country: ${e['country']}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  e['description'],
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: colors.textSecondary,
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          // Bottom Action & Attribution Footer
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-            decoration: BoxDecoration(
-              color: colors.cardBackground,
-              border: Border(
-                top: BorderSide(color: colors.divider, width: 1),
-              ),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    InkWell(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Loading more economic events...')),
-                        );
-                      },
-                      child: Row(
-                        children: [
-                          Text(
-                            'More events',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFF1E88E5),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right,
-                              size: 16, color: Color(0xFF1E88E5)),
-                        ],
-                      ),
-                    ),
-
-                    // TV Watermark Badge
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: colors.cardBackground,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
-                            blurRadius: 3,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          'TV',
+                        Icon(LucideIcons.alertTriangle, size: 40, color: colors.bearish),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Failed to load economic events',
                           style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
                             color: colors.textPrimary,
                           ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 6),
-
-                // TradingView Attribution Text Link
-                InkWell(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Economic Calendar powered by TradingView')),
-                    );
-                  },
-                  child: RichText(
-                    text: TextSpan(
-                      text: 'Economic Calendar ',
-                      style: GoogleFonts.inter(
-                        color: const Color(0xFF1E88E5),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'by TradingView',
+                        const SizedBox(height: 6),
+                        Text(
+                          err.toString(),
+                          textAlign: TextAlign.center,
                           style: GoogleFonts.inter(
+                            fontSize: 12,
                             color: colors.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w400,
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => ref.refresh(calendarEventsProvider),
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Retry'),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ],
+                data: (events) {
+                  final filtered = _impactFilter == 'ALL'
+                      ? events
+                      : events.where((e) => e.impact == _impactFilter).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.calendar, size: 48, color: colors.textSecondary.withValues(alpha: 0.5)),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No economic events scheduled',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Check back later for upcoming macro announcements',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () async => ref.refresh(calendarEventsProvider),
+                    child: ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(height: 1, thickness: 0.8, color: colors.divider),
+                      itemBuilder: (context, index) {
+                        final e = filtered[index];
+                        final isExpanded = _expandedEventIds.contains(e.id);
+                        final signalLevel = e.impact == 'HIGH' ? 3 : (e.impact == 'MEDIUM' ? 2 : 1);
+
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              if (isExpanded) {
+                                _expandedEventIds.remove(e.id);
+                              } else {
+                                _expandedEventIds.add(e.id);
+                              }
+                            });
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // 1. Left Time / Badge Area
+                                    SizedBox(
+                                      width: 64,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (e.time.isNotEmpty) ...[
+                                            if (e.impact == 'HIGH')
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE82B57),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: Text(
+                                                  e.time,
+                                                  style: GoogleFonts.inter(
+                                                    color: Colors.white,
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    fontFeatures: const [FontFeature.tabularFigures()],
+                                                  ),
+                                                ),
+                                              )
+                                            else
+                                              Text(
+                                                e.time,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 12.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: colors.textSecondary,
+                                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                                ),
+                                              ),
+                                            const SizedBox(height: 4),
+                                          ],
+
+                                          // Flag & Signal Bars
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(e.flag, style: const TextStyle(fontSize: 15)),
+                                              const SizedBox(width: 4),
+                                              _buildSignalBars(signalLevel, colors),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    const SizedBox(width: 8),
+
+                                    // 2. Center/Right Title & Economic Metrics
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (e.title.isNotEmpty)
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    e.title,
+                                                    style: GoogleFonts.inter(
+                                                      fontSize: 12.5,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: colors.textPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Icon(
+                                                  isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                                  size: 16,
+                                                  color: colors.textSecondary,
+                                                ),
+                                              ],
+                                            ),
+
+                                          const SizedBox(height: 4),
+
+                                          // Metrics Row (A: Actual, F: Forecast, P: Previous)
+                                          Wrap(
+                                            spacing: 10,
+                                            runSpacing: 4,
+                                            children: [
+                                              if (e.actual.isNotEmpty)
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'A: ',
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11,
+                                                        color: colors.textSecondary,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      e.actual,
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w800,
+                                                        color: colors.textPrimary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+
+                                              if (e.forecast.isNotEmpty)
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'F: ',
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11,
+                                                        color: colors.textSecondary,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      e.forecast,
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: colors.textPrimary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+
+                                              if (e.previous.isNotEmpty)
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'P: ',
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11,
+                                                        color: colors.textSecondary,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      e.previous,
+                                                      style: GoogleFonts.inter(
+                                                        fontSize: 11.5,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: colors.textPrimary,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                // Expanded Information
+                                if (isExpanded) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: colors.surface,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: colors.divider, width: 1),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Country: ${e.country}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: colors.textPrimary,
+                                          ),
+                                        ),
+                                        if (e.description.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            e.description,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              color: colors.textSecondary,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
+
           if (_selectedTabIndex == 1)
             const Expanded(
               child: CorporateActionsView(),
@@ -671,6 +476,33 @@ class _EconomicCalendarScreenState extends State<EconomicCalendarScreen> {
           if (index == 2) context.go('/net-deals');
           if (index == 3) context.go('/history');
         },
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String impact, TradingColors colors) {
+    final isSelected = _impactFilter == impact;
+    return InkWell(
+      onTap: () => setState(() => _impactFilter = impact),
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: isSelected ? colors.primary.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? colors.primary : colors.divider,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          impact,
+          style: GoogleFonts.inter(
+            fontSize: 10.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? colors.primary : colors.textSecondary,
+          ),
+        ),
       ),
     );
   }

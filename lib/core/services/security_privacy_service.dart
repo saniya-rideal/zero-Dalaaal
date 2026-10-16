@@ -24,6 +24,17 @@ class PrivacyConsentRecord {
     this.isAuditLogged = true,
   });
 
+  factory PrivacyConsentRecord.empty() => PrivacyConsentRecord(
+    consentId: '',
+    userId: '',
+    termsVersion: 'v2026.1',
+    privacyPolicyVersion: 'v2026.1',
+    riskDisclosureVersion: 'SEBI/2023/73',
+    acceptedAt: DateTime.fromMillisecondsSinceEpoch(0),
+    ipAddress: '',
+    isAuditLogged: false,
+  );
+
   Map<String, dynamic> toJson() => {
     'consentId': consentId,
     'userId': userId,
@@ -55,15 +66,7 @@ class AttemptTracker {
 class SecurityPrivacyService extends ChangeNotifier {
   final Ref? _ref;
   final Map<String, AttemptTracker> _trackers = {};
-  PrivacyConsentRecord _consentRecord = PrivacyConsentRecord(
-    consentId: 'consent_initial_2026',
-    userId: 'ZD84920',
-    termsVersion: 'v2026.1 (August 2026)',
-    privacyPolicyVersion: 'v2026.1 (August 2026)',
-    riskDisclosureVersion: 'SEBI/2023/73',
-    acceptedAt: DateTime.now().subtract(const Duration(days: 15)),
-    ipAddress: '103.21.14.82',
-  );
+  PrivacyConsentRecord _consentRecord = PrivacyConsentRecord.empty();
 
   bool _isScreenProtectionActive = false;
 

@@ -10,9 +10,9 @@ enum NetworkStatus {
 class ConnectivityService extends StateNotifier<NetworkStatus> {
   ConnectivityService() : super(NetworkStatus.online);
 
-  /// Manually toggle simulated offline mode for testing
-  void setSimulatedOffline(bool isOffline) {
-    state = isOffline ? NetworkStatus.offline : NetworkStatus.online;
+  /// Update active network connection status
+  void updateStatus(NetworkStatus newStatus) {
+    state = newStatus;
   }
 
   /// Trigger manual reconnect attempt

@@ -1,10 +1,11 @@
-import 'dart:math';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../data/mock/support_repository.dart';
+import '../data/support_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
@@ -33,6 +34,7 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
   TicketPriority _priority = TicketPriority.medium;
   final List<TicketAttachment> _attachments = [];
   bool _isSubmitting = false;
+  bool _isUploadingAttachment = false;
 
   @override
   void dispose() {
@@ -41,23 +43,52 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
     super.dispose();
   }
 
-  void _addSimulatedAttachment({required bool isPdf}) {
-    final rng = Random();
-    final id = 'att_${DateTime.now().millisecondsSinceEpoch}';
-    final name = isPdf
-        ? 'statement_record_${rng.nextInt(900) + 100}.pdf'
-        : 'screenshot_proof_${rng.nextInt(900) + 100}.png';
-    final size = isPdf ? rng.nextInt(800000) + 200000 : rng.nextInt(350000) + 50000;
+  Future<void> _pickAndUploadAttachment({required bool isPdf}) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: isPdf ? FileType.custom : FileType.image,
+        allowedExtensions: isPdf ? ['pdf'] : null,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
+      if (bytes == null || bytes.isEmpty) return;
 
-    setState(() {
-      _attachments.add(TicketAttachment(
-        id: id,
-        fileName: name,
-        fileSizeBytes: size,
-        fileType: isPdf ? 'pdf' : 'image',
-        uploadedAt: DateTime.now(),
-      ));
-    });
+      setState(() => _isUploadingAttachment = true);
+
+      final repo = ref.read(supportRepositoryProvider);
+      final attachment = await repo.uploadAttachment(
+        fileName: file.name,
+        bytes: bytes,
+        mimeType: isPdf ? 'application/pdf' : 'image/png',
+      );
+
+      if (mounted) {
+        setState(() {
+          _attachments.add(attachment);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${file.name} uploaded successfully.'),
+            backgroundColor: const Color(0xFF00A854),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload attachment: $e'),
+            backgroundColor: const Color(0xFFE23A3A),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingAttachment = false);
+      }
+    }
   }
 
   Future<void> _submitTicket() async {
@@ -281,12 +312,12 @@ class _CreateTicketSheetState extends ConsumerState<CreateTicketSheet> {
                           TextButton.icon(
                             icon: const Icon(LucideIcons.image, size: 16),
                             label: Text('Add Image', style: AppTypography.caption(color: colors.primary, weight: FontWeight.w600)),
-                            onPressed: () => _addSimulatedAttachment(isPdf: false),
+                            onPressed: _isUploadingAttachment ? null : () => _pickAndUploadAttachment(isPdf: false),
                           ),
                           TextButton.icon(
                             icon: const Icon(LucideIcons.fileText, size: 16),
                             label: Text('Add PDF', style: AppTypography.caption(color: colors.primary, weight: FontWeight.w600)),
-                            onPressed: () => _addSimulatedAttachment(isPdf: true),
+                            onPressed: _isUploadingAttachment ? null : () => _pickAndUploadAttachment(isPdf: true),
                           ),
                         ],
                       ),

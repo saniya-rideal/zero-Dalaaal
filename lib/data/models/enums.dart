@@ -1,6 +1,7 @@
-enum Exchange { NSE, BSE, NFO, MCX, CDS }
+enum Exchange { NSE, BSE, NFO, MCX, CDS, CRYPTO, FX, FOREX }
 
-enum InstrumentType { EQ, FUT, CE, PE, INDEX }
+enum InstrumentType { EQ, FUT, CE, PE, INDEX, CRYPTO, FX }
+
 
 enum TransactionType {
   BUY,
@@ -37,9 +38,9 @@ enum SipFrequency { DAILY, WEEKLY, MONTHLY }
 
 enum SipStatus { ACTIVE, PAUSED, CANCELLED, COMPLETED }
 
-enum AlertCondition { ABOVE, BELOW, PERCENT_CHANGE }
+enum AlertCondition { ABOVE, BELOW, PERCENT_CHANGE, GTE, LTE, GREATER_THAN_OR_EQUAL, LESS_THAN_OR_EQUAL }
 
-enum AlertStatus { ACTIVE, TRIGGERED, EXPIRED }
+enum AlertStatus { ACTIVE, TRIGGERED, EXPIRED, DISABLED }
 
 enum IpoStatus { UPCOMING, CURRENT, CLOSED }
 

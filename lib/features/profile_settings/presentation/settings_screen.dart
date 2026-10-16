@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../data/mock/legal_documents.dart';
-import '../../../data/mock/settings_repository.dart';
+import '../data/app_config_repository.dart';
+import '../data/settings_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
-import '../../../shared_widgets/zero_drawer.dart';
+import '../../auth/data/real_auth_repository.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -23,31 +23,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final settings = ref.watch(appSettingsProvider);
-    final repo = ref.read(settingsRepositoryProvider);
+    final repo = ref.read(settingsRepositoryProvider.notifier);
 
     return Scaffold(
       backgroundColor: colors.background,
-      drawer: const ZeroDrawer(activeRoute: '/settings'),
       appBar: AppBar(
         backgroundColor: colors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: Builder(
-          builder: (ctx) {
-            final canPop = Navigator.of(ctx).canPop();
-            if (canPop) {
-              return IconButton(
-                icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
-                onPressed: () => Navigator.of(ctx).pop(),
-                tooltip: 'Back',
-              );
-            }
-            return IconButton(
-              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 24),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-              tooltip: 'Menu',
+        leading: IconButton(
+          icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Settings saved successfully.'),
+                duration: Duration(seconds: 1),
+                behavior: SnackBarBehavior.floating,
+              ),
             );
+            context.pop();
           },
         ),
         title: Text(
@@ -78,16 +72,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ================= 1. PROFILE SECTION =================
-                  _buildSectionHeader('Profile', colors),
+                  _buildSectionHeader('Profile & Security', colors),
                   _buildNavRow(
                     icon: LucideIcons.keyRound,
-                    title: 'Change Passwords',
+                    title: 'Change Password',
                     onTap: () => _showChangePasswordSheet(context, repo, colors),
+                    colors: colors,
+                  ),
+                  _buildNavRow(
+                    icon: LucideIcons.shieldCheck,
+                    title: 'Change Security PIN',
+                    onTap: () => _showChangePinSheet(context, colors),
                     colors: colors,
                   ),
                   _buildSwitchRow(
                     icon: LucideIcons.smartphone,
-                    title: 'Enable two-factor authentication',
+                    title: 'Enable Two-Factor Authentication',
                     value: settings.twoFactorEnabled,
                     onChanged: (val) => repo.setTwoFactorEnabled(val),
                     colors: colors,
@@ -170,7 +170,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   _buildNavRow(
                     icon: LucideIcons.fileText,
                     title: 'Terms and Conditions',
-                    onTap: () => _showDocumentViewer(context, LegalDocuments.termsAndConditions, colors),
+                    onTap: () => _showDocumentViewer(context, 'terms-and-conditions', 'Terms and Conditions', colors),
                     colors: colors,
                   ),
                   _buildNavRow(
@@ -180,13 +180,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     colors: colors,
                   ),
                   _buildNavRow(
-                    icon: LucideIcons.shield,
-                    title: 'Privacy Policy',
-                    onTap: () => _showDocumentViewer(context, LegalDocuments.privacyPolicy, colors),
+                    icon: LucideIcons.info,
+                    title: 'About Zero',
+                    onTap: () => context.push('/about'),
                     colors: colors,
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -196,55 +196,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // ─── Header Widget ────────────────────────────────────────────────────────
+  // ─── Section Header ────────────────────────────────────────────────────────
   Widget _buildSectionHeader(String title, TradingColors colors) {
     return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 6, left: 4),
+      padding: const EdgeInsets.only(top: 14, bottom: 8),
       child: Text(
-        title,
+        title.toUpperCase(),
         style: GoogleFonts.inter(
-          color: colors.textPrimary,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+          color: colors.primary,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.1,
         ),
       ),
     );
   }
 
-  // ─── Nav Row with Chevron ──────────────────────────────────────────────────
+  // ─── Standard Navigation Row ──────────────────────────────────────────────
   Widget _buildNavRow({
     required IconData icon,
     required String title,
     required VoidCallback onTap,
     required TradingColors colors,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        child: Row(
-          children: [
-            Icon(icon, size: 24, color: colors.textPrimary),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.inter(
-                  color: colors.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            Icon(LucideIcons.chevronRight, size: 20, color: colors.textPrimary.withValues(alpha: 0.6)),
-          ],
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+      leading: Icon(icon, size: 20, color: colors.textPrimary),
+      title: Text(
+        title,
+        style: GoogleFonts.inter(
+          color: colors.textPrimary,
+          fontSize: 14.5,
+          fontWeight: FontWeight.w500,
         ),
       ),
+      trailing: Icon(LucideIcons.chevronRight, size: 18, color: colors.textSecondary),
+      onTap: onTap,
     );
   }
 
-  // ─── Switch Row ───────────────────────────────────────────────────────────
+  // ─── Standard Switch Row ──────────────────────────────────────────────────
   Widget _buildSwitchRow({
     required IconData icon,
     required String title,
@@ -256,24 +247,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
-          Icon(icon, size: 24, color: colors.textPrimary),
+          Icon(icon, size: 20, color: colors.textPrimary),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               title,
               style: GoogleFonts.inter(
                 color: colors.textPrimary,
-                fontSize: 15,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
-          Switch(
+          Switch.adaptive(
             value: value,
-            activeColor: Colors.white,
-            activeTrackColor: const Color(0xFFE53935),
-            inactiveThumbColor: Colors.white,
-            inactiveTrackColor: colors.textSecondary.withValues(alpha: 0.25),
+            activeColor: colors.primary,
             onChanged: onChanged,
           ),
         ],
@@ -281,51 +269,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  // ─── Language Row with Dropdown ───────────────────────────────────────────
+  // ─── Language Selector Dropdown Row ───────────────────────────────────────
   Widget _buildLanguageRow({
     required AppLanguage currentLanguage,
     required ValueChanged<AppLanguage> onLanguageChanged,
     required TradingColors colors,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       child: Row(
         children: [
-          Icon(LucideIcons.languages, size: 22, color: colors.textPrimary),
+          Icon(LucideIcons.globe, size: 20, color: colors.textPrimary),
           const SizedBox(width: 14),
           Expanded(
             child: Text(
               'Language',
               style: GoogleFonts.inter(
                 color: colors.textPrimary,
-                fontSize: 15,
+                fontSize: 14.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
           ),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<AppLanguage>(
-              value: currentLanguage == AppLanguage.english
-                  ? currentLanguage
-                  : AppLanguage.english,
-              dropdownColor: colors.cardBackground,
-              icon: Icon(LucideIcons.chevronDown, color: colors.textPrimary, size: 18),
-              items: [
-                DropdownMenuItem(
-                  value: AppLanguage.english,
-                  child: Text(
-                    'English',
-                    style: GoogleFonts.inter(
-                      color: colors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: colors.divider),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<AppLanguage>(
+                value: currentLanguage,
+                isDense: true,
+                dropdownColor: colors.cardBackground,
+                items: const [
+                  DropdownMenuItem(
+                    value: AppLanguage.english,
+                    child: Text('English', style: TextStyle(fontSize: 13)),
                   ),
-                ),
-              ],
-              onChanged: (val) {
-                if (val != null) onLanguageChanged(val);
-              },
+                ],
+                onChanged: (val) {
+                  if (val != null) onLanguageChanged(val);
+                },
+              ),
             ),
           ),
         ],
@@ -346,73 +333,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(LucideIcons.calculator, size: 22, color: colors.textPrimary),
+              Icon(LucideIcons.calculator, size: 20, color: colors.textPrimary),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'One-Click / Default Amount',
+                  'One-Click / Default Lots',
                   style: GoogleFonts.inter(
                     color: colors.textPrimary,
-                    fontSize: 15,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              // Minus circle
               GestureDetector(
                 onTap: () {
                   final next = (amount - 0.1).clamp(0.0, 100.0);
                   onChanged(double.parse(next.toStringAsFixed(1)));
                 },
                 child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFE53935),
-                    shape: BoxShape.circle,
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: colors.divider),
                   ),
-                  child: const Icon(LucideIcons.minus, size: 14, color: Colors.white),
+                  child: Center(child: Icon(LucideIcons.minus, size: 14, color: colors.textPrimary)),
                 ),
               ),
-              const SizedBox(width: 12),
-              Text(
-                amount.toStringAsFixed(1),
-                style: GoogleFonts.inter(
-                  color: colors.textPrimary,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  amount.toStringAsFixed(1),
+                  style: GoogleFonts.inter(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
                 ),
               ),
-              const SizedBox(width: 12),
-              // Plus circle
               GestureDetector(
                 onTap: () {
                   final next = (amount + 0.1).clamp(0.0, 100.0);
                   onChanged(double.parse(next.toStringAsFixed(1)));
                 },
                 child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1E88E5),
-                    shape: BoxShape.circle,
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: colors.divider),
                   ),
-                  child: const Icon(LucideIcons.plus, size: 14, color: Colors.white),
+                  child: Center(child: Icon(LucideIcons.plus, size: 14, color: colors.textPrimary)),
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 38),
-            child: Text(
-              'The default amount for one-click trading from Quotes tab and Trade screen. Put 0 to make it as Min Amount Per Deal per script',
-              style: GoogleFonts.inter(
-                color: colors.textSecondary,
-                fontSize: 11.5,
-                height: 1.3,
-              ),
-            ),
           ),
         ],
       ),
@@ -441,7 +417,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Change Passwords', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: colors.textPrimary)),
+            Text('Change Password', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: colors.textPrimary)),
             const SizedBox(height: 14),
             TextField(
               controller: oldPass,
@@ -481,13 +457,114 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE53935),
+                backgroundColor: colors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: const Text('UPDATE PASSWORD', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Change Security PIN Sheet ────────────────────────────────────────────
+  void _showChangePinSheet(BuildContext context, TradingColors colors) {
+    final currentPin = TextEditingController();
+    final newPin = TextEditingController();
+    final confirmPin = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.cardBackground,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Change Security PIN', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: colors.textPrimary)),
+              const SizedBox(height: 14),
+              TextField(
+                controller: currentPin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                style: GoogleFonts.inter(color: colors.textPrimary),
+                decoration: const InputDecoration(labelText: 'Current 6-digit PIN', counterText: '', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: newPin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                style: GoogleFonts.inter(color: colors.textPrimary),
+                decoration: const InputDecoration(labelText: 'New 6-digit PIN', counterText: '', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: confirmPin,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                style: GoogleFonts.inter(color: colors.textPrimary),
+                decoration: const InputDecoration(labelText: 'Confirm New 6-digit PIN', counterText: '', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton(
+                onPressed: isSubmitting ? null : () async {
+                  if (currentPin.text.length != 6) {
+                    _showToast('Current PIN must be 6 digits.');
+                    return;
+                  }
+                  if (newPin.text.length != 6) {
+                    _showToast('New PIN must be 6 digits.');
+                    return;
+                  }
+                  if (newPin.text != confirmPin.text) {
+                    _showToast('New PINs do not match.');
+                    return;
+                  }
+
+                  setModalState(() => isSubmitting = true);
+                  try {
+                    final authRepo = ref.read(authRepositoryProvider);
+                    final success = await authRepo.changePin(
+                      currentPin: currentPin.text.trim(),
+                      newPin: newPin.text.trim(),
+                    );
+                    if (success && mounted) {
+                      Navigator.pop(ctx);
+                      _showToast('Security PIN updated successfully!');
+                    }
+                  } catch (e) {
+                    _showToast(e.toString());
+                  } finally {
+                    if (mounted) setModalState(() => isSubmitting = false);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: isSubmitting
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('UPDATE PIN', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -587,7 +664,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   // ─── Legal Document Viewer ────────────────────────────────────────────────
-  void _showDocumentViewer(BuildContext context, LegalDocumentItem doc, TradingColors colors) {
+  void _showDocumentViewer(BuildContext context, String slug, String title, TradingColors colors) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -598,35 +675,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         maxChildSize: 0.95,
         minChildSize: 0.5,
         expand: false,
-        builder: (_, scrollController) => Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        builder: (_, scrollController) => FutureBuilder<String>(
+          future: ref.read(appConfigRepositoryProvider).getLegalDocument(slug),
+          builder: (context, snapshot) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: ListView(
+                controller: scrollController,
                 children: [
-                  Expanded(
-                    child: Text(
-                      doc.title,
-                      style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: colors.textPrimary),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: colors.textPrimary),
+                        ),
+                      ),
+                      IconButton(icon: Icon(LucideIcons.x, color: colors.textSecondary), onPressed: () => Navigator.pop(ctx)),
+                    ],
                   ),
-                  IconButton(icon: Icon(LucideIcons.x, color: colors.textSecondary), onPressed: () => Navigator.pop(ctx)),
+                  const Divider(height: 24),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+                  else if (snapshot.hasError)
+                    Text('Failed to load legal document: ${snapshot.error}', style: TextStyle(color: colors.bearish))
+                  else
+                    Text(
+                      snapshot.data ?? 'Document not available.',
+                      style: GoogleFonts.inter(fontSize: 13, height: 1.5, color: colors.textPrimary),
+                    ),
+                  const SizedBox(height: 20),
                 ],
               ),
-              Text(
-                '${doc.subtitle} • Last updated: ${doc.lastUpdated}',
-                style: GoogleFonts.inter(fontSize: 11.5, color: colors.textSecondary),
-              ),
-              const Divider(height: 24),
-              Text(
-                doc.content,
-                style: GoogleFonts.inter(fontSize: 13, height: 1.5, color: colors.textPrimary),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

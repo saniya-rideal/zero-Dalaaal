@@ -39,10 +39,22 @@ class MarketDepth {
     'sell': sell.map((e) => e.toJson()).toList(),
   };
 
-  factory MarketDepth.fromJson(Map<String, dynamic> json) => MarketDepth(
-    buy: (json['buy'] as List<dynamic>).map((e) => DepthLevel.fromJson(e as Map<String, dynamic>)).toList(),
-    sell: (json['sell'] as List<dynamic>).map((e) => DepthLevel.fromJson(e as Map<String, dynamic>)).toList(),
-  );
+  factory MarketDepth.fromJson(Map<String, dynamic> json) {
+    List<DepthLevel> parseList(dynamic raw) {
+      if (raw is List) {
+        return raw
+            .whereType<Map<String, dynamic>>()
+            .map((e) => DepthLevel.fromJson(e))
+            .toList();
+      }
+      return const [];
+    }
+
+    return MarketDepth(
+      buy: parseList(json['buy']),
+      sell: parseList(json['sell']),
+    );
+  }
 }
 
 class Quote {
@@ -81,6 +93,16 @@ class Quote {
     required this.depth,
     required this.timestamp,
   });
+
+  double get bestBid => depth.buy.isNotEmpty ? depth.buy.first.price : ltp;
+  double get bestAsk => depth.sell.isNotEmpty ? depth.sell.first.price : ltp;
+  double get lastPrice => ltp;
+  double get openPrice => open;
+  double get dayHigh => high;
+  double get dayLow => low;
+  double get netChange => change;
+  double get percentChange => changePercent;
+  DateTime get lastTradeTime => timestamp;
 
   Quote copyWith({
     String? token,
@@ -139,22 +161,71 @@ class Quote {
     'timestamp': timestamp.toIso8601String(),
   };
 
-  factory Quote.fromJson(Map<String, dynamic> json) => Quote(
-    token: json['token'] as String,
-    ltp: (json['ltp'] as num).toDouble(),
-    open: (json['open'] as num).toDouble(),
-    high: (json['high'] as num).toDouble(),
-    low: (json['low'] as num).toDouble(),
-    close: (json['close'] as num).toDouble(),
-    prevClose: (json['prevClose'] as num).toDouble(),
-    change: (json['change'] as num).toDouble(),
-    changePercent: (json['changePercent'] as num).toDouble(),
-    volume: (json['volume'] as num).toInt(),
-    lowerCircuit: (json['lowerCircuit'] as num?)?.toDouble() ?? 0.0,
-    upperCircuit: (json['upperCircuit'] as num?)?.toDouble() ?? 0.0,
-    high52: (json['high52'] as num?)?.toDouble() ?? 0.0,
-    low52: (json['low52'] as num?)?.toDouble() ?? 0.0,
-    depth: MarketDepth.fromJson(json['depth'] as Map<String, dynamic>),
-    timestamp: DateTime.parse(json['timestamp'] as String),
+  factory Quote.fromJson(Map<String, dynamic> json) {
+    final sym = (json['symbol'] ?? json['token'] ?? '').toString();
+    final lastPrice = (json['last'] ?? json['ltp'] ?? json['price'] as num?)?.toDouble() ?? 0.0;
+    final op = (json['open'] as num?)?.toDouble() ?? lastPrice;
+    final hi = (json['high'] as num?)?.toDouble() ?? lastPrice;
+    final lo = (json['low'] as num?)?.toDouble() ?? lastPrice;
+    final cl = (json['close'] as num?)?.toDouble() ?? lastPrice;
+    final pc = (json['prevClose'] ?? json['previousClose'] as num?)?.toDouble() ?? op;
+    final chg = (json['change'] as num?)?.toDouble() ?? (lastPrice - pc);
+    final chgPct = (json['changePercent'] ?? json['pChange'] as num?)?.toDouble() ??
+        (pc != 0 ? ((chg / pc) * 100) : 0.0);
+    final vol = (json['volume'] ?? json['vol'] as num?)?.toInt() ?? 0;
+
+    final bid = (json['bid'] as num?)?.toDouble() ?? lastPrice;
+    final ask = (json['ask'] as num?)?.toDouble() ?? lastPrice;
+
+    MarketDepth d;
+    if (json['depth'] is Map<String, dynamic>) {
+      d = MarketDepth.fromJson(json['depth'] as Map<String, dynamic>);
+    } else {
+      d = MarketDepth(
+        buy: [DepthLevel(price: bid, qty: 1, orders: 1)],
+        sell: [DepthLevel(price: ask, qty: 1, orders: 1)],
+      );
+    }
+
+    DateTime ts;
+    if (json['timestamp'] != null) {
+      ts = DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now();
+    } else {
+      ts = DateTime.now();
+    }
+
+    return Quote(
+      token: sym,
+      ltp: lastPrice,
+      open: op,
+      high: hi,
+      low: lo,
+      close: cl,
+      prevClose: pc,
+      change: double.parse(chg.toStringAsFixed(2)),
+      changePercent: double.parse(chgPct.toStringAsFixed(2)),
+      volume: vol,
+      lowerCircuit: (json['lowerCircuit'] as num?)?.toDouble() ?? (pc * 0.9),
+      upperCircuit: (json['upperCircuit'] as num?)?.toDouble() ?? (pc * 1.1),
+      high52: (json['high52'] as num?)?.toDouble() ?? (hi * 1.2),
+      low52: (json['low52'] as num?)?.toDouble() ?? (lo * 0.8),
+      depth: d,
+      timestamp: ts,
+    );
+  }
+
+  factory Quote.zero(String token) => Quote(
+    token: token,
+    ltp: 0.0,
+    open: 0.0,
+    high: 0.0,
+    low: 0.0,
+    close: 0.0,
+    prevClose: 0.0,
+    change: 0.0,
+    changePercent: 0.0,
+    volume: 0,
+    depth: const MarketDepth(buy: [], sell: []),
+    timestamp: DateTime.now(),
   );
 }

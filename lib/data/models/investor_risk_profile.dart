@@ -137,7 +137,7 @@ class InvestorRiskProfile {
   final RiskCategory category;
   final int score;
   final Map<int, int> answers; // question id -> option index
-  final DateTime lastAssessed;
+  final DateTime? lastAssessed;
   final bool isFnoSuitable;
   final String suitabilityAdvisory;
 
@@ -145,7 +145,7 @@ class InvestorRiskProfile {
     required this.category,
     required this.score,
     required this.answers,
-    required this.lastAssessed,
+    this.lastAssessed,
     required this.isFnoSuitable,
     required this.suitabilityAdvisory,
   });
@@ -192,17 +192,15 @@ class InvestorRiskProfile {
     );
   }
 
-  /// Default profile for demo Indian retail user
-  factory InvestorRiskProfile.defaultModerate() {
-    final defaultAnswers = <int, int>{
-      1: 1, // 30-45 (4 pts)
-      2: 1, // Steady Growth (3 pts)
-      3: 1, // 1-3 yrs (3 pts)
-      4: 1, // Hold & wait (3 pts)
-      5: 1, // 10-30% (4 pts)
-    };
-    // Total = 4 + 3 + 3 + 3 + 4 = 17 (Moderate)
-    return InvestorRiskProfile.fromAnswers(defaultAnswers);
+  /// Empty initial state before questionnaire is taken
+  factory InvestorRiskProfile.empty() {
+    return const InvestorRiskProfile(
+      category: RiskCategory.conservative,
+      score: 0,
+      answers: {},
+      isFnoSuitable: false,
+      suitabilityAdvisory: 'Risk profile not yet assessed. Complete the questionnaire to determine SEBI suitability.',
+    );
   }
 
   InvestorRiskProfile copyWith({
@@ -227,7 +225,7 @@ class InvestorRiskProfile {
         'category': category.name,
         'score': score,
         'answers': answers.map((k, v) => MapEntry(k.toString(), v)),
-        'lastAssessed': lastAssessed.toIso8601String(),
+        'lastAssessed': lastAssessed?.toIso8601String(),
         'isFnoSuitable': isFnoSuitable,
         'suitabilityAdvisory': suitabilityAdvisory,
       };

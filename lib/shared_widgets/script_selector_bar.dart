@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../core/services/realtime_quote_service.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
-import '../data/mock/pinned_scripts_provider.dart';
-import '../data/mock/seed_instruments.dart';
-import '../data/mock/ticker_service.dart';
 import '../data/models/models.dart';
-import '../../features/order_entry/presentation/order_entry_sheet.dart';
+import '../features/market/data/real_market_repository.dart';
+import '../features/order_entry/presentation/order_entry_sheet.dart';
+import '../features/profile_settings/data/pinned_instruments_repository.dart';
 
 class ScriptSelectorBar extends ConsumerStatefulWidget {
   final Instrument? leftScript;
@@ -39,7 +39,8 @@ class _ScriptSelectorBarState extends ConsumerState<ScriptSelectorBar> {
       ),
       builder: (context) {
         final colors = context.tradingColors;
-        final allScripts = SeedInstruments.all;
+        final repo = ref.read(marketRepositoryProvider);
+        final allScripts = repo.cachedInstruments;
         String pickerQuery = '';
 
         return StatefulBuilder(

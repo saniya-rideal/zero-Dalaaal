@@ -4,10 +4,19 @@ class Instrument {
   final String token;
   final String symbol;
   final String name;
-  final Exchange exchange;
-  final InstrumentType type;
-  final double lotSize;
+  final String market; // INDIAN | CRYPTO | FOREX
+  final String segment; // EQUITY | COMMODITY | CRYPTO | FOREX
+  final Exchange exchange; // Display: NSE | BSE | CRYPTO | FX | etc.
+  final InstrumentType type; // EQ | INDEX | CRYPTO | FX | FUT | CE | PE
+  final String quoteCurrency;
   final double tickSize;
+  final double lotSize;
+  final int minQuantity;
+  final int quantityStep;
+  final double maxLeverage;
+  final double defaultLeverage;
+  final double takerFeeRate;
+  final bool isActive;
   final DateTime? expiry;
   final double? strike;
   final int freezeQty;
@@ -17,33 +26,54 @@ class Instrument {
   final String? suspensionReason;
 
   const Instrument({
-    required this.token,
+    String? token,
     required this.symbol,
     required this.name,
+    this.market = 'INDIAN',
+    this.segment = 'EQUITY',
     required this.exchange,
     required this.type,
-    this.lotSize = 1.0,
+    this.quoteCurrency = 'INR',
     this.tickSize = 0.05,
+    this.lotSize = 1.0,
+    this.minQuantity = 1,
+    this.quantityStep = 1,
+    this.maxLeverage = 5.0,
+    this.defaultLeverage = 5.0,
+    this.takerFeeRate = 0.0,
+    this.isActive = true,
     this.expiry,
     this.strike,
     this.freezeQty = 25000,
-    this.leverageMultiplier = 5.0,
+    double? leverageMultiplier,
     this.surveillanceTag,
     this.isSuspended = false,
     this.suspensionReason,
-  });
+  })  : token = token ?? symbol,
+        leverageMultiplier = leverageMultiplier ?? maxLeverage;
 
   /// Contract multiplier for F&O / commodities (defaults to lotSize or 1.0)
   double get contractMultiplier => lotSize > 0 ? lotSize : 1.0;
+
+  String get category => segment;
 
   Instrument copyWith({
     String? token,
     String? symbol,
     String? name,
+    String? market,
+    String? segment,
     Exchange? exchange,
     InstrumentType? type,
+    String? quoteCurrency,
     double? lotSize,
     double? tickSize,
+    int? minQuantity,
+    int? quantityStep,
+    double? maxLeverage,
+    double? defaultLeverage,
+    double? takerFeeRate,
+    bool? isActive,
     DateTime? expiry,
     double? strike,
     int? freezeQty,
@@ -56,10 +86,19 @@ class Instrument {
       token: token ?? this.token,
       symbol: symbol ?? this.symbol,
       name: name ?? this.name,
+      market: market ?? this.market,
+      segment: segment ?? this.segment,
       exchange: exchange ?? this.exchange,
       type: type ?? this.type,
+      quoteCurrency: quoteCurrency ?? this.quoteCurrency,
       lotSize: lotSize ?? this.lotSize,
       tickSize: tickSize ?? this.tickSize,
+      minQuantity: minQuantity ?? this.minQuantity,
+      quantityStep: quantityStep ?? this.quantityStep,
+      maxLeverage: maxLeverage ?? this.maxLeverage,
+      defaultLeverage: defaultLeverage ?? this.defaultLeverage,
+      takerFeeRate: takerFeeRate ?? this.takerFeeRate,
+      isActive: isActive ?? this.isActive,
       expiry: expiry ?? this.expiry,
       strike: strike ?? this.strike,
       freezeQty: freezeQty ?? this.freezeQty,
@@ -74,10 +113,19 @@ class Instrument {
     'token': token,
     'symbol': symbol,
     'name': name,
+    'market': market,
+    'segment': segment,
     'exchange': exchange.name,
     'type': type.name,
+    'quoteCurrency': quoteCurrency,
     'lotSize': lotSize,
     'tickSize': tickSize,
+    'minQuantity': minQuantity,
+    'quantityStep': quantityStep,
+    'maxLeverage': maxLeverage,
+    'defaultLeverage': defaultLeverage,
+    'takerFeeRate': takerFeeRate,
+    'isActive': isActive,
     'expiry': expiry?.toIso8601String(),
     'strike': strike,
     'freezeQty': freezeQty,
@@ -87,28 +135,65 @@ class Instrument {
     'suspensionReason': suspensionReason,
   };
 
-  factory Instrument.fromJson(Map<String, dynamic> json) => Instrument(
-    token: json['token'] as String,
-    symbol: json['symbol'] as String,
-    name: json['name'] as String,
-    exchange: Exchange.values.byName(json['exchange'] as String),
-    type: InstrumentType.values.byName(json['type'] as String),
-    lotSize: (json['lotSize'] as num?)?.toDouble() ?? 1.0,
-    tickSize: (json['tickSize'] as num?)?.toDouble() ?? 0.05,
-    expiry: json['expiry'] != null ? DateTime.parse(json['expiry'] as String) : null,
-    strike: (json['strike'] as num?)?.toDouble(),
-    freezeQty: (json['freezeQty'] as num?)?.toInt() ?? 25000,
-    leverageMultiplier: (json['leverageMultiplier'] as num?)?.toDouble() ?? 5.0,
-    surveillanceTag: json['surveillanceTag'] as String?,
-    isSuspended: json['isSuspended'] as bool? ?? false,
-    suspensionReason: json['suspensionReason'] as String?,
-  );
+  factory Instrument.fromJson(Map<String, dynamic> json) {
+    final sym = (json['symbol'] ?? json['token'] ?? '').toString();
+    final tok = (json['token'] ?? sym).toString();
+
+    // Tolerant exchange parsing
+    Exchange ex = Exchange.NSE;
+    final exRaw = (json['exchange'] ?? '').toString().toUpperCase();
+    for (final val in Exchange.values) {
+      if (val.name == exRaw) {
+        ex = val;
+        break;
+      }
+    }
+
+    // Tolerant instrument type parsing
+    InstrumentType it = InstrumentType.EQ;
+    final itRaw = (json['type'] ?? '').toString().toUpperCase();
+    for (final val in InstrumentType.values) {
+      if (val.name == itRaw) {
+        it = val;
+        break;
+      }
+    }
+
+    final maxLev = (json['maxLeverage'] ?? json['leverageMultiplier'] as num?)?.toDouble() ?? 5.0;
+    final defLev = (json['defaultLeverage'] as num?)?.toDouble() ?? maxLev;
+
+    return Instrument(
+      token: tok,
+      symbol: sym,
+      name: (json['name'] ?? sym).toString(),
+      market: (json['market'] ?? 'INDIAN').toString(),
+      segment: (json['segment'] ?? 'EQUITY').toString(),
+      exchange: ex,
+      type: it,
+      quoteCurrency: (json['quoteCurrency'] ?? 'INR').toString(),
+      lotSize: (json['lotSize'] as num?)?.toDouble() ?? 1.0,
+      tickSize: (json['tickSize'] as num?)?.toDouble() ?? 0.05,
+      minQuantity: (json['minQuantity'] as num?)?.toInt() ?? 1,
+      quantityStep: (json['quantityStep'] as num?)?.toInt() ?? 1,
+      maxLeverage: maxLev,
+      defaultLeverage: defLev,
+      takerFeeRate: (json['takerFeeRate'] as num?)?.toDouble() ?? 0.0,
+      isActive: json['isActive'] as bool? ?? true,
+      expiry: json['expiry'] != null ? DateTime.tryParse(json['expiry'].toString()) : null,
+      strike: (json['strike'] as num?)?.toDouble(),
+      freezeQty: (json['freezeQty'] as num?)?.toInt() ?? 25000,
+      leverageMultiplier: (json['leverageMultiplier'] as num?)?.toDouble() ?? maxLev,
+      surveillanceTag: json['surveillanceTag'] as String?,
+      isSuspended: json['isSuspended'] as bool? ?? false,
+      suspensionReason: json['suspensionReason'] as String?,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Instrument && runtimeType == other.runtimeType && token == other.token;
+      other is Instrument && runtimeType == other.runtimeType && symbol == other.symbol;
 
   @override
-  int get hashCode => token.hashCode;
+  int get hashCode => symbol.hashCode;
 }

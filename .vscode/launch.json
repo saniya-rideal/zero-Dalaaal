@@ -1,0 +1,43 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "zero-Dalaaal (Flutter CPH2119)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=ENV=dev",
+        "--dart-define=API_URL=http://localhost:5000",
+        "--dart-define=SOCKET_URL=http://localhost:5000"
+      ]
+    },
+    {
+      "name": "zero-Dalaaal (Local Backend - USB)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=ENV=dev",
+        "--dart-define=API_URL=http://localhost:5000",
+        "--dart-define=SOCKET_URL=http://localhost:5000"
+      ]
+    },
+    {
+      "name": "zero-Dalaaal (Local Backend - Wi-Fi 192.168.1.36)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=ENV=dev",
+        "--dart-define=API_URL=http://192.168.1.36:5000",
+        "--dart-define=SOCKET_URL=http://192.168.1.36:5000"
+      ]
+    },
+    {
+      "name": "zero-Dalaaal (Production)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=ENV=prod"
+      ]
+    }
+  ]
+}

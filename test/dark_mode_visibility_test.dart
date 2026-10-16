@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zero_dalali/core/theme/app_theme.dart';
 import 'package:zero_dalali/core/theme/trading_colors.dart';
+import 'package:zero_dalali/features/calendar/data/calendar_repository.dart';
 import 'package:zero_dalali/features/calendar/presentation/economic_calendar_screen.dart';
 import 'package:zero_dalali/shared_widgets/zero_bottom_nav_bar.dart';
 import 'package:zero_dalali/shared_widgets/zero_drawer.dart';
@@ -80,8 +81,23 @@ void main() {
 
     testWidgets('EconomicCalendarScreen in Dark Mode renders event title and metrics clearly',
         (tester) async {
+      final sampleEvent = EconomicEvent(
+        id: 'ev_1',
+        title: 'HSBC: SERVICES - BUSINESS ACTIVITY',
+        country: 'India',
+        time: '10:30 AM',
+        impact: 'HIGH',
+        actual: '58.5',
+        forecast: '57.0',
+        previous: '56.8',
+        date: DateTime.now(),
+      );
+
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [
+            calendarEventsProvider.overrideWith((ref) => [sampleEvent]),
+          ],
           child: MaterialApp(
             theme: AppTheme.darkTheme,
             home: const EconomicCalendarScreen(),

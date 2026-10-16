@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../../core/theme/trading_colors.dart';
-import '../../../../data/mock/corporate_actions_repository.dart';
 import '../../../../data/models/corporate_action.dart';
+import '../../../quote_detail/data/fundamentals_repository.dart';
+import '../../data/calendar_repository.dart';
 
 class CorporateActionsView extends ConsumerStatefulWidget {
   const CorporateActionsView({super.key});
@@ -29,9 +30,12 @@ class _CorporateActionsViewState extends ConsumerState<CorporateActionsView> {
     final colors = context.tradingColors;
     final actions = ref.watch(filteredCorporateActionsProvider);
     final filter = ref.watch(corporateActionsFilterProvider);
-    final repo = ref.watch(corporateActionsRepositoryProvider);
-    final allActions = repo.getAllActions();
-    final counts = repo.getCountsByType();
+    final allActionsAsync = ref.watch(corporateActionsProvider(null));
+    final allActions = allActionsAsync.valueOrNull ?? const [];
+    final counts = <CorporateActionType, int>{};
+    for (final t in CorporateActionType.values) {
+      counts[t] = allActions.where((a) => a.actionType == t).length;
+    }
 
     return Column(
       children: [

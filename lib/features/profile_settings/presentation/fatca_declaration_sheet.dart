@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../data/mock/fatca_repository.dart';
+import '../data/compliance_repository.dart';
 import '../../../data/models/fatca_declaration.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 

@@ -5,18 +5,23 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/enums.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../data/real_funds_repository.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
-import '../../../core/services/web_redirect_service.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
 class WithdrawFundsSheet extends ConsumerStatefulWidget {
   const WithdrawFundsSheet({super.key});
 
   static void show(BuildContext context) {
-    WebRedirectService.openWithdrawWebsite(context: context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const WithdrawFundsSheet(),
+    );
   }
 
   @override
@@ -25,18 +30,28 @@ class WithdrawFundsSheet extends ConsumerStatefulWidget {
 
 class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
   final _amountController = TextEditingController(text: '10000');
-  final _otpController = TextEditingController(text: '1234');
-  String _selectedDestinationType = 'BANK'; // 'BANK' or 'UPI'
-  String _selectedBankId = 'bank_hdfc_01';
-  final String _selectedUpiId = 'anurag@okhdfcbank';
-  bool _showOtpStep = false;
+  late final TextEditingController _accountNumberController;
+  late final TextEditingController _ifscController;
   bool _isSubmitting = false;
   String? _errorText;
 
   @override
+  void initState() {
+    super.initState();
+    final profile = ref.read(authControllerProvider).session?.profile;
+    _accountNumberController = TextEditingController(
+      text: profile?.bankAccountNumber.isNotEmpty == true
+          ? profile!.bankAccountNumber.replaceAll(' ', '')
+          : '987654321012',
+    );
+    _ifscController = TextEditingController(text: 'HDFC0001234');
+  }
+
+  @override
   void dispose() {
     _amountController.dispose();
-    _otpController.dispose();
+    _accountNumberController.dispose();
+    _ifscController.dispose();
     super.dispose();
   }
 
@@ -66,32 +81,37 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
       return;
     }
 
-    // Step 1: Open OTP 2FA confirmation if not already shown
-    if (!_showOtpStep) {
-      setState(() => _showOtpStep = true);
-      return;
-    }
-
     final amt = double.tryParse(_amountController.text);
     if (amt == null) return;
+
+    if (_accountNumberController.text.trim().isEmpty) {
+      setState(() => _errorText = 'Please enter bank account number');
+      return;
+    }
+    if (_ifscController.text.trim().isEmpty) {
+      setState(() => _errorText = 'Please enter IFSC code');
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final engine = ref.read(orderSimulationEngineProvider);
-      final isUpi = _selectedDestinationType == 'UPI';
-      final destination = isUpi
-          ? _selectedUpiId
-          : (_selectedBankId == 'bank_hdfc_01'
-              ? 'HDFC Bank Ltd (•••• 4912)'
-              : 'ICICI Bank Ltd (•••• 8841)');
+      final repo = ref.read(fundsRepositoryProvider);
+      final idempotencyKey = 'wth_${DateTime.now().millisecondsSinceEpoch}';
 
-      final txn = await engine.requestWithdrawal(
+      // Contract Section 4.4: POST /api/wallet/withdraw
+      final txn = await repo.withdraw(
         amount: amt,
-        destination: destination,
-        isUpi: isUpi,
-        otp: _otpController.text,
+        accountNumber: _accountNumberController.text.trim(),
+        ifsc: _ifscController.text.trim(),
+        method: 'BANK_TRANSFER',
+        currency: 'INR',
+        idempotencyKey: idempotencyKey,
       );
+
+      ref.invalidate(fundsSummaryProvider);
+      ref.invalidate(walletLedgerProvider);
+      ref.invalidate(walletTransactionsListProvider);
 
       if (!mounted) return;
       Navigator.pop(context); // Close sheet
@@ -103,7 +123,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Withdrawal Failed: $e'),
             backgroundColor: context.tradingColors.bearish,
           ),
         );
@@ -114,10 +134,9 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final breakdown = engine.getBalanceBreakdown(Segment.EQUITY);
-    final available = breakdown.withdrawableBalance;
-    final bankAccounts = engine.linkedBankAccounts;
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+    final available = fundsAsync.valueOrNull?.withdrawable ?? 0.0;
+    final profile = ref.watch(authControllerProvider).session?.profile;
 
     return Container(
       decoration: BoxDecoration(
@@ -141,7 +160,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
               Text('Withdraw Funds', style: AppTypography.h1(color: colors.textPrimary)),
               const SizedBox(height: 4),
               Text(
-                'Transfer settled cash directly to your verified bank account or UPI.',
+                'Transfer settled cash directly to your verified bank account.',
                 style: AppTypography.caption(color: colors.textSecondary),
               ),
 
@@ -155,68 +174,41 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: colors.divider, width: 0.5),
                 ),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Available to withdraw', style: AppTypography.caption(color: colors.textSecondary)),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              onTap: () => BalanceBreakdownDialog.show(context, Segment.EQUITY),
-                              child: Icon(LucideIcons.info, size: 14, color: colors.primary),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          CurrencyFormatter.format(available),
-                          style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w800, tabular: true),
-                        ),
-                      ],
-                    ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Available to withdraw', style: AppTypography.caption(color: colors.textSecondary)),
+                          const SizedBox(height: 4),
+                          Text(
+                            CurrencyFormatter.format(available),
+                            style: AppTypography.h2(color: colors.textPrimary, tabular: true),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
                       onPressed: () => BalanceBreakdownDialog.show(context, Segment.EQUITY),
-                      child: Text(
-                        'View Breakdown',
-                        style: GoogleFonts.inter(
-                          color: colors.primary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                        ),
+                      icon: Icon(LucideIcons.info, size: 14, color: colors.primary),
+                      label: Text(
+                        'Breakdown',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: colors.primary),
                       ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
 
               // Amount Input
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  Text('WITHDRAWAL AMOUNT', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
-                  Text(
-                    'Min: ₹100 • Max: ${CurrencyFormatter.format(available)}',
-                    style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11),
-                  ),
-                ],
-              ),
+              Text('WITHDRAWAL AMOUNT', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
               const SizedBox(height: 8),
               TextField(
                 controller: _amountController,
@@ -248,187 +240,48 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
 
               const SizedBox(height: 20),
 
-              // Destination Selector
-              Text('PAYOUT DESTINATION', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+              // Destination Bank Details
+              Text('BANK ACCOUNT DETAILS', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
               const SizedBox(height: 8),
 
-              // Bank Accounts
-              ...bankAccounts.map((bank) {
-                final isSelected = _selectedDestinationType == 'BANK' && _selectedBankId == bank.id;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Material(
-                    color: isSelected ? colors.primary.withValues(alpha: 0.08) : colors.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: isSelected ? colors.primary : colors.divider,
-                        width: isSelected ? 1.5 : 0.5,
-                      ),
-                    ),
-                    child: ListTile(
-                      leading: const Icon(LucideIcons.landmark, size: 22),
-                      title: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 6,
-                        children: [
-                          Text(bank.bankName, style: AppTypography.body(weight: FontWeight.w600)),
-                          if (bank.isPrimary)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colors.bullish.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Primary',
-                                style: TextStyle(color: colors.bullish, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                        ],
-                      ),
-                      subtitle: Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 6,
-                        children: [
-                          Text('${bank.accountNumberMasked} • ${bank.ifsc}', style: AppTypography.caption(color: colors.textSecondary)),
-                          if (bank.isVerified)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(LucideIcons.badgeCheck, color: colors.bullish, size: 12),
-                                const SizedBox(width: 2),
-                                Text('Verified', style: TextStyle(color: colors.bullish, fontSize: 10.5, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                        ],
-                      ),
-                      trailing: Radio<String>(
-                        value: bank.id,
-                        groupValue: _selectedDestinationType == 'BANK' ? _selectedBankId : null,
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedDestinationType = 'BANK';
-                            _selectedBankId = val!;
-                          });
-                        },
-                      ),
-                      onTap: () {
-                        setState(() {
-                          _selectedDestinationType = 'BANK';
-                          _selectedBankId = bank.id;
-                        });
-                      },
-                    ),
-                  ),
-                );
-              }),
-
-              // Instant UPI Destination
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Material(
-                  color: _selectedDestinationType == 'UPI' ? colors.primary.withValues(alpha: 0.08) : colors.surface,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: _selectedDestinationType == 'UPI' ? colors.primary : colors.divider,
-                      width: _selectedDestinationType == 'UPI' ? 1.5 : 0.5,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: const Icon(LucideIcons.wallet, size: 22),
-                    title: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 6,
-                      children: [
-                        Text('Verified UPI ID', style: AppTypography.body(weight: FontWeight.w600)),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: colors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Instant Payout',
-                            style: TextStyle(color: colors.primary, fontSize: 10, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Text(_selectedUpiId, style: AppTypography.caption(color: colors.textSecondary)),
-                    trailing: Radio<String>(
-                      value: 'UPI',
-                      groupValue: _selectedDestinationType,
-                      onChanged: (val) => setState(() => _selectedDestinationType = val!),
-                    ),
-                    onTap: () => setState(() => _selectedDestinationType = 'UPI'),
-                  ),
+              TextField(
+                controller: _accountNumberController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Account Number',
+                  hintText: 'Enter bank account number',
+                  filled: true,
+                  fillColor: colors.surface,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
               ),
-
-              const SizedBox(height: 12),
-
-              // OTP 2FA Step
-              if (_showOtpStep) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: colors.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(LucideIcons.shieldCheck, color: colors.primary, size: 16),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Enter 2FA Security OTP',
-                            style: GoogleFonts.inter(
-                              color: colors.textPrimary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sent via SMS to registered mobile ••••••9124 (Demo OTP: 1234)',
-                        style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _otpController,
-                        keyboardType: TextInputType.number,
-                        maxLength: 4,
-                        style: GoogleFonts.inter(
-                          color: colors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 18,
-                          letterSpacing: 8,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: '1234',
-                          counterText: '',
-                          filled: true,
-                          fillColor: colors.surface,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        ),
-                      ),
-                    ],
-                  ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _ifscController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  labelText: 'IFSC Code',
+                  hintText: 'e.g. HDFC0001234',
+                  filled: true,
+                  fillColor: colors.surface,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 ),
-                const SizedBox(height: 14),
+              ),
+              if (profile?.bankName.isNotEmpty == true) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Linked Bank: ${profile!.bankName}',
+                  style: GoogleFonts.inter(fontSize: 11, color: colors.textSecondary),
+                ),
               ],
 
-              // Schedule & Cutoff Disclosures
+              const SizedBox(height: 20),
+
+              // Information Notice
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: colors.surface,
                   borderRadius: BorderRadius.circular(8),
@@ -437,12 +290,12 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.info, size: 16, color: colors.primary),
+                    Icon(LucideIcons.clock, size: 18, color: colors.warning),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Cutoff time: 8:00 PM on trading days. Requests are pending until cutoff and can be cancelled anytime with instant margin restoration.',
-                        style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11, height: 1.3),
+                        'Withdrawal requests reserve your cash balance immediately and are reviewed and disbursed via NEFT/RTGS during banking hours.',
+                        style: GoogleFonts.inter(fontSize: 11, color: colors.textSecondary, height: 1.3),
                       ),
                     ),
                   ],
@@ -451,7 +304,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
 
               const SizedBox(height: 20),
 
-              // Confirm Withdrawal Button
+              // Action CTA
               ElevatedButton(
                 onPressed: _isSubmitting ? null : () => _handleConfirmWithdrawal(available),
                 style: ElevatedButton.styleFrom(
@@ -465,13 +318,21 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : Text(
-                        _showOtpStep ? 'SUBMIT WITHDRAWAL' : 'VERIFY & PROCEED',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(LucideIcons.arrowDownLeft, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Request Withdrawal',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
+                        ],
                       ),
               ),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -480,8 +341,11 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
   }
 
   Widget _buildPctChip(String label, double pct, double available) {
+    final colors = context.tradingColors;
     return ActionChip(
-      label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      label: Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+      backgroundColor: colors.surface,
+      side: BorderSide(color: colors.divider, width: 0.5),
       onPressed: () => _applyPercentage(pct, available),
     );
   }

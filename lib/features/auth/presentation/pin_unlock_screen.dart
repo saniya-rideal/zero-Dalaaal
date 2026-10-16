@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/services/security_privacy_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -23,6 +23,8 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
   int _lockoutSeconds = 0;
   Timer? _lockoutTimer;
   late final SecurityPrivacyService _securityService;
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  bool _canCheckBiometrics = false;
 
   @override
   void initState() {
@@ -30,7 +32,15 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
     _securityService = ref.read(securityPrivacyServiceProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _securityService.setScreenProtection(true);
+      _checkBiometrics();
     });
+  }
+
+  Future<void> _checkBiometrics() async {
+    try {
+      final canCheck = await _localAuth.canCheckBiometrics;
+      if (mounted) setState(() => _canCheckBiometrics = canCheck);
+    } catch (_) {}
   }
 
   @override
@@ -63,7 +73,7 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
     if (_isLocked) return;
 
     final security = ref.read(securityPrivacyServiceProvider);
-    final success = await ref.read(authControllerProvider.notifier).verifyPin(pin);
+    final success = await ref.read(authControllerProvider.notifier).verifyAppPin(pin);
 
     if (success) {
       _failedAttempts = 0;
@@ -72,21 +82,39 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
         context.go('/quotes');
       }
     } else {
-      setState(() => _failedAttempts++);
-      security.recordFailedAttempt('app_pin_unlock', maxAttempts: 3, lockoutDurationSeconds: 60);
+      final currentAuthState = ref.read(authControllerProvider);
+      if (currentAuthState.errorMessage != null && currentAuthState.errorMessage!.contains('ACCOUNT_LOCKED')) {
+        _startLockoutTimer(900);
+      } else {
+        setState(() => _failedAttempts++);
+        security.recordFailedAttempt('app_pin_unlock', maxAttempts: 5, lockoutDurationSeconds: 900);
 
-      if (_failedAttempts >= 3) {
-        _startLockoutTimer(60);
+        if (_failedAttempts >= 5) {
+          _startLockoutTimer(900);
+        }
       }
     }
+  }
+
+  Future<void> _handleBiometricAuth() async {
+    if (_isLocked) return;
+    try {
+      final didAuthenticate = await _localAuth.authenticate(
+        localizedReason: 'Unlock Zero Dalali',
+        options: const AuthenticationOptions(stickyAuth: true, biometricOnly: true),
+      );
+      if (didAuthenticate && mounted) {
+        context.go('/quotes');
+      }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final authState = ref.watch(authControllerProvider);
-    final userName = authState.session?.profile.name ?? AppConstants.demoUserName;
-    final userId = authState.session?.profile.userId ?? AppConstants.demoUserId;
+    final userName = authState.session?.profile.name ?? 'Trader';
+    final userId = authState.session?.profile.userId ?? '-';
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -137,7 +165,7 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
                       Icon(LucideIcons.clock, color: colors.bearish, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        'PIN Locked. Try again in $_lockoutSeconds s',
+                        'Account Locked. Try again in ${(_lockoutSeconds / 60).ceil()}m',
                         style: AppTypography.body(
                           color: colors.bearish,
                           weight: FontWeight.w700,
@@ -151,12 +179,21 @@ class _PinUnlockScreenState extends ConsumerState<PinUnlockScreen> {
                 title: 'Enter App PIN',
                 subtitle: _isLocked
                     ? 'Too many failed attempts. Cooldown active.'
-                    : 'Unlock Kite with your 6-digit PIN',
+                    : 'Unlock Zero with your 6-digit PIN',
                 hasError: authState.errorMessage != null || _isLocked,
-                showBiometric: false,
-                onBiometricPressed: null,
+                showBiometric: _canCheckBiometrics && !_isLocked,
+                onBiometricPressed: _handleBiometricAuth,
                 onCompleted: _isLocked ? (_) {} : _handlePinSubmitted,
               ),
+
+              if (authState.errorMessage != null && !_isLocked) ...[
+                const SizedBox(height: 12),
+                Text(
+                  authState.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.caption(color: colors.bearish),
+                ),
+              ],
 
               const SizedBox(height: 24),
 

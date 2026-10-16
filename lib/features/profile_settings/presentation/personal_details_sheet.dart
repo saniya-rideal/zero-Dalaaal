@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../auth/presentation/auth_controller.dart';
 
@@ -35,11 +34,11 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
   void initState() {
     super.initState();
     final profile = ref.read(authControllerProvider).session?.profile;
-    _nameController = TextEditingController(text: profile?.name ?? AppConstants.demoUserName);
-    _emailController = TextEditingController(text: profile?.email ?? 'demo@zero.life');
-    _mobileController = TextEditingController(text: '8739039936');
-    _dobController = TextEditingController(text: '1994-08-15');
-    _addressController = TextEditingController(text: '402, Trade Tower, Bandra Kurla Complex, Mumbai 400051');
+    _nameController = TextEditingController(text: profile?.name ?? '');
+    _emailController = TextEditingController(text: profile?.email ?? '');
+    _mobileController = TextEditingController(text: profile?.phone ?? '');
+    _dobController = TextEditingController(text: profile?.dob ?? '');
+    _addressController = TextEditingController(text: profile?.address ?? '');
   }
 
   @override
@@ -52,14 +51,55 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
     super.dispose();
   }
 
+  Future<void> _handleSaveChanges() async {
+    final profile = ref.read(authControllerProvider).session?.profile;
+    final Map<String, dynamic> changedFields = {};
+
+    if (_nameController.text.trim() != profile?.name) {
+      changedFields['name'] = _nameController.text.trim();
+    }
+    if (_mobileController.text.trim() != profile?.phone) {
+      changedFields['phone'] = _mobileController.text.trim();
+    }
+    if (_dobController.text.trim() != profile?.dob) {
+      changedFields['dob'] = _dobController.text.trim();
+    }
+    if (_addressController.text.trim() != profile?.address) {
+      changedFields['address'] = _addressController.text.trim();
+    }
+
+    if (changedFields.isEmpty) {
+      setState(() => _isEditing = false);
+      return;
+    }
+
+    final success = await ref.read(authControllerProvider.notifier).updateProfile(changedFields);
+    if (success && mounted) {
+      setState(() => _isEditing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Personal profile details updated successfully.'),
+          backgroundColor: Color(0xFF00A854),
+        ),
+      );
+    } else if (mounted) {
+      final error = ref.read(authControllerProvider).errorMessage ?? 'Failed to update profile.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: const Color(0xFFC62828),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final authState = ref.watch(authControllerProvider);
     final profile = authState.session?.profile;
-
-    final userId = profile?.userId ?? AppConstants.demoUserId;
-    final pan = profile?.pan ?? AppConstants.demoPan;
+    final userId = profile?.userId ?? '-';
+    final pan = profile?.pan ?? '-';
 
     return Container(
       decoration: BoxDecoration(
@@ -138,7 +178,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'ACTIVE',
+                        profile?.kycStatus ?? 'ACTIVE',
                         style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: colors.bullish),
                       ),
                     ),
@@ -180,7 +220,7 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                 label: 'Email Address',
                 controller: _emailController,
                 colors: colors,
-                enabled: _isEditing,
+                enabled: false,
                 verified: true,
               ),
               const SizedBox(height: 12),
@@ -204,19 +244,11 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
               const SizedBox(height: 12),
 
               _buildFieldRow(
-                label: 'Country of Residency',
-                controller: TextEditingController(text: 'India (+91)'),
+                label: 'Bank Account (Masked)',
+                controller: TextEditingController(text: profile?.bankAccountNumber ?? '-'),
                 colors: colors,
                 enabled: false,
-              ),
-              const SizedBox(height: 12),
-
-              _buildFieldRow(
-                label: 'Demat BO ID (CDSL)',
-                controller: TextEditingController(text: '1208160012345678'),
-                colors: colors,
-                enabled: false,
-                verified: true,
+                verified: profile?.bankAccountNumber != null,
               ),
 
               const SizedBox(height: 20),
@@ -250,22 +282,16 @@ class _PersonalDetailsSheetState extends ConsumerState<PersonalDetailsSheet> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          setState(() => _isEditing = false);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Personal profile details updated successfully.'),
-                              backgroundColor: Color(0xFF00A854),
-                            ),
-                          );
-                        },
+                        onPressed: authState.isLoading ? null : _handleSaveChanges,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: authState.isLoading
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text('SAVE CHANGES', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],

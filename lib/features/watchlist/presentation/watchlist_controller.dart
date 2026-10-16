@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/models.dart';
-import '../data/mock_watchlist_repository.dart';
+import '../data/real_watchlist_repository.dart';
 import '../domain/watchlist_repository.dart';
 
 class WatchlistState {

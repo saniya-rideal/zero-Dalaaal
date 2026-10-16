@@ -35,9 +35,12 @@ class Basket {
   };
 
   factory Basket.fromJson(Map<String, dynamic> json) => Basket(
-    id: json['id'] as String,
-    name: json['name'] as String,
-    legs: (json['legs'] as List<dynamic>).map((e) => OrderRequest.fromJson(e as Map<String, dynamic>)).toList(),
-    createdAt: DateTime.parse(json['createdAt'] as String),
+    id: (json['id'] ?? json['_id'] ?? '').toString(),
+    name: (json['name'] ?? '').toString(),
+    legs: ((json['orders'] ?? json['legs']) as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .map(OrderRequest.fromJson)
+        .toList(),
+    createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
   );
 }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../data/mock/support_repository.dart';
+import '../data/support_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
@@ -788,17 +788,13 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
               const SizedBox(height: 14),
               const Divider(height: 1),
               const SizedBox(height: 14),
-              _buildContactRow(LucideIcons.mapPin, 'Registered Office', contact.registeredAddress, colors),
+              _buildContactRow(LucideIcons.mapPin, 'Corporate Office', contact.corporateOffice, colors),
               const SizedBox(height: 12),
-              _buildContactRow(LucideIcons.building2, 'Corporate Operations', contact.corporateOffice, colors),
+              _buildContactRow(LucideIcons.badgeCheck, 'SEBI Reg. Number', contact.sebiRegNumber, colors),
               const SizedBox(height: 12),
-              _buildContactRow(LucideIcons.badgeCheck, 'SEBI Registration No', contact.sebiRegNumber, colors),
+              _buildContactRow(LucideIcons.landmark, 'Exchange Memberships', 'NSE: ${contact.nseMemberId} | BSE: ${contact.bseMemberId}', colors),
               const SizedBox(height: 12),
-              _buildContactRow(LucideIcons.landmark, 'Depository Participant (DP ID)', 'CDSL: ${contact.cdslDpId} | NSDL: ${contact.nsdlDpId}', colors),
-              const SizedBox(height: 12),
-              _buildContactRow(LucideIcons.arrowLeftRight, 'Exchange Member IDs', 'NSE: ${contact.nseMemberId} | BSE: ${contact.bseMemberId} | MCX: ${contact.mcxMemberId}', colors),
-              const SizedBox(height: 12),
-              _buildContactRow(LucideIcons.phoneCall, 'Toll-Free Helpline', contact.tollFreePhone, colors, isPhone: true),
+              _buildContactRow(LucideIcons.phoneCall, 'Help Desk', contact.tollFreePhone, colors, isPhone: true),
               const SizedBox(height: 12),
               _buildContactRow(LucideIcons.mail, 'Customer Support', contact.supportEmail, colors, isEmail: true),
               const SizedBox(height: 12),

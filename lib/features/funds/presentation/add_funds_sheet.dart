@@ -4,18 +4,23 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../../../core/utils/currency_formatter.dart';
 import '../../../data/models/funds.dart';
-import 'payment_gateway_dialog.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../data/real_funds_repository.dart';
 import 'transaction_receipt_dialog.dart';
-import '../../../core/services/web_redirect_service.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
 class AddFundsSheet extends ConsumerStatefulWidget {
   const AddFundsSheet({super.key});
 
   static void show(BuildContext context) {
-    WebRedirectService.openDepositWebsite(context: context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const AddFundsSheet(),
+    );
   }
 
   @override
@@ -26,7 +31,7 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
   final _amountController = TextEditingController(text: '10000');
   PaymentMethod _method = PaymentMethod.UPI;
   String _selectedUpiApp = 'Google Pay';
-  final _upiVpaController = TextEditingController(text: 'anurag@okhdfcbank');
+  late final TextEditingController _upiVpaController;
   String _selectedBank = 'HDFC Bank Ltd';
   bool _isSubmitting = false;
   String? _errorText;
@@ -39,6 +44,21 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
     'Axis Bank Ltd',
     'Kotak Mahindra Bank',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = ref.read(authControllerProvider).session?.profile;
+    final userHandle = (profile != null && profile.email.isNotEmpty)
+        ? profile.email.split('@').first
+        : (profile?.phone ?? 'trader');
+    _upiVpaController = TextEditingController(
+      text: userHandle.isNotEmpty ? '$userHandle@okhdfcbank' : 'trader@upi',
+    );
+    if (profile != null && profile.bankName.isNotEmpty) {
+      _selectedBank = profile.bankName;
+    }
+  }
 
   @override
   void dispose() {
@@ -81,49 +101,36 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
     setState(() => _isSubmitting = true);
 
     try {
-      // 1. Open Simulated Gateway Dialog
-      final outcome = await PaymentGatewayDialog.show(
-        context,
+      final repo = ref.read(fundsRepositoryProvider);
+      final idempotencyKey = 'dep_${DateTime.now().millisecondsSinceEpoch}';
+
+      // 1. Contract Section 4.2: POST /api/wallet/deposit/create
+      final pendingTxn = await repo.createDeposit(
         amount: amt,
-        method: _method,
-        upiId: _method == PaymentMethod.UPI ? _upiVpaController.text : null,
-        bankName: _method == PaymentMethod.NET_BANKING ? _selectedBank : null,
+        currency: 'INR',
+        idempotencyKey: idempotencyKey,
       );
 
-      if (!mounted) return;
-
-      if (outcome == null || outcome == WalletTransactionStatus.CANCELLED) {
-        setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Deposit cancelled by user.')),
-        );
-        return;
-      }
-
-      // 2. Initiate deposit in engine with simulated outcome
-      final engine = ref.read(orderSimulationEngineProvider);
-      final txn = await engine.initiateDeposit(
-        amount: amt,
-        method: _method,
-        upiId: _method == PaymentMethod.UPI ? _upiVpaController.text : null,
-        bankName: _method == PaymentMethod.NET_BANKING ? _selectedBank : null,
-        outcome: outcome,
-        failureReason: outcome == WalletTransactionStatus.FAILED
-            ? 'Payment declined by issuing bank or server timed out'
-            : null,
+      // 2. Contract Section 4.3: POST /api/wallet/deposit/verify
+      final verifiedTxn = await repo.verifyDeposit(
+        depositId: pendingTxn.id,
       );
+
+      ref.invalidate(fundsSummaryProvider);
+      ref.invalidate(walletLedgerProvider);
+      ref.invalidate(walletTransactionsListProvider);
 
       if (!mounted) return;
       Navigator.pop(context); // Close add funds sheet
 
       // 3. Show digital receipt dialog
-      await TransactionReceiptDialog.show(context, txn);
+      await TransactionReceiptDialog.show(context, verifiedTxn);
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Deposit Failed: $e'),
             backgroundColor: context.tradingColors.bearish,
           ),
         );
@@ -154,59 +161,22 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
               const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
-              // Title & Currency Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Add Funds', style: AppTypography.h1(color: colors.textPrimary)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: colors.bullish.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: colors.bullish.withValues(alpha: 0.3)),
-                    ),
-                    child: Text(
-                      'INR (₹) Only',
-                      style: GoogleFonts.inter(
-                        color: colors.bullish,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              Text('Add Funds', style: AppTypography.h1(color: colors.textPrimary)),
               const SizedBox(height: 4),
               Text(
-                'Instant zero-fee transfer via UPI, Net Banking, or Debit Card.',
+                'Instant credit to your equity & F&O trading account balance.',
                 style: AppTypography.caption(color: colors.textSecondary),
               ),
 
               const SizedBox(height: 20),
 
               // Amount Input
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  Text(
-                    'DEPOSIT AMOUNT (₹)',
-                    style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600),
-                  ),
-                  Text(
-                    _method == PaymentMethod.UPI ? 'Min ₹100 • Max ₹2,00,000' : 'Min ₹100 • Max ₹10,00,000',
-                    style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
+              Text('ENTER AMOUNT', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+              const SizedBox(height: 8),
               TextField(
                 controller: _amountController,
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setState(_validateAmount),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                onChanged: (_) => setState(() => _validateAmount()),
                 style: AppTypography.display(color: colors.textPrimary, weight: FontWeight.w700, tabular: true),
                 decoration: InputDecoration(
                   prefixText: '₹ ',
@@ -243,15 +213,9 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
               ),
               _buildPaymentOption(
                 PaymentMethod.NET_BANKING,
-                'Net Banking (40+ Supported Banks)',
+                'Net Banking (Verified Bank Account)',
                 'Instant credit • Max ₹10 Lakh per txn • Zero Charges',
                 LucideIcons.landmark,
-              ),
-              _buildPaymentOption(
-                PaymentMethod.CARD,
-                'Payment Gateway / Debit Card',
-                'Instant transfer via Visa / Mastercard / RuPay',
-                LucideIcons.creditCard,
               ),
 
               const SizedBox(height: 16),
@@ -274,12 +238,17 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
                       selectedColor: colors.primary.withValues(alpha: 0.15),
                       onSelected: (selected) {
                         if (selected) {
+                          final profile = ref.read(authControllerProvider).session?.profile;
+                          final handle = (profile?.email != null && profile!.email.isNotEmpty)
+                              ? profile.email.split('@').first
+                              : 'trader';
                           setState(() {
                             _selectedUpiApp = app;
-                            if (app == 'Google Pay') _upiVpaController.text = 'anurag@okhdfcbank';
-                            if (app == 'PhonePe') _upiVpaController.text = 'anurag@ybl';
-                            if (app == 'Paytm') _upiVpaController.text = 'anurag@paytm';
-                            if (app == 'BHIM UPI') _upiVpaController.text = 'anurag@upi';
+                            if (app == 'Google Pay') _upiVpaController.text = '$handle@okhdfcbank';
+                            if (app == 'PhonePe') _upiVpaController.text = '$handle@ybl';
+                            if (app == 'Paytm') _upiVpaController.text = '$handle@paytm';
+                            if (app == 'BHIM UPI') _upiVpaController.text = '$handle@upi';
+                            if (app == 'Custom VPA') _upiVpaController.text = '';
                           });
                         }
                       },
@@ -304,41 +273,40 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
                   style: GoogleFonts.inter(color: colors.textSecondary, fontWeight: FontWeight.w600, fontSize: 11),
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _supportedBanks.map((bank) {
-                    final isBankSelected = _selectedBank == bank;
-                    return ChoiceChip(
-                      label: Text(bank),
-                      selected: isBankSelected,
-                      selectedColor: colors.primary.withValues(alpha: 0.15),
-                      onSelected: (selected) {
-                        if (selected) setState(() => _selectedBank = bank);
-                      },
-                    );
-                  }).toList(),
+                DropdownButtonFormField<String>(
+                  value: _selectedBank,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: colors.surface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: _supportedBanks.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedBank = val);
+                  },
                 ),
               ],
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // Trust & Security Notice
+              // Important Regulatory Notice
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: colors.surface,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: colors.divider, width: 0.5),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.lock, size: 16, color: colors.bullish),
+                    Icon(LucideIcons.shieldCheck, size: 18, color: colors.bullish),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Secured with 256-bit encryption. Funds deposited will be credited instantly to your trading margin.',
-                        style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11),
+                        'Deposits must originate strictly from your linked bank account. Third-party transfers are automatically rejected per SEBI regulations.',
+                        style: GoogleFonts.inter(fontSize: 11, color: colors.textSecondary, height: 1.3),
                       ),
                     ),
                   ],
@@ -347,11 +315,11 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
 
               const SizedBox(height: 20),
 
-              // Submit Button with Duplicate Submission Protection
+              // Action CTA
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _handleProceed,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.bullish,
+                  backgroundColor: colors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -361,13 +329,21 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text(
-                        'PROCEED TO PAY',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(LucideIcons.arrowUpRight, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Deposit ${CurrencyFormatter.format(double.tryParse(_amountController.text) ?? 0.0)}',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
+                        ],
                       ),
               ),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -376,15 +352,19 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
   }
 
   Widget _buildQuickChip(String label, double amt) {
+    final colors = context.tradingColors;
     return ActionChip(
-      label: Text(label),
+      label: Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+      backgroundColor: colors.surface,
+      side: BorderSide(color: colors.divider, width: 0.5),
       onPressed: () => _addQuickAmount(amt),
     );
   }
 
-  Widget _buildPaymentOption(PaymentMethod method, String label, String subtitle, IconData icon) {
-    final isSelected = _method == method;
+  Widget _buildPaymentOption(PaymentMethod method, String title, String subtitle, IconData icon) {
     final colors = context.tradingColors;
+    final isSelected = _method == method;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
@@ -396,21 +376,20 @@ class _AddFundsSheetState extends ConsumerState<AddFundsSheet> {
             width: isSelected ? 1.5 : 0.5,
           ),
         ),
-        clipBehavior: Clip.antiAlias,
-        child: RadioListTile<PaymentMethod>(
-        value: method,
-        groupValue: _method,
-        title: Text(label, style: AppTypography.body(weight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11)),
-        secondary: Icon(icon, color: isSelected ? colors.primary : colors.textSecondary),
-        onChanged: (val) {
-          setState(() {
-            _method = val!;
-            _validateAmount();
-          });
-        },
+        child: ListTile(
+          leading: Icon(icon, color: isSelected ? colors.primary : colors.textSecondary),
+          title: Text(title, style: AppTypography.body(weight: FontWeight.w600)),
+          subtitle: Text(subtitle, style: AppTypography.caption(color: colors.textSecondary)),
+          trailing: Radio<PaymentMethod>(
+            value: method,
+            groupValue: _method,
+            onChanged: (val) {
+              if (val != null) setState(() => _method = val);
+            },
+          ),
+          onTap: () => setState(() => _method = method),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

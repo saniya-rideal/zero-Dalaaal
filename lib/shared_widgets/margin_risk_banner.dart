@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../data/mock/order_simulation_engine.dart';
+import '../features/funds/data/real_funds_repository.dart';
 import '../data/models/enums.dart';
 import '../data/models/funds.dart';
 
@@ -19,8 +19,9 @@ class MarginRiskBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final funds = engine.getFundsSummary(segment);
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+    final funds = fundsAsync.valueOrNull;
+    if (funds == null) return const SizedBox.shrink();
     final risk = funds.riskLevel;
 
     if (risk == MarginRiskLevel.NORMAL) {

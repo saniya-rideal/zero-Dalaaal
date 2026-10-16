@@ -8,12 +8,11 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../data/mock/candle_generator.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/mock/seed_instruments.dart';
-import '../../../data/mock/ticker_service.dart';
 import '../../../data/models/models.dart';
+import '../../market/data/real_market_repository.dart';
+import '../../orders/data/real_trading_repository.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_bottom_nav_bar.dart';
@@ -92,7 +91,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final instrument = SeedInstruments.findByToken(_currentToken) ??
+    final repo = ref.watch(marketRepositoryProvider);
+    final instrument = repo.findBySymbol(_currentToken) ??
         Instrument(
           token: _currentToken,
           symbol: _currentToken.replaceAll('_', ' ').toUpperCase(),
@@ -989,7 +989,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
     setState(() => _isExecutingQuickTrade = true);
 
     try {
-      final engine = ref.read(orderSimulationEngineProvider);
+      final tradingRepo = ref.read(tradingRepositoryProvider);
       final idempotencyKey =
           'chart_quick_${DateTime.now().millisecondsSinceEpoch}_${instrument.token}';
       final request = OrderRequest(
@@ -1001,7 +1001,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
         quantity: (_tradeLots * 100).toInt().clamp(1, 10000),
         price: price,
       );
-      await engine.placeOrder(request);
+      await tradingRepo.placeOrder(request);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1187,7 +1187,8 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
 
   void _showInstrumentPicker(BuildContext context) {
     final colors = context.tradingColors;
-    final allInstruments = SeedInstruments.all;
+    final repo = ref.read(marketRepositoryProvider);
+    final allInstruments = repo.cachedInstruments;
 
     showModalBottomSheet(
       context: context,
@@ -1331,7 +1332,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
 }
 
 // Interactive TradingView Chart Canvas Painter
-class _TradingViewInteractiveCanvas extends StatefulWidget {
+class _TradingViewInteractiveCanvas extends ConsumerStatefulWidget {
   final String token;
   final Timeframe timeframeEnum;
   final ChartType chartType;
@@ -1367,12 +1368,12 @@ class _TradingViewInteractiveCanvas extends StatefulWidget {
   });
 
   @override
-  State<_TradingViewInteractiveCanvas> createState() =>
+  ConsumerState<_TradingViewInteractiveCanvas> createState() =>
       _TradingViewInteractiveCanvasState();
 }
 
 class _TradingViewInteractiveCanvasState
-    extends State<_TradingViewInteractiveCanvas> {
+    extends ConsumerState<_TradingViewInteractiveCanvas> {
   List<Candle> _candles = [];
   double _candleWidth = 8.5;
   double _baseCandleWidth = 8.5;
@@ -1457,23 +1458,30 @@ class _TradingViewInteractiveCanvasState
   }
 
 
-  void _loadCandles({bool isLargeRange = false}) {
+  void _loadCandles({bool isLargeRange = false}) async {
     if (isLargeRange) {
       setState(() => _edgeCtrl.startLargeRangeLoad());
     }
-    Future.delayed(Duration(milliseconds: isLargeRange ? 900 : 80), () {
-      if (!mounted) return;
-      final candles = CandleGenerator.generateCandles(
-        token: widget.token,
-        timeframe: widget.timeframeEnum,
-        count: isLargeRange ? 500 : 100,
+    try {
+      final repo = ref.read(marketRepositoryProvider);
+      final candles = await repo.getCandles(
+        widget.token,
+        interval: widget.timeframeEnum.name,
+        limit: isLargeRange ? 500 : 100,
       );
+      if (!mounted) return;
       setState(() {
         _candles = candles;
         _scrollOffset = 0.0;
         _edgeCtrl.onCandlesLoaded(candles, isMarketClosed: _isMarketClosed());
       });
-    });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _edgeCtrl.onCandlesLoaded([], isMarketClosed: _isMarketClosed());
+        });
+      }
+    }
   }
 
   @override

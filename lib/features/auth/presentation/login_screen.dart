@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import 'auth_controller.dart';
@@ -17,9 +16,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _userIdController =
-      TextEditingController(text: AppConstants.demoUserId);
-  final _passwordController = TextEditingController(text: 'Zero123');
+  final _identifierController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
 
@@ -31,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void dispose() {
     _lockoutTimer?.cancel();
-    _userIdController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -55,22 +53,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
+  bool _isValidIdentifier(String value) {
+    final clean = value.trim();
+    if (clean.isEmpty) return false;
+    // Accept Client ID format ZD + 6 digits (e.g. ZD482915)
+    if (RegExp(r'^ZD\d{6}$', caseSensitive: false).hasMatch(clean)) return true;
+    // Accept valid Email
+    if (RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) return true;
+    // Accept Phone Number (10 to 13 digits with optional +)
+    if (RegExp(r'^\+?[0-9]{10,13}$').hasMatch(clean)) return true;
+    // Fallback: at least 4 characters
+    return clean.length >= 4;
+  }
+
   Future<void> _handleLogin() async {
     if (_isLocked) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final success = await ref.read(authControllerProvider.notifier).login(
-          _userIdController.text.trim(),
+    final result = await ref.read(authControllerProvider.notifier).login(
+          _identifierController.text.trim(),
           _passwordController.text,
         );
 
-    if (success && mounted) {
+    if (result != null && mounted) {
       _failedAttempts = 0;
-      context.go('/quotes');
+      // Navigate to Security PIN / TOTP screen
+      context.push('/totp');
     } else {
-      setState(() => _failedAttempts++);
-      if (_failedAttempts >= 3) {
-        _startLockoutTimer(60);
+      final authState = ref.read(authControllerProvider);
+      if (authState.errorMessage != null && authState.errorMessage!.contains('ACCOUNT_LOCKED')) {
+        _startLockoutTimer(900); // 15 mins
+      } else {
+        setState(() => _failedAttempts++);
+        if (_failedAttempts >= 5) {
+          _startLockoutTimer(900);
+        }
       }
     }
   }
@@ -131,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 8),
 
                 Text(
-                  'Enter your User ID and password to access your account',
+                  'Enter your Client ID, email, or mobile number to continue',
                   style: AppTypography.body(color: colors.textSecondary),
                 ),
 
@@ -151,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Account temporarily locked due to 3 failed attempts. Please retry in $_lockoutSeconds seconds.',
+                            'Account temporarily locked. Please retry in ${(_lockoutSeconds / 60).ceil()} minutes.',
                             style: AppTypography.caption(
                               color: colors.bearish,
                               weight: FontWeight.w600,
@@ -181,16 +198,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 32),
 
                 TextFormField(
-                  controller: _userIdController,
+                  controller: _identifierController,
                   enabled: !_isLocked,
                   decoration: const InputDecoration(
-                    labelText: 'User ID / Account No.',
-                    hintText: 'e.g. 159537',
+                    labelText: 'Client ID / Email / Mobile',
+                    hintText: 'e.g. ZD482915 or trader@example.com',
                     prefixIcon: Icon(LucideIcons.user, size: 18),
                   ),
-                  validator: (val) => val == null || val.isEmpty
-                      ? 'Please enter your User ID'
-                      : null,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Please enter your Client ID, email or phone';
+                    }
+                    if (!_isValidIdentifier(val)) {
+                      return 'Enter a valid Client ID (e.g. ZD482915), email or mobile';
+                    }
+                    return null;
+                  },
                 ),
 
                 const SizedBox(height: 16),

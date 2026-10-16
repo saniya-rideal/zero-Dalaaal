@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/instrument.dart';
+import '../../market/data/real_market_repository.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_bottom_nav_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 
-class ProfitCalculatorScreen extends StatefulWidget {
+class ProfitCalculatorScreen extends ConsumerStatefulWidget {
   const ProfitCalculatorScreen({super.key});
 
   @override
-  State<ProfitCalculatorScreen> createState() => _ProfitCalculatorScreenState();
+  ConsumerState<ProfitCalculatorScreen> createState() => _ProfitCalculatorScreenState();
 }
 
-class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
+class _ProfitCalculatorScreenState extends ConsumerState<ProfitCalculatorScreen> {
   Instrument? _selectedScript;
   String _side = 'Buy';
   double _openPrice = 1156.20;
@@ -27,9 +28,20 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedScript = SeedInstruments.findBySymbol('COPPER MCX Sep') ??
-        SeedInstruments.findByToken('mcx_copper') ??
-        SeedInstruments.all.first;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final repo = ref.read(marketRepositoryProvider);
+      final loaded = repo.cachedInstruments;
+      if (loaded.isNotEmpty) {
+        setState(() => _selectedScript = loaded.first);
+      } else {
+        repo.getInstruments().then((list) {
+          if (mounted && list.isNotEmpty) {
+            setState(() => _selectedScript = list.first);
+          }
+        });
+      }
+    });
   }
 
   @override
@@ -453,7 +465,8 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
   }
 
   void _showScriptPicker(BuildContext context, TradingColors colors) {
-    final all = SeedInstruments.all;
+    final repo = ref.read(marketRepositoryProvider);
+    final all = repo.cachedInstruments;
     showModalBottomSheet(
       context: context,
       backgroundColor: colors.cardBackground,

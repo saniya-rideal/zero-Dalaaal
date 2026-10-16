@@ -149,20 +149,20 @@ class CorporateAction {
 
   factory CorporateAction.fromJson(Map<String, dynamic> json) =>
       CorporateAction(
-        id: json['id'] as String,
-        symbol: json['symbol'] as String,
-        companyName: json['companyName'] as String,
+        id: (json['id'] ?? json['_id'] ?? 'ca_${DateTime.now().millisecondsSinceEpoch}').toString(),
+        symbol: (json['symbol'] ?? '').toString(),
+        companyName: (json['companyName'] ?? json['symbol'] ?? '').toString(),
         actionType: CorporateActionType.values.firstWhere(
-          (e) => e.name == json['actionType'],
+          (e) => e.name.toLowerCase() == (json['actionType'] ?? json['type'] ?? '').toString().toLowerCase(),
           orElse: () => CorporateActionType.dividend,
         ),
-        details: json['details'] as String,
-        exDate: DateTime.parse(json['exDate'] as String),
-        recordDate: DateTime.parse(json['recordDate'] as String),
-        announcementDate: DateTime.parse(json['announcementDate'] as String),
-        currentPrice: (json['currentPrice'] as num).toDouble(),
-        dividendYield: (json['dividendYield'] as num?)?.toDouble(),
-        ratio: json['ratio'] as String?,
-        remarks: json['remarks'] as String?,
+        details: (json['details'] ?? json['description'] ?? '').toString(),
+        exDate: DateTime.tryParse((json['exDate'] ?? '').toString()) ?? DateTime.now(),
+        recordDate: DateTime.tryParse((json['recordDate'] ?? '').toString()) ?? DateTime.now(),
+        announcementDate: DateTime.tryParse((json['announcementDate'] ?? '').toString()) ?? DateTime.now(),
+        currentPrice: (json['currentPrice'] ?? json['price'] as num?)?.toDouble() ?? 0.0,
+        dividendYield: (json['dividendYield'] ?? json['yield'] as num?)?.toDouble(),
+        ratio: json['ratio']?.toString(),
+        remarks: json['remarks']?.toString(),
       );
 }

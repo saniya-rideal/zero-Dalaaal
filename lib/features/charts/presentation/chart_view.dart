@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -6,14 +5,15 @@ import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/candle_generator.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../market/data/real_market_repository.dart';
 import '../../../data/models/models.dart';
 import '../domain/indicator.dart';
 import 'chart_edge_cases.dart';
 import 'indicators/indicator_math.dart';
 
 
-class CandlestickChartView extends StatefulWidget {
+class CandlestickChartView extends ConsumerStatefulWidget {
   final String token;
   final Timeframe initialTimeframe;
   final ChartType initialChartType;
@@ -30,10 +30,10 @@ class CandlestickChartView extends StatefulWidget {
   });
 
   @override
-  State<CandlestickChartView> createState() => _CandlestickChartViewState();
+  ConsumerState<CandlestickChartView> createState() => _CandlestickChartViewState();
 }
 
-class _CandlestickChartViewState extends State<CandlestickChartView> {
+class _CandlestickChartViewState extends ConsumerState<CandlestickChartView> {
   late Timeframe _selectedTimeframe;
   late ChartType _selectedChartType;
   List<Candle> _candles = [];
@@ -53,7 +53,7 @@ class _CandlestickChartViewState extends State<CandlestickChartView> {
     super.initState();
     _selectedTimeframe = widget.initialTimeframe;
     _selectedChartType = widget.initialChartType;
-    // Simulate delayed data for exchanges that don't have live feed
+    // Track delayed data for exchanges that don't have live feed
     _edgeCtrl = ChartEdgeCaseController(
       initialState: ChartDataState.loading,
       hasDelayedData: _isDelayedFeed(widget.token),
@@ -85,25 +85,55 @@ class _CandlestickChartViewState extends State<CandlestickChartView> {
   }
 
 
-  void _loadCandles({bool isLargeRange = false}) {
+  void _loadCandles({bool isLargeRange = false}) async {
     if (isLargeRange) {
       setState(() => _edgeCtrl.startLargeRangeLoad());
     }
 
-    // Simulate async generation (mimic network latency)
-    Future.delayed(Duration(milliseconds: isLargeRange ? 800 : 120), () {
-      if (!mounted) return;
-      final candles = CandleGenerator.generateCandles(
-        token: widget.token,
-        timeframe: _selectedTimeframe,
-        count: isLargeRange ? 500 : 120,
+    try {
+      final repo = ref.read(marketRepositoryProvider);
+      final days = isLargeRange ? 180 : 30;
+      final from = DateTime.now().subtract(Duration(days: days));
+      final to = DateTime.now();
+      final candles = await repo.getCandles(
+        widget.token,
+        interval: _timeframeToResolution(_selectedTimeframe),
+        from: from.millisecondsSinceEpoch ~/ 1000,
+        to: to.millisecondsSinceEpoch ~/ 1000,
       );
+      if (!mounted) return;
       setState(() {
         _candles = candles;
         _scrollOffset = 0.0;
         _edgeCtrl.onCandlesLoaded(candles, isMarketClosed: _isMarketClosed());
       });
-    });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _edgeCtrl.onCandlesLoaded(_candles, isMarketClosed: _isMarketClosed());
+      });
+    }
+  }
+
+  String _timeframeToResolution(Timeframe tf) {
+    switch (tf) {
+      case Timeframe.ONE_MIN:
+        return '1m';
+      case Timeframe.FIVE_MIN:
+        return '5m';
+      case Timeframe.FIFTEEN_MIN:
+        return '15m';
+      case Timeframe.THIRTY_MIN:
+        return '30m';
+      case Timeframe.ONE_HOUR:
+        return '1h';
+      case Timeframe.ONE_DAY:
+        return '1d';
+      case Timeframe.ONE_WEEK:
+        return '1w';
+      case Timeframe.ONE_MONTH:
+        return '1M';
+    }
   }
 
 

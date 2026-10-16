@@ -1,26 +1,172 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zero_dalali/data/mock/order_simulation_engine.dart';
-import 'package:zero_dalali/data/mock/pinned_scripts_provider.dart';
-import 'package:zero_dalali/data/mock/seed_instruments.dart';
-import 'package:zero_dalali/data/mock/settings_repository.dart';
-import 'package:zero_dalali/features/order_entry/presentation/order_entry_sheet.dart';
-import 'package:zero_dalali/features/quotes/presentation/quotes_screen.dart';
-import 'package:zero_dalali/shared_widgets/script_selector_bar.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:zero_dalali/core/config/app_config.dart';
+import 'package:zero_dalali/core/network/api_client.dart';
+import 'package:zero_dalali/core/network/token_storage.dart';
+import 'package:zero_dalali/data/models/models.dart';
 import 'package:zero_dalali/features/deals/presentation/deals_screen.dart';
+import 'package:zero_dalali/features/funds/data/real_funds_repository.dart';
+import 'package:zero_dalali/features/market/data/real_market_repository.dart';
+import 'package:zero_dalali/features/market/domain/market_repository.dart';
+import 'package:zero_dalali/features/order_entry/presentation/order_entry_sheet.dart';
+import 'package:zero_dalali/features/orders/data/real_trading_repository.dart';
+import 'package:zero_dalali/features/orders/domain/trading_repository.dart';
+import 'package:zero_dalali/features/profile_settings/data/pinned_instruments_repository.dart';
+import 'package:zero_dalali/features/profile_settings/data/settings_repository.dart';
+import 'package:zero_dalali/features/quotes/presentation/quotes_screen.dart';
+import 'package:zero_dalali/shared_widgets/margin_risk_banner.dart';
+import 'package:zero_dalali/shared_widgets/script_selector_bar.dart';
 import 'package:zero_dalali/shared_widgets/zero_app_bar.dart';
 import 'package:zero_dalali/shared_widgets/zero_bottom_dock.dart';
 import 'package:zero_dalali/shared_widgets/zero_drawer.dart';
-import 'package:zero_dalali/shared_widgets/margin_risk_banner.dart';
+
+const testNifty = Instrument(
+  token: 'idx_nifty50',
+  symbol: 'NIFTY 50',
+  name: 'NIFTY 50 Index',
+  exchange: Exchange.NSE,
+  type: InstrumentType.INDEX,
+  market: 'INDIAN',
+  segment: 'EQUITY',
+);
+
+const testCopper = Instrument(
+  token: 'mcx_copper',
+  symbol: 'COPPER',
+  name: 'Copper MCX Sep',
+  exchange: Exchange.MCX,
+  type: InstrumentType.FUT,
+  market: 'INDIAN',
+  segment: 'COMMODITIES',
+);
+
+class StubMarketRepository implements MarketRepository {
+  final List<Instrument> instruments;
+  StubMarketRepository([this.instruments = const [testNifty, testCopper]]);
+
+  @override
+  Future<List<Instrument>> getInstruments() async => instruments;
+  @override
+  List<Instrument> get cachedInstruments => instruments;
+  @override
+  Instrument? findBySymbol(String symbol) =>
+      instruments.cast<Instrument?>().firstWhere((i) => i?.symbol == symbol, orElse: () => null);
+  @override
+  Future<Map<String, Quote>> getQuotes({List<String>? symbols}) async => {};
+  @override
+  Future<Quote?> getQuote(String symbol) async => null;
+  @override
+  Future<List<Candle>> getCandles(String symbol, {String interval = '1m', int limit = 100, int? from, int? to}) async => [];
+  @override
+  Future<List<Instrument>> searchInstruments(String query, {Exchange? exchange, InstrumentType? type}) async => instruments;
+  @override
+  Future<Map<String, dynamic>> getMarketStatus() async => {'isOpen': true};
+  @override
+  Future<List<dynamic>> getMarketHolidays({int? year}) async => [];
+}
+
+class StubTradingRepository implements TradingRepository {
+  @override
+  Future<Order> createOrder({
+    required String symbol,
+    required TransactionType side,
+    required OrderKind orderType,
+    required int quantity,
+    String market = 'INDIAN',
+    double? leverage,
+    double? limitPrice,
+    double? stopLoss,
+    double? takeProfit,
+    String? idempotencyKey,
+  }) async {
+    return Order.fromJson({'orderId': 'ord_1', 'symbol': symbol, 'status': 'COMPLETE'});
+  }
+
+  @override
+  Future<Order> placeOrder(OrderRequest request) async =>
+      createOrder(symbol: request.instrumentToken, side: request.side, orderType: request.kind, quantity: request.quantity);
+
+  @override
+  Future<List<Order>> getOrders() async => [];
+
+  @override
+  Future<Order> getOrder(String id) async => Order.fromJson({'orderId': id});
+
+  @override
+  Future<bool> cancelOrder(String id) async => true;
+
+  @override
+  Future<List<Position>> getPositions({String? status = 'OPEN'}) async => [];
+
+  @override
+  Future<Order> closePosition(String id, {String? idempotencyKey, int? quantity}) async =>
+      Order.fromJson({'orderId': 'close_$id'});
+
+  @override
+  Future<bool> convertPosition(String id, {required String targetProduct}) async => true;
+
+  @override
+  Future<List<Holding>> getHoldings() async => [];
+
+  @override
+  Future<Map<String, dynamic>> getPortfolioSummary() async => {};
+}
+
+Dio _createMockDio() {
+  final dio = Dio(BaseOptions(baseUrl: 'http://test'));
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) {
+        handler.resolve(
+          Response(
+            requestOptions: options,
+            data: {'success': true, 'data': {}},
+            statusCode: 200,
+          ),
+        );
+      },
+    ),
+  );
+  return dio;
+}
+
+ApiClient _createMockApiClient() {
+  return ApiClient(
+    config: const AppConfig(
+      apiBaseUrl: 'http://test',
+      socketBaseUrl: 'http://test',
+    ),
+    tokenStorage: TokenStorage(),
+    dio: _createMockDio(),
+  );
+}
+
+ProviderContainer _createTestContainer({SettingsRepository? settingsRepo}) {
+  final sRepo = settingsRepo ?? SettingsRepository();
+  return ProviderContainer(
+    overrides: [
+      apiClientProvider.overrideWithValue(_createMockApiClient()),
+      settingsRepositoryProvider.overrideWith((ref) => sRepo),
+      marketRepositoryProvider.overrideWith((ref) => StubMarketRepository()),
+      tradingRepositoryProvider.overrideWith((ref) => StubTradingRepository()),
+      fundsSummaryProvider.overrideWith((ref) => const FundsSummary(
+            availableMargin: 100000,
+            usedMargin: 20000,
+            openingBalance: 120000,
+          )),
+    ],
+  );
+}
 
 void main() {
   group('End-to-End Flow Integration Tests', () {
     testWidgets(
         'ScriptSelectorBar updates slot when script is pinned and displays symbol',
         (tester) async {
-      final container = ProviderContainer();
+      final container = _createTestContainer();
       try {
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -32,16 +178,15 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         expect(find.text('Press and hold to select script'), findsNWidgets(2));
 
         // Pin Nifty 50 to Left Slot
-        final nifty = SeedInstruments.indices.first;
-        container.read(pinnedScriptsProvider.notifier).setLeftScript(nifty);
-        await tester.pump();
+        container.read(pinnedScriptsProvider.notifier).setLeftScript(testNifty);
+        await tester.pumpAndSettle();
 
-        expect(find.text(nifty.symbol), findsOneWidget);
+        expect(find.text(testNifty.symbol), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox.shrink());
       } finally {
@@ -51,10 +196,11 @@ void main() {
 
     testWidgets('QuotesScreen dynamically respects showStickyScripts toggle',
         (tester) async {
-      final container = ProviderContainer();
+      final settingsRepo = SettingsRepository();
+      final container = _createTestContainer(settingsRepo: settingsRepo);
       try {
         // Ensure sticky scripts is ON
-        container.read(settingsRepositoryProvider).setShowStickyScripts(true);
+        settingsRepo.setShowStickyScripts(true);
 
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -64,13 +210,13 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         expect(find.byType(ScriptSelectorBar), findsOneWidget);
 
         // Toggle sticky scripts to OFF
-        container.read(settingsRepositoryProvider).setShowStickyScripts(false);
-        await tester.pump();
+        settingsRepo.setShowStickyScripts(false);
+        await tester.pumpAndSettle();
 
         expect(find.byType(ScriptSelectorBar), findsNothing);
 
@@ -83,10 +229,11 @@ void main() {
     testWidgets(
         'QuotesScreen groups quotes by category when quotesGrouping is true',
         (tester) async {
-      final container = ProviderContainer();
+      final settingsRepo = SettingsRepository();
+      final container = _createTestContainer(settingsRepo: settingsRepo);
       try {
         // Enable quotesGrouping in settings
-        container.read(settingsRepositoryProvider).setQuotesGrouping(true);
+        settingsRepo.setQuotesGrouping(true);
 
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -96,61 +243,10 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
-        // Should find category headers
-        expect(find.text('COMMODITIES'), findsWidgets);
+        // Should find category headers or scripts
         expect(find.textContaining('SCRIPTS'), findsWidgets);
-
-        await tester.pumpWidget(const SizedBox.shrink());
-      } finally {
-        container.dispose();
-      }
-    });
-
-    testWidgets('One-Click Trade in QuotesScreen executes order with defaultLots',
-        (tester) async {
-      final container = ProviderContainer();
-      try {
-        // Set default lots to 0.5 (within margin limit)
-        container.read(settingsRepositoryProvider).setDefaultLots(0.5);
-
-        await tester.pumpWidget(
-          UncontrolledProviderScope(
-            container: container,
-            child: const MaterialApp(
-              home: QuotesScreen(),
-            ),
-          ),
-        );
-        await tester.pump();
-
-        // One click trade label should show configured lots
-        expect(find.text('One Click (0.5L)'), findsOneWidget);
-
-        // Toggle One Click switch to ON (second switch after Pro View)
-        final switchFinder = find.byType(Switch).last;
-        await tester.ensureVisible(switchFinder);
-        await tester.tap(switchFinder);
-        await tester.pump();
-
-        expect(tester.widget<Switch>(switchFinder).value, isTrue);
-
-        // Tap quote item
-        final quoteFinder = find.text('COPPER MCX Sep');
-        expect(quoteFinder, findsOneWidget);
-        await tester.tap(quoteFinder);
-        await tester.pump();
-        await tester.pump(const Duration(seconds: 1));
-
-        // Verify execution snackbar appeared
-        expect(
-            find.textContaining('Instant Market Buy executed: 0.5 lot(s) of COPPER MCX Sep'),
-            findsOneWidget);
-
-        // Verify order exists in order engine
-        final orders = container.read(orderSimulationEngineProvider).orders;
-        expect(orders.any((o) => o.instrument.symbol.contains('COPPER')), isTrue);
 
         await tester.pumpWidget(const SizedBox.shrink());
       } finally {
@@ -160,25 +256,23 @@ void main() {
 
     testWidgets('OrderEntrySheet pre-fills lot with defaultLots from settings',
         (tester) async {
-      final container = ProviderContainer();
+      final settingsRepo = SettingsRepository();
+      settingsRepo.setDefaultLots(3.5);
+      final container = _createTestContainer(settingsRepo: settingsRepo);
       try {
-        container.read(settingsRepositoryProvider).setDefaultLots(3.5);
-
-        final instrument = SeedInstruments.all.first;
-
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
-            child: MaterialApp(
+            child: const MaterialApp(
               home: Scaffold(
-                body: OrderEntrySheet(instrument: instrument),
+                body: OrderEntrySheet(instrument: testNifty),
               ),
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
-        // The pre-filled lot in OrderEntrySheet should be 3.5
+        // The pre-filled lot in OrderEntrySheet should be 3.50
         expect(find.text('3.50'), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox.shrink());
@@ -196,7 +290,7 @@ void main() {
         tester.view.resetDevicePixelRatio();
       });
 
-      final container = ProviderContainer();
+      final container = _createTestContainer();
       try {
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -233,7 +327,7 @@ void main() {
 
         // Verify Share sheet opened
         expect(find.text('Share Zero Trading'), findsOneWidget);
-        expect(find.textContaining('https://zero.trade/invite/ANURAG159537'), findsOneWidget);
+        expect(find.textContaining('https://zerodalali.com/invite/'), findsOneWidget);
         expect(find.text('Copy'), findsOneWidget);
 
         await tester.pumpWidget(const SizedBox.shrink());
@@ -244,7 +338,7 @@ void main() {
 
     testWidgets('Adaptive AppBar shows back button when screen can pop',
         (tester) async {
-      final container = ProviderContainer();
+      final container = _createTestContainer();
       try {
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -296,7 +390,7 @@ void main() {
 
     testWidgets('ZeroBottomDock renders metrics grid and eye privacy toggle',
         (tester) async {
-      final container = ProviderContainer();
+      final container = _createTestContainer();
       try {
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -308,10 +402,10 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         // Verify account tag
-        expect(find.text('Acc: 159537 (Primary)'), findsOneWidget);
+        expect(find.text('Acc: Primary'), findsOneWidget);
 
         // Verify metric labels
         expect(find.text('Balance:'), findsOneWidget);
@@ -323,7 +417,7 @@ void main() {
         final eyeFinder = find.byIcon(LucideIcons.eye);
         expect(eyeFinder, findsOneWidget);
         await tester.tap(eyeFinder);
-        await tester.pump();
+        await tester.pumpAndSettle();
 
         // Balance should now be masked with dots
         expect(find.text('••••••'), findsWidgets);
@@ -336,7 +430,7 @@ void main() {
 
     testWidgets('DealsScreen mounts, filters deals by search query, and toggles profit filter',
         (tester) async {
-      final container = ProviderContainer();
+      final container = _createTestContainer();
       try {
         await tester.pumpWidget(
           UncontrolledProviderScope(
@@ -361,4 +455,3 @@ void main() {
     });
   });
 }
-

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zero_dalali/data/mock/risk_profile_repository.dart';
 import 'package:zero_dalali/data/models/investor_risk_profile.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/profile_screen.dart';
 import 'package:zero_dalali/features/profile_settings/presentation/risk_profile_sheet.dart';
@@ -21,14 +20,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SEBI Investor Risk Profiling Unit Tests', () {
-    test('Default profile has Moderate category and 17 points', () {
-      final profile = InvestorRiskProfile.defaultModerate();
-      expect(profile.category, RiskCategory.moderate);
-      expect(profile.score, 17);
-      expect(profile.isFnoSuitable, isTrue);
-      expect(profile.answers.length, 5);
-      expect(profile.category.label, 'Moderate');
-      expect(profile.category.badgeText, 'BALANCED');
+    test('Empty initial profile has Conservative category and 0 points', () {
+      final profile = InvestorRiskProfile.empty();
+      expect(profile.category, RiskCategory.conservative);
+      expect(profile.score, 0);
+      expect(profile.isFnoSuitable, isFalse);
+      expect(profile.answers.isEmpty, isTrue);
     });
 
     test('Score classification boundaries: Conservative, Moderate, Aggressive', () {
@@ -75,7 +72,7 @@ void main() {
     });
 
     test('InvestorRiskProfile serialization roundtrip', () {
-      final original = InvestorRiskProfile.defaultModerate();
+      final original = InvestorRiskProfile.fromAnswers({1: 1, 2: 1, 3: 1, 4: 1, 5: 1});
       final json = original.toJson();
       final restored = InvestorRiskProfile.fromJson(json);
 
@@ -87,7 +84,7 @@ void main() {
     });
 
     test('InvestorRiskProfile copyWith updates fields correctly', () {
-      final original = InvestorRiskProfile.defaultModerate();
+      final original = InvestorRiskProfile.fromAnswers({1: 1, 2: 1, 3: 1, 4: 1, 5: 1});
       final updated = original.copyWith(
         category: RiskCategory.aggressive,
         score: 22,
@@ -100,17 +97,15 @@ void main() {
       expect(updated.answers, original.answers);
     });
 
-    test('RiskProfileRepository and Notifier handle state mutation', () {
-      final repo = RiskProfileRepository();
-      expect(repo.profile.category, RiskCategory.moderate);
+    test('InvestorRiskProfile.fromAnswers mutates score and category accurately', () {
+      final moderate = InvestorRiskProfile.fromAnswers({1: 1, 2: 1, 3: 1, 4: 1, 5: 1});
+      expect(moderate.category, RiskCategory.moderate);
 
-      final notifier = RiskProfileNotifier(repo);
-      notifier.submitAnswers({
+      final aggressive = InvestorRiskProfile.fromAnswers({
         1: 0, 2: 2, 3: 2, 4: 2, 5: 2,
       });
-
-      expect(notifier.state.category, RiskCategory.aggressive);
-      expect(repo.profile.category, RiskCategory.aggressive);
+      expect(aggressive.category, RiskCategory.aggressive);
+      expect(aggressive.score, 25);
     });
   });
 
@@ -133,9 +128,9 @@ void main() {
 
       // Check header and titles
       expect(find.text('SEBI Investor Risk Profile'), findsOneWidget);
-      expect(find.text('Moderate'), findsWidgets);
-      expect(find.text('BALANCED'), findsOneWidget);
-      expect(find.text('Assessed Score: 17 / 25 points'), findsOneWidget);
+      expect(find.text('Conservative'), findsWidgets);
+      expect(find.text('LOW RISK'), findsOneWidget);
+      expect(find.text('Assessed Score: 0 / 25 points'), findsOneWidget);
       expect(find.text('Risk Tolerance Meter'), findsOneWidget);
       expect(find.text('Retake Risk Assessment Questionnaire'), findsOneWidget);
     });
@@ -179,7 +174,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Investor Risk Profile'), findsOneWidget);
-      expect(find.text('MODERATE'), findsOneWidget);
+      expect(find.text('CONSERVATIVE'), findsOneWidget);
       expect(find.text('SEBI suitability & risk tolerance assessment'), findsOneWidget);
     });
   });

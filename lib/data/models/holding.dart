@@ -1,3 +1,4 @@
+import 'enums.dart';
 import 'instrument.dart';
 
 class Holding {
@@ -20,6 +21,7 @@ class Holding {
   });
 
   int get totalQuantity => quantity + t1Quantity;
+  double get currentPrice => ltp;
   double get investedValue => totalQuantity * averagePrice;
   double get currentValue => totalQuantity * ltp;
   double get totalPnl => currentValue - investedValue;
@@ -62,15 +64,31 @@ class Holding {
     'firstBuyDate': firstBuyDate.toIso8601String(),
   };
 
-  factory Holding.fromJson(Map<String, dynamic> json) => Holding(
-    instrument: Instrument.fromJson(json['instrument'] as Map<String, dynamic>),
-    quantity: (json['quantity'] as num).toInt(),
-    t1Quantity: (json['t1Quantity'] as num?)?.toInt() ?? 0,
-    averagePrice: (json['averagePrice'] as num).toDouble(),
-    ltp: (json['ltp'] as num).toDouble(),
-    closePrice: (json['closePrice'] as num).toDouble(),
-    firstBuyDate: DateTime.parse(json['firstBuyDate'] as String),
-  );
+  factory Holding.fromJson(Map<String, dynamic> json) {
+    Instrument inst;
+    if (json['instrument'] is Map<String, dynamic>) {
+      inst = Instrument.fromJson(json['instrument'] as Map<String, dynamic>);
+    } else {
+      final sym = (json['symbol'] ?? json['instrument'] ?? '').toString();
+      inst = Instrument(
+        token: (json['token'] ?? json['instrumentToken'] ?? sym).toString(),
+        symbol: sym,
+        name: (json['name'] ?? sym).toString(),
+        exchange: Exchange.NSE,
+        type: InstrumentType.EQ,
+      );
+    }
+
+    return Holding(
+      instrument: inst,
+      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      t1Quantity: (json['t1Quantity'] as num?)?.toInt() ?? 0,
+      averagePrice: (json['averagePrice'] as num?)?.toDouble() ?? 0.0,
+      ltp: (json['ltp'] as num?)?.toDouble() ?? 0.0,
+      closePrice: (json['closePrice'] as num?)?.toDouble() ?? (json['ltp'] as num?)?.toDouble() ?? 0.0,
+      firstBuyDate: DateTime.tryParse((json['firstBuyDate'] ?? '').toString()) ?? DateTime.now(),
+    );
+  }
 }
 
 class PortfolioSummary {

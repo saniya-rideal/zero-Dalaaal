@@ -29,11 +29,11 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
     final authState = ref.watch(authControllerProvider);
     final profile = authState.session?.profile;
     final displayName = profile != null
-        ? '${profile.userId}: ${profile.name}'
-        : '159537: Anurag Sin...';
-    final displayPhone = profile != null
+        ? (profile.userId.isNotEmpty ? '${profile.userId}: ${profile.name}' : profile.name)
+        : '-';
+    final displayPhone = profile != null && profile.phone.isNotEmpty
         ? '${profile.phone} - ZeroDalali'
-        : '8739039936 - ZeroDalali';
+        : 'ZeroDalali';
 
     return Drawer(
       width: (screenWidth * 0.74).clamp(260.0, 320.0),
@@ -338,6 +338,11 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
 
   void _showAccountSwitchSheet(BuildContext context) {
     final colors = context.tradingColors;
+    final authState = ref.read(authControllerProvider);
+    final profile = authState.session?.profile;
+    final accountName = (profile != null && profile.name.isNotEmpty) ? profile.name : 'Primary Account';
+    final accountId = (profile != null && profile.userId.isNotEmpty) ? profile.userId : 'LIVE';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: colors.surface,
@@ -356,32 +361,14 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
               color: Colors.transparent,
               child: ListTile(
                 leading: const Icon(LucideIcons.checkCircle2, color: Color(0xFF00A854), size: 22),
-                title: Text('159537: Anurag Singh (LIVE)', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
-                subtitle: Text('Balance: 0.00 USD • Margin Level: 100.00%', style: TextStyle(color: colors.textSecondary)),
+                title: Text('$accountId: $accountName (LIVE)', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
+                subtitle: Text('Live Trading Account', style: TextStyle(color: colors.textSecondary)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Active Account: 159537: Anurag Singh (LIVE)'),
+                      content: Text('Active Account: $accountId: $accountName (LIVE)'),
                       backgroundColor: colors.surface,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              ),
-            ),
-            Material(
-              color: Colors.transparent,
-              child: ListTile(
-                leading: Icon(LucideIcons.user, color: colors.textSecondary, size: 22),
-                title: Text('248901: Demo Trading Account', style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.w600)),
-                subtitle: Text('Balance: 10,000.00 USD (Virtual)', style: TextStyle(color: colors.textSecondary)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Switched to Demo Trading Account (10,000 USD virtual)'),
-                      backgroundColor: colors.primary,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -395,6 +382,10 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
   }
 
   void _showShareAppSheet(BuildContext context, TradingColors colors) {
+    final profile = ref.read(authControllerProvider).session?.profile;
+    final shareCode = (profile != null && profile.userId.isNotEmpty) ? profile.userId : 'TRADE';
+    final shareUrl = 'https://zerodalali.com/invite/$shareCode';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: colors.surface,
@@ -436,7 +427,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                 children: [
                   Expanded(
                     child: Text(
-                      'https://zero.trade/invite/ANURAG159537',
+                      shareUrl,
                       style: AppTypography.body(color: colors.primary, weight: FontWeight.w700),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -444,7 +435,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   const SizedBox(width: 8),
                   InkWell(
                     onTap: () {
-                      Clipboard.setData(const ClipboardData(text: 'https://zero.trade/invite/ANURAG159537'));
+                      Clipboard.setData(ClipboardData(text: shareUrl));
                       Navigator.pop(sheetContext);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -479,7 +470,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                 icon: const Icon(LucideIcons.send, size: 18),
                 label: const Text('Share Link', style: TextStyle(fontWeight: FontWeight.bold)),
                 onPressed: () {
-                  Clipboard.setData(const ClipboardData(text: 'https://zero.trade/invite/ANURAG159537'));
+                  Clipboard.setData(ClipboardData(text: shareUrl));
                   Navigator.pop(sheetContext);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

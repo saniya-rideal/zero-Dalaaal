@@ -165,19 +165,19 @@ class ValuationRatios {
       };
 
   factory ValuationRatios.fromJson(Map<String, dynamic> json) => ValuationRatios(
-        peRatio: (json['peRatio'] as num).toDouble(),
-        sectorPe: (json['sectorPe'] as num).toDouble(),
-        pbRatio: (json['pbRatio'] as num).toDouble(),
-        debtToEquity: (json['debtToEquity'] as num).toDouble(),
-        roe: (json['roe'] as num).toDouble(),
-        roce: (json['roce'] as num).toDouble(),
-        dividendYield: (json['dividendYield'] as num).toDouble(),
-        marketCap: (json['marketCap'] as num).toDouble(),
-        marketCapCategory: json['marketCapCategory'] as String,
-        bookValuePerShare: (json['bookValuePerShare'] as num).toDouble(),
-        faceValue: (json['faceValue'] as num).toDouble(),
-        beta: (json['beta'] as num).toDouble(),
-        evToEbitda: (json['evToEbitda'] as num).toDouble(),
+        peRatio: (json['peRatio'] ?? json['pe'] as num?)?.toDouble() ?? 0.0,
+        sectorPe: (json['sectorPe'] as num?)?.toDouble() ?? 0.0,
+        pbRatio: (json['pbRatio'] ?? json['pb'] as num?)?.toDouble() ?? 0.0,
+        debtToEquity: (json['debtToEquity'] as num?)?.toDouble() ?? 0.0,
+        roe: (json['roe'] as num?)?.toDouble() ?? 0.0,
+        roce: (json['roce'] as num?)?.toDouble() ?? 0.0,
+        dividendYield: (json['dividendYield'] ?? json['divYield'] as num?)?.toDouble() ?? 0.0,
+        marketCap: (json['marketCap'] ?? json['mcap'] as num?)?.toDouble() ?? 0.0,
+        marketCapCategory: (json['marketCapCategory'] ?? 'Large Cap').toString(),
+        bookValuePerShare: (json['bookValuePerShare'] as num?)?.toDouble() ?? 0.0,
+        faceValue: (json['faceValue'] as num?)?.toDouble() ?? 10.0,
+        beta: (json['beta'] as num?)?.toDouble() ?? 1.0,
+        evToEbitda: (json['evToEbitda'] as num?)?.toDouble() ?? 0.0,
       );
 }
 
@@ -218,16 +218,16 @@ class ShareholdingPattern {
 
   factory ShareholdingPattern.fromJson(Map<String, dynamic> json) =>
       ShareholdingPattern(
-        asOfQuarter: json['asOfQuarter'] as String,
-        promoterPercent: (json['promoterPercent'] as num).toDouble(),
+        asOfQuarter: (json['asOfQuarter'] ?? 'Current Quarter').toString(),
+        promoterPercent: (json['promoterPercent'] ?? json['promoter'] as num?)?.toDouble() ?? 0.0,
         promoterPledgedPercent:
-            (json['promoterPledgedPercent'] as num).toDouble(),
-        fiiPercent: (json['fiiPercent'] as num).toDouble(),
-        diiPercent: (json['diiPercent'] as num).toDouble(),
-        publicPercent: (json['publicPercent'] as num).toDouble(),
-        promoterChangeQoq: (json['promoterChangeQoq'] as num).toDouble(),
-        fiiChangeQoq: (json['fiiChangeQoq'] as num).toDouble(),
-        diiChangeQoq: (json['diiChangeQoq'] as num).toDouble(),
+            (json['promoterPledgedPercent'] as num?)?.toDouble() ?? 0.0,
+        fiiPercent: (json['fiiPercent'] ?? json['fii'] as num?)?.toDouble() ?? 0.0,
+        diiPercent: (json['diiPercent'] ?? json['dii'] as num?)?.toDouble() ?? 0.0,
+        publicPercent: (json['publicPercent'] ?? json['retail'] as num?)?.toDouble() ?? 0.0,
+        promoterChangeQoq: (json['promoterChangeQoq'] as num?)?.toDouble() ?? 0.0,
+        fiiChangeQoq: (json['fiiChangeQoq'] as num?)?.toDouble() ?? 0.0,
+        diiChangeQoq: (json['diiChangeQoq'] as num?)?.toDouble() ?? 0.0,
       );
 }
 
@@ -272,26 +272,72 @@ class StockFundamentals {
         'shareholding': shareholding.toJson(),
       };
 
-  factory StockFundamentals.fromJson(Map<String, dynamic> json) =>
-      StockFundamentals(
-        symbol: json['symbol'] as String,
-        companyName: json['companyName'] as String,
-        sector: json['sector'] as String,
-        industry: json['industry'] as String,
-        about: json['about'] as String,
-        ratios:
-            ValuationRatios.fromJson(json['ratios'] as Map<String, dynamic>),
-        quarterlyResults: (json['quarterlyResults'] as List)
-            .map((e) => FinancialPeriod.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        annualResults: (json['annualResults'] as List)
-            .map((e) => FinancialPeriod.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        balanceSheet: BalanceSheetSummary.fromJson(
-            json['balanceSheet'] as Map<String, dynamic>),
-        cashFlow:
-            CashFlowSummary.fromJson(json['cashFlow'] as Map<String, dynamic>),
-        shareholding: ShareholdingPattern.fromJson(
-            json['shareholding'] as Map<String, dynamic>),
-      );
+  factory StockFundamentals.fromJson(Map<String, dynamic> json) {
+    ValuationRatios rat;
+    if (json['ratios'] is Map<String, dynamic>) {
+      rat = ValuationRatios.fromJson(json['ratios'] as Map<String, dynamic>);
+    } else {
+      rat = ValuationRatios.fromJson(json);
+    }
+
+    ShareholdingPattern sh;
+    if (json['shareholding'] is Map<String, dynamic>) {
+      sh = ShareholdingPattern.fromJson(json['shareholding'] as Map<String, dynamic>);
+    } else {
+      sh = ShareholdingPattern.fromJson(json);
+    }
+
+    List<FinancialPeriod> qResults = [];
+    if (json['quarterlyResults'] is List) {
+      qResults = (json['quarterlyResults'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => FinancialPeriod.fromJson(e))
+          .toList();
+    }
+
+    List<FinancialPeriod> aResults = [];
+    if (json['annualResults'] is List) {
+      aResults = (json['annualResults'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => FinancialPeriod.fromJson(e))
+          .toList();
+    }
+
+    BalanceSheetSummary bs = const BalanceSheetSummary(
+      asOfDate: '',
+      totalAssets: 0,
+      totalLiabilities: 0,
+      shareholderEquity: 0,
+      totalDebt: 0,
+      cashAndEquivalents: 0,
+    );
+    if (json['balanceSheet'] is Map<String, dynamic>) {
+      bs = BalanceSheetSummary.fromJson(json['balanceSheet'] as Map<String, dynamic>);
+    }
+
+    CashFlowSummary cf = const CashFlowSummary(
+      asOfDate: '',
+      operatingCashFlow: 0,
+      investingCashFlow: 0,
+      financingCashFlow: 0,
+      freeCashFlow: 0,
+    );
+    if (json['cashFlow'] is Map<String, dynamic>) {
+      cf = CashFlowSummary.fromJson(json['cashFlow'] as Map<String, dynamic>);
+    }
+
+    return StockFundamentals(
+      symbol: (json['symbol'] ?? '').toString(),
+      companyName: (json['companyName'] ?? json['name'] ?? json['symbol'] ?? '').toString(),
+      sector: (json['sector'] ?? '').toString(),
+      industry: (json['industry'] ?? '').toString(),
+      about: (json['about'] ?? '').toString(),
+      ratios: rat,
+      quarterlyResults: qResults,
+      annualResults: aResults,
+      balanceSheet: bs,
+      cashFlow: cf,
+      shareholding: sh,
+    );
+  }
 }

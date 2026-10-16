@@ -1,14 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zero_dalali/data/mock/sector_heatmap_repository.dart';
 import 'package:zero_dalali/data/models/models.dart';
+import 'package:zero_dalali/features/heatmap/data/heatmap_repository.dart';
 import 'package:zero_dalali/features/heatmap/presentation/sector_heatmap_screen.dart';
 import 'package:zero_dalali/features/heatmap/presentation/widgets/stock_quick_action_sheet.dart';
 
+const sampleStock = HeatmapStockItem(
+  token: 'eq_hdfcbank',
+  symbol: 'HDFCBANK',
+  name: 'HDFC Bank Ltd',
+  sector: 'Banking & Financials',
+  marketCap: 12.8,
+  weight: 11.2,
+  ltp: 1648.20,
+  change: 18.40,
+  changePercent: 1.13,
+  changePercent1W: 2.40,
+  changePercent1M: 4.80,
+  changePercent1Y: 14.20,
+  volume: 14850000,
+  dayHigh: 1656.00,
+  dayLow: 1635.50,
+  isNifty50: true,
+);
+
+const sampleAutoStock = HeatmapStockItem(
+  token: 'eq_tatamotors',
+  symbol: 'TATAMOTORS',
+  name: 'Tata Motors Ltd',
+  sector: 'Automobiles',
+  marketCap: 3.5,
+  weight: 7.8,
+  ltp: 950.00,
+  change: 15.00,
+  changePercent: 1.60,
+  changePercent1W: 3.10,
+  changePercent1M: 5.50,
+  changePercent1Y: 25.00,
+  volume: 8500000,
+  dayHigh: 960.00,
+  dayLow: 940.00,
+  isNifty50: true,
+);
+
+final sampleSectors = [
+  const SectorPerformance(
+    name: 'Banking & Financials',
+    indexSymbol: 'NIFTY BANK',
+    weight: 11.2,
+    avgChangePercent: 1.13,
+    advancesCount: 8,
+    declinesCount: 2,
+    unchangedCount: 0,
+    stocks: [sampleStock],
+  ),
+  const SectorPerformance(
+    name: 'Automobiles',
+    indexSymbol: 'NIFTY AUTO',
+    weight: 7.8,
+    avgChangePercent: 1.60,
+    advancesCount: 4,
+    declinesCount: 1,
+    unchangedCount: 0,
+    stocks: [sampleAutoStock],
+  ),
+];
+
 Widget _wrapWidget(Widget child, {List<Override> overrides = const []}) {
   return ProviderScope(
-    overrides: overrides,
+    overrides: [
+      rawSectorHeatmapProvider.overrideWith((ref) => sampleSectors),
+      ...overrides,
+    ],
     child: MaterialApp(
       home: child,
     ),
@@ -19,25 +83,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Sector Heatmap Unit Tests', () {
-    const sampleStock = HeatmapStockItem(
-      token: 'eq_hdfcbank',
-      symbol: 'HDFCBANK',
-      name: 'HDFC Bank Ltd',
-      sector: 'Banking & Financials',
-      marketCap: 12.8,
-      weight: 11.2,
-      ltp: 1648.20,
-      change: 18.40,
-      changePercent: 1.13,
-      changePercent1W: 2.40,
-      changePercent1M: 4.80,
-      changePercent1Y: 14.20,
-      volume: 14850000,
-      dayHigh: 1656.00,
-      dayLow: 1635.50,
-      isNifty50: true,
-    );
-
     test('HeatmapStockItem getEffectiveChange handles all timeframes', () {
       expect(sampleStock.getEffectiveChange(HeatmapTimeframe.oneDay), 1.13);
       expect(sampleStock.getEffectiveChange(HeatmapTimeframe.oneWeek), 2.40);
@@ -78,46 +123,20 @@ void main() {
       expect(parsed.stocks.first.symbol, 'HDFCBANK');
     });
 
-    test('SectorHeatmapRepository returns all 8 sectors and calculates breadth', () {
-      final sectors = SectorHeatmapRepository.getAllSectors();
-      expect(sectors.length, 8);
-
-      const defaultFilter = SectorHeatmapFilterState();
-      final payload = SectorHeatmapRepository.getPayload(defaultFilter);
-
-      expect(payload.sectors.length, 8);
-      expect(payload.summary.totalAdvances, greaterThan(0));
-      expect(payload.summary.totalDeclines, greaterThan(0));
-      expect(payload.summary.topSectorName, isNotEmpty);
-      expect(payload.summary.laggingSectorName, isNotEmpty);
-    });
-
-    test('SectorHeatmapRepository filters by scope and selected sector', () {
-      // Test Scope filtering (Gainers Only)
-      const gainersFilter = SectorHeatmapFilterState(scope: HeatmapScope.gainersOnly);
-      final gainersPayload = SectorHeatmapRepository.getPayload(gainersFilter);
-      for (final s in gainersPayload.sectors) {
-        for (final stock in s.stocks) {
-          expect(stock.getEffectiveChange(HeatmapTimeframe.oneDay), greaterThan(0.05));
-        }
-      }
-
-      // Test Scope filtering (Losers Only)
-      const losersFilter = SectorHeatmapFilterState(scope: HeatmapScope.losersOnly);
-      final losersPayload = SectorHeatmapRepository.getPayload(losersFilter);
-      for (final s in losersPayload.sectors) {
-        for (final stock in s.stocks) {
-          expect(stock.getEffectiveChange(HeatmapTimeframe.oneDay), lessThan(-0.05));
-        }
-      }
-
-      // Test Single Sector selection
-      const singleSectorFilter = SectorHeatmapFilterState(
-        selectedSectorName: 'Automobiles',
+    test('SectorHeatmapDataProvider computes summary and breadth from sectors', () {
+      final container = ProviderContainer(
+        overrides: [
+          rawSectorHeatmapProvider.overrideWith((ref) => sampleSectors),
+        ],
       );
-      final singlePayload = SectorHeatmapRepository.getPayload(singleSectorFilter);
-      expect(singlePayload.sectors.length, 1);
-      expect(singlePayload.sectors.first.name, 'Automobiles');
+      addTearDown(container.dispose);
+
+      final payload = container.read(sectorHeatmapDataProvider);
+      expect(payload.sectors.length, 2);
+      expect(payload.summary.totalAdvances, 12);
+      expect(payload.summary.totalDeclines, 3);
+      expect(payload.summary.topSectorName, 'Automobiles');
+      expect(payload.summary.laggingSectorName, 'Banking & Financials');
     });
 
     test('SectorHeatmapFilterNotifier mutates state correctly', () {

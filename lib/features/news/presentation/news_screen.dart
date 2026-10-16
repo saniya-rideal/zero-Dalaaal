@@ -4,11 +4,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../data/mock/news_repository.dart';
-import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../quote_detail/presentation/quote_detail_screen.dart';
+import '../data/news_repository.dart';
+
+final newsListProvider = FutureProvider.autoDispose.family<List<NewsArticle>, ({String? category, String? query, int page})>((ref, arg) async {
+  final repo = ref.watch(newsRepositoryProvider);
+  final cat = (arg.category != null && arg.category != 'ALL') ? arg.category : null;
+  return repo.getArticles(
+    category: cat,
+    symbol: arg.query,
+    page: arg.page,
+    limit: 20,
+  );
+});
 
 class NewsScreen extends ConsumerStatefulWidget {
   final int initialTabIndex;
@@ -23,11 +33,9 @@ class NewsScreen extends ConsumerStatefulWidget {
 }
 
 class _NewsScreenState extends ConsumerState<NewsScreen> {
-  // News Tab State
   NewsCategory _selectedNewsCategory = NewsCategory.ALL;
   final TextEditingController _newsSearchController = TextEditingController();
   int _newsPage = 1;
-  static const int _newsPageSize = 6;
 
   @override
   void dispose() {
@@ -90,28 +98,20 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
     );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // TAB 1: MARKET NEWS FEED
-  // ═══════════════════════════════════════════════════════════════════════════
-
   Widget _buildMarketNewsTab(TradingColors colors) {
-    final repo = ref.watch(newsRepositoryProvider);
-    final result = repo.getArticles(
-      query: _newsSearchController.text,
-      category: _selectedNewsCategory,
-      page: 1,
-      pageSize: _newsPage * _newsPageSize,
-    );
+    final query = _newsSearchController.text.trim();
+    final catName = _selectedNewsCategory == NewsCategory.ALL ? null : _selectedNewsCategory.name;
+    final articlesAsync = ref.watch(newsListProvider((
+      category: catName,
+      query: query.isNotEmpty ? query : null,
+      page: _newsPage,
+    )));
 
     return RefreshIndicator(
       color: const Color(0xFF1E88E5),
       onRefresh: () async {
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (mounted) {
-          setState(() {
-            _newsPage = 1;
-          });
-        }
+        setState(() => _newsPage = 1);
+        ref.invalidate(newsListProvider);
       },
       child: CustomScrollView(
         slivers: [
@@ -143,22 +143,23 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                           )
                         : null,
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  onChanged: (_) => setState(() => _newsPage = 1),
+                  onSubmitted: (_) => setState(() => _newsPage = 1),
                 ),
               ),
             ),
           ),
 
-          // 2. Category Filter Chips
+          // 2. Category Chips Bar
           SliverToBoxAdapter(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
+            child: SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  _buildNewsCategoryChip('All', NewsCategory.ALL, colors),
+                  _buildNewsCategoryChip('All News', NewsCategory.ALL, colors),
                   _buildNewsCategoryChip('Equities', NewsCategory.EQUITIES, colors),
                   _buildNewsCategoryChip('F&O', NewsCategory.FNO, colors),
                   _buildNewsCategoryChip('Commodities', NewsCategory.COMMODITIES, colors),
@@ -169,122 +170,94 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
             ),
           ),
 
-          // 3. Third-party Disclaimer Notice
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: colors.divider),
-                ),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.info, size: 14, color: colors.textSecondary),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Third-party curated wires for informational purposes only. Not investment advice.',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          color: colors.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-          // 4. Articles List or Empty State
-          if (result.items.isEmpty)
-            SliverFillRemaining(
+          // 3. Articles List or Empty / Error / Loading
+          articlesAsync.when(
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (err, _) => SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32.0),
+                  padding: const EdgeInsets.all(24.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(LucideIcons.searchX, size: 48, color: colors.textSecondary),
+                      Icon(LucideIcons.alertTriangle, size: 40, color: colors.loss),
                       const SizedBox(height: 12),
-                      Text(
-                        'No matching news articles found',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: colors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Try searching for another keyword or switch category filter.',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(fontSize: 12.5, color: colors.textSecondary),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton.icon(
-                        onPressed: () {
-                          _newsSearchController.clear();
-                          setState(() {
-                            _selectedNewsCategory = NewsCategory.ALL;
-                            _newsPage = 1;
-                          });
-                        },
-                        icon: const Icon(LucideIcons.rotateCcw, size: 16),
-                        label: const Text('Reset Filters'),
+                      Text('Failed to load news', style: TextStyle(color: colors.textPrimary)),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () => ref.invalidate(newsListProvider),
+                        child: const Text('Retry'),
                       ),
                     ],
                   ),
                 ),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final article = result.items[index];
-                    return _buildArticleCard(article, colors);
-                  },
-                  childCount: result.items.length,
-                ),
-              ),
             ),
+            data: (articles) {
+              if (articles.isEmpty) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.searchX, size: 48, color: colors.textSecondary),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No matching news articles found',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Try searching for another keyword or switch category filter.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(fontSize: 12.5, color: colors.textSecondary),
+                          ),
+                          const SizedBox(height: 16),
+                          TextButton.icon(
+                            onPressed: () {
+                              _newsSearchController.clear();
+                              setState(() {
+                                _selectedNewsCategory = NewsCategory.ALL;
+                                _newsPage = 1;
+                              });
+                            },
+                            icon: const Icon(LucideIcons.rotateCcw, size: 16),
+                            label: const Text('Reset Filters'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
 
-          // 5. Pagination ("Load More" button)
-          if (result.hasMore)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() => _newsPage++);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: colors.divider),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(LucideIcons.arrowDown, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Load More Articles (${result.totalCount - result.items.length} remaining)',
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ],
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final article = articles[index];
+                      return _buildArticleCard(article, colors);
+                    },
+                    childCount: articles.length,
                   ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
@@ -348,7 +321,6 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Meta Row: Source • Sentiment • Timestamp
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -397,10 +369,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 8),
-
-                // Headline
                 Text(
                   article.title,
                   style: GoogleFonts.inter(
@@ -410,10 +379,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     height: 1.3,
                   ),
                 ),
-
                 const SizedBox(height: 6),
-
-                // Summary
                 Text(
                   article.summary,
                   maxLines: 2,
@@ -424,72 +390,35 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     height: 1.4,
                   ),
                 ),
-
-                const SizedBox(height: 10),
-
-                // Footer Row: Related Instrument Tags & Share Button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Related Instruments
-                    Expanded(
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: article.relatedSymbols.map((sym) {
-                          return InkWell(
-                            onTap: () => _openRelatedInstrument(sym),
+                if (article.relatedSymbols.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: article.relatedSymbols.map((sym) {
+                      return InkWell(
+                        onTap: () => _openRelatedInstrument(sym),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                          decoration: BoxDecoration(
+                            color: colors.surface,
                             borderRadius: BorderRadius.circular(4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                              decoration: BoxDecoration(
-                                color: colors.surface,
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: colors.divider),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(LucideIcons.lineChart, size: 12, color: Color(0xFF1E88E5)),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    sym,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF1E88E5),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            border: Border.all(color: colors.divider),
+                          ),
+                          child: Text(
+                            sym,
+                            style: GoogleFonts.inter(
+                              color: colors.textPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-
-                    // Read Time & Share Icon
-                    Row(
-                      children: [
-                        Text(
-                          '${article.readTimeMinutes}m read',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: colors.textSecondary,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: Icon(LucideIcons.share2, size: 18, color: colors.textSecondary),
-                          onPressed: () => _promptShareArticle(article),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          tooltip: 'Share Article',
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
             ),
           ),
@@ -499,15 +428,10 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
   }
 
   void _openRelatedInstrument(String symbol) {
-    final instrument = SeedInstruments.all.firstWhere(
-      (i) => i.symbol.toUpperCase() == symbol.toUpperCase(),
-      orElse: () => SeedInstruments.findByToken('eq_sbin')!,
-    );
-
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => QuoteDetailScreen(token: instrument.token),
+        builder: (_) => QuoteDetailScreen(token: symbol),
       ),
     );
   }
@@ -531,7 +455,6 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
             child: ListView(
               controller: scrollController,
               children: [
-                // Top Action Bar
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -554,10 +477,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                       children: [
                         Text(
                           article.timeAgo,
-                          style: GoogleFonts.inter(
-                            color: colors.textSecondary,
-                            fontSize: 12,
-                          ),
+                          style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 12),
                         ),
                         const SizedBox(width: 12),
                         IconButton(
@@ -572,10 +492,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // Headline
                 Text(
                   article.title,
                   style: GoogleFonts.inter(
@@ -585,10 +502,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     height: 1.3,
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
-                // Related Instruments Row
                 if (article.relatedSymbols.isNotEmpty) ...[
                   Wrap(
                     spacing: 8,
@@ -615,60 +529,6 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                   ),
                   const SizedBox(height: 14),
                 ],
-
-                // Key Takeaways Box
-                if (article.keyTakeaways.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E88E5).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF1E88E5).withValues(alpha: 0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(LucideIcons.lightbulb, color: Color(0xFF1E88E5), size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Key Market Takeaways',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1E88E5),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...article.keyTakeaways.map((takeaway) => Padding(
-                              padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('• ', style: TextStyle(color: Color(0xFF1E88E5), fontWeight: FontWeight.bold)),
-                                  Expanded(
-                                    child: Text(
-                                      takeaway,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.5,
-                                        color: colors.textPrimary,
-                                        height: 1.35,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // Full Content
                 Text(
                   article.fullContent,
                   style: GoogleFonts.inter(
@@ -678,50 +538,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
                     height: 1.6,
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
-                // Statutory External Source Disclaimer Box
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: colors.divider),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(LucideIcons.scale, size: 16, color: colors.textSecondary),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Third-Party Sourced Content & Risk Disclaimer',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'This article was published by ${article.source} and curated by ZeroDalali for informational purposes only. ZeroDalali does not independently verify or guarantee the accuracy, completeness, or timeliness of external wire feeds. This content does not constitute financial, investment, or legal advice.',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: colors.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Share & Close Buttons
                 Row(
                   children: [
                     Expanded(
@@ -762,9 +579,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: context.tradingColors.cardBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (shareCtx) {
         final shareText = '${article.title}\n\n${article.summary}\n\nSource: ${article.source}\nRead on ZeroDalali Trading App';
         return SafeArea(

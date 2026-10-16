@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
@@ -13,8 +12,7 @@ import 'nominee_management_sheet.dart';
 import 'personal_details_sheet.dart';
 import 'fatca_declaration_sheet.dart';
 import 'risk_profile_sheet.dart';
-import '../../../data/mock/fatca_repository.dart';
-import '../../../data/mock/risk_profile_repository.dart';
+import '../data/compliance_repository.dart';
 import '../../../data/models/investor_risk_profile.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -28,8 +26,9 @@ class ProfileScreen extends ConsumerWidget {
     final riskProfile = ref.watch(riskProfileProvider);
     final profile = authState.session?.profile;
 
-    Color riskBadgeColor;
-    switch (riskProfile.category) {
+    final riskCategory = riskProfile.category;
+    Color riskBadgeColor = const Color(0xFF10B981);
+    switch (riskCategory) {
       case RiskCategory.conservative:
         riskBadgeColor = const Color(0xFF0284C7);
         break;
@@ -40,10 +39,9 @@ class ProfileScreen extends ConsumerWidget {
         riskBadgeColor = const Color(0xFFF59E0B);
         break;
     }
-
-    final name = profile?.name ?? AppConstants.demoUserName;
-    final userId = profile?.userId ?? AppConstants.demoUserId;
-    final pan = profile?.pan ?? AppConstants.demoPan;
+    final name = profile?.name ?? 'User';
+    final userId = profile?.userId ?? '-';
+    final pan = profile?.pan ?? '-';
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -211,7 +209,7 @@ class ProfileScreen extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              riskProfile.category.label.toUpperCase(),
+                              riskCategory.label.toUpperCase(),
                               style: GoogleFonts.inter(
                                 color: riskBadgeColor,
                                 fontWeight: FontWeight.bold,

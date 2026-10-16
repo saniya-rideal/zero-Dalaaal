@@ -1,14 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:zero_dalali/data/mock/corporate_actions_repository.dart';
 import 'package:zero_dalali/data/models/corporate_action.dart';
+import 'package:zero_dalali/features/calendar/data/calendar_repository.dart';
 import 'package:zero_dalali/features/calendar/presentation/economic_calendar_screen.dart';
 import 'package:zero_dalali/features/calendar/presentation/widgets/corporate_actions_view.dart';
+import 'package:zero_dalali/features/quote_detail/data/fundamentals_repository.dart';
+
+final _testActions = [
+  CorporateAction(
+    id: 'act_vedl',
+    symbol: 'VEDL',
+    companyName: 'Vedanta Limited',
+    actionType: CorporateActionType.dividend,
+    details: 'Dividend ₹28.50',
+    exDate: DateTime(2026, 10, 20),
+    recordDate: DateTime(2026, 10, 21),
+    announcementDate: DateTime(2026, 10, 1),
+    currentPrice: 432.80,
+    dividendYield: 7.2,
+    remarks: 'High yield dividend',
+  ),
+  CorporateAction(
+    id: 'act_wipro',
+    symbol: 'WIPRO',
+    companyName: 'Wipro Limited',
+    actionType: CorporateActionType.bonus,
+    details: 'Bonus 1:1',
+    exDate: DateTime(2026, 10, 25),
+    recordDate: DateTime(2026, 10, 26),
+    announcementDate: DateTime(2026, 10, 5),
+    currentPrice: 540.0,
+  ),
+  CorporateAction(
+    id: 'act_irctc',
+    symbol: 'IRCTC',
+    companyName: 'Indian Railway Catering and Tourism Corp',
+    actionType: CorporateActionType.split,
+    details: 'Split 1:5',
+    exDate: DateTime(2026, 10, 30),
+    recordDate: DateTime(2026, 10, 31),
+    announcementDate: DateTime(2026, 10, 10),
+    currentPrice: 920.0,
+  ),
+  CorporateAction(
+    id: 'act_tcs',
+    symbol: 'TCS',
+    companyName: 'Tata Consultancy Services',
+    actionType: CorporateActionType.split,
+    details: 'Split 1:2',
+    exDate: DateTime(2026, 10, 30),
+    recordDate: DateTime(2026, 10, 31),
+    announcementDate: DateTime(2026, 10, 10),
+    currentPrice: 4200.0,
+  ),
+];
 
 Widget _wrapWidget(Widget child, {List<Override> overrides = const []}) {
   return ProviderScope(
-    overrides: overrides,
+    overrides: [
+      corporateActionsProvider(null).overrideWith((ref) async => _testActions),
+      calendarEventsProvider.overrideWith((ref) async => const []),
+      ...overrides,
+    ],
     child: MaterialApp(
       home: child,
     ),
@@ -75,27 +129,42 @@ void main() {
       expect(restored.remarks, action.remarks);
     });
 
-    test('CorporateActionsRepository filters by type and search query', () {
-      final repo = CorporateActionsRepository();
-      final all = repo.getAllActions();
-      expect(all.isNotEmpty, isTrue);
+    test('CorporateActions filtering by type and search query', () {
+      final sampleActions = [
+        CorporateAction(
+          id: '1',
+          symbol: 'TCS',
+          companyName: 'Tata Consultancy Services',
+          actionType: CorporateActionType.dividend,
+          details: 'Dividend ₹28',
+          exDate: DateTime(2026, 10, 20),
+          recordDate: DateTime(2026, 10, 21),
+          announcementDate: DateTime(2026, 10, 1),
+          currentPrice: 4200,
+        ),
+        CorporateAction(
+          id: '2',
+          symbol: 'INFY',
+          companyName: 'Infosys Limited',
+          actionType: CorporateActionType.split,
+          details: 'Split 1:2',
+          exDate: DateTime(2026, 10, 22),
+          recordDate: DateTime(2026, 10, 23),
+          announcementDate: DateTime(2026, 10, 2),
+          currentPrice: 1850,
+        ),
+      ];
 
-      final dividends = repo.getActions(type: CorporateActionType.dividend);
-      expect(dividends.every((a) => a.actionType == CorporateActionType.dividend), isTrue);
+      final dividends = sampleActions.where((a) => a.actionType == CorporateActionType.dividend).toList();
+      expect(dividends.length, 1);
+      expect(dividends.first.symbol, 'TCS');
 
-      final splits = repo.getActions(type: CorporateActionType.split);
-      expect(splits.every((a) => a.actionType == CorporateActionType.split), isTrue);
+      final splits = sampleActions.where((a) => a.actionType == CorporateActionType.split).toList();
+      expect(splits.length, 1);
+      expect(splits.first.symbol, 'INFY');
 
-      final searchTcs = repo.getActions(searchQuery: 'TCS');
-      expect(searchTcs.every((a) => a.symbol.contains('TCS') || a.companyName.contains('Tata')), isTrue);
-      expect(searchTcs.length, greaterThanOrEqualTo(1));
-
-      final counts = repo.getCountsByType();
-      expect(counts[CorporateActionType.dividend], greaterThan(0));
-      expect(counts[CorporateActionType.split], greaterThan(0));
-      expect(counts[CorporateActionType.bonus], greaterThan(0));
-      expect(counts[CorporateActionType.buyback], greaterThan(0));
-      expect(counts[CorporateActionType.rights], greaterThan(0));
+      final searchTcs = sampleActions.where((a) => a.symbol.contains('TCS') || a.companyName.contains('Tata')).toList();
+      expect(searchTcs.length, 1);
     });
 
     test('CorporateActionsFilterNotifier updates state properly', () {

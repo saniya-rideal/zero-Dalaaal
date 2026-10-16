@@ -44,6 +44,11 @@ class TradingColors extends ThemeExtension<TradingColors> {
     required this.flashRed,
   });
 
+  Color get profit => bullish;
+  Color get loss => bearish;
+  Color get up => bullish;
+  Color get down => bearish;
+
   static const light = TradingColors(
     primary: Color(0xFFE82B57), // Zero signature Rose Pink
     secondary: Color(0xFF2F80ED), // Script button blue

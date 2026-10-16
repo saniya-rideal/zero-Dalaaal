@@ -1,73 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
-import '../../../core/theme/typography.dart';
+import '../../../data/models/alert.dart';
+import '../../../data/models/enums.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../data/alerts_repository.dart';
 
-class AlertItem {
-  final String id;
-  final String symbol;
-  final double triggerPrice;
-  final String condition;
-  final String createdTime;
-  bool isActive;
+final alertsListProvider = FutureProvider.autoDispose<List<PriceAlert>>((ref) async {
+  final repo = ref.watch(alertsRepositoryProvider);
+  return repo.getAlerts();
+});
 
-  AlertItem({
-    required this.id,
-    required this.symbol,
-    required this.triggerPrice,
-    required this.condition,
-    required this.createdTime,
-    this.isActive = true,
-  });
-}
-
-class AlertsScreen extends StatefulWidget {
+class AlertsScreen extends ConsumerStatefulWidget {
   const AlertsScreen({super.key});
 
   @override
-  State<AlertsScreen> createState() => _AlertsScreenState();
+  ConsumerState<AlertsScreen> createState() => _AlertsScreenState();
 }
 
-class _AlertsScreenState extends State<AlertsScreen> {
+class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   final TextEditingController _searchController = TextEditingController();
-  final List<AlertItem> _alerts = [
-    AlertItem(
-      id: '1',
-      symbol: 'COPPER MCX Sep',
-      triggerPrice: 1375.00,
-      condition: 'Price >= 1375.00',
-      createdTime: '03 Sep 2026 10:15',
-      isActive: true,
-    ),
-    AlertItem(
-      id: '2',
-      symbol: 'GOLD MCX Oct',
-      triggerPrice: 71500.00,
-      condition: 'Price >= 71500.00',
-      createdTime: '03 Sep 2026 09:30',
-      isActive: true,
-    ),
-    AlertItem(
-      id: '3',
-      symbol: 'SILVER MCX Dec',
-      triggerPrice: 83000.00,
-      condition: 'Price <= 83000.00',
-      createdTime: '02 Sep 2026 18:45',
-      isActive: false,
-    ),
-    AlertItem(
-      id: '4',
-      symbol: 'CRUDEOIL MCX Sep',
-      triggerPrice: 6400.00,
-      condition: 'Price >= 6400.00',
-      createdTime: '02 Sep 2026 16:20',
-      isActive: true,
-    ),
-  ];
-  final Set<String> _selectedAlertIds = {};
+  bool _isActionInProgress = false;
 
   @override
   void dispose() {
@@ -76,11 +32,10 @@ class _AlertsScreenState extends State<AlertsScreen> {
   }
 
   void _showAddAlertDialog() {
-    final colors = Theme.of(context).brightness == Brightness.dark
-        ? TradingColors.dark
-        : TradingColors.light;
-    final scriptController = TextEditingController(text: 'COPPER MCX Sep');
-    final priceController = TextEditingController(text: '1370.00');
+    final colors = context.tradingColors;
+    final scriptController = TextEditingController(text: 'RELIANCE');
+    final priceController = TextEditingController();
+    String condition = 'GTE';
     bool isCreating = false;
 
     showModalBottomSheet(
@@ -88,96 +43,161 @@ class _AlertsScreenState extends State<AlertsScreen> {
       isScrollControlled: true,
       backgroundColor: colors.cardBackground,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (bottomContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(bottomContext).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Create Price Alert',
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (bottomContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(bottomContext).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Create Price Alert',
                 style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: colors.textPrimary)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: scriptController,
-              style: TextStyle(color: colors.textPrimary),
-              decoration: InputDecoration(
-                labelText: 'Script Name',
-                labelStyle: TextStyle(color: colors.textSecondary),
-                border: const OutlineInputBorder(),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: colors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              keyboardType: TextInputType.number,
-              style: TextStyle(color: colors.textPrimary),
-              decoration: InputDecoration(
-                labelText: 'Target Trigger Price',
-                labelStyle: TextStyle(color: colors.textSecondary),
-                border: const OutlineInputBorder(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: scriptController,
+                textCapitalization: TextCapitalization.characters,
+                style: TextStyle(color: colors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Symbol',
+                  labelStyle: TextStyle(color: colors.textSecondary),
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                if (isCreating) return;
-                final target = double.tryParse(priceController.text) ?? 0.0;
-                if (priceController.text.isNotEmpty && target > 0) {
-                  isCreating = true;
-                  setState(() {
-                    _alerts.insert(
-                      0,
-                      AlertItem(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        symbol: scriptController.text.trim(),
-                        triggerPrice: target,
-                        condition: 'Price >= ${target.toStringAsFixed(2)}',
-                        createdTime: 'Just now',
-                        isActive: true,
-                      ),
-                    );
-                  });
-                  Navigator.pop(bottomContext);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Price alert created!')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: condition,
+                dropdownColor: colors.cardBackground,
+                style: TextStyle(color: colors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Condition',
+                  labelStyle: TextStyle(color: colors.textSecondary),
+                  border: const OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'GTE', child: Text('Price >= (Greater than or Equal)')),
+                  DropdownMenuItem(value: 'LTE', child: Text('Price <= (Less than or Equal)')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setSheetState(() => condition = val);
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: TextStyle(color: colors.textPrimary),
+                decoration: InputDecoration(
+                  labelText: 'Target Trigger Price',
+                  labelStyle: TextStyle(color: colors.textSecondary),
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: isCreating
+                    ? null
+                    : () async {
+                        final target = double.tryParse(priceController.text) ?? 0.0;
+                        final sym = scriptController.text.trim().toUpperCase();
+                        if (sym.isEmpty || target <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter valid symbol and price')),
+                          );
+                          return;
+                        }
+                        setSheetState(() => isCreating = true);
+                        try {
+                          await ref.read(alertsRepositoryProvider).createAlert(
+                                symbol: sym,
+                                targetPrice: target,
+                                condition: condition,
+                              );
+                          if (!mounted) return;
+                          ref.invalidate(alertsListProvider);
+                          Navigator.pop(bottomContext);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Price alert created successfully!')),
+                          );
+                        } catch (e) {
+                          setSheetState(() => isCreating = false);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to create alert: $e')),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
                   backgroundColor: colors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14)),
-              child: const Text('SET ALERT',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
-          ],
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: isCreating
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text(
+                        'SET ALERT',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _deleteAlert(String id) async {
+    setState(() => _isActionInProgress = true);
+    try {
+      await ref.read(alertsRepositoryProvider).deleteAlert(id);
+      ref.invalidate(alertsListProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete alert: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isActionInProgress = false);
+    }
+  }
+
+  Future<void> _toggleAlert(String id) async {
+    setState(() => _isActionInProgress = true);
+    try {
+      await ref.read(alertsRepositoryProvider).toggleAlert(id);
+      ref.invalidate(alertsListProvider);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update alert: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isActionInProgress = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final query = _searchController.text.trim().toLowerCase();
-
-    var filteredAlerts = _alerts;
-    if (query.isNotEmpty) {
-      filteredAlerts = _alerts
-          .where((a) =>
-              a.symbol.toLowerCase().contains(query) ||
-              a.condition.toLowerCase().contains(query))
-          .toList();
-    }
+    final alertsAsync = ref.watch(alertsListProvider);
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -188,11 +208,14 @@ class _AlertsScreenState extends State<AlertsScreen> {
         scrolledUnderElevation: 0,
         leading: const AdaptiveLeadingButton(),
         centerTitle: true,
-        title: Text('Alerts',
-            style: GoogleFonts.inter(
-                color: colors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontSize: 18)),
+        title: Text(
+          'Alerts',
+          style: GoogleFonts.inter(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
         actions: [
           IconButton(
             icon: Icon(LucideIcons.plus, color: colors.primary, size: 22),
@@ -204,34 +227,27 @@ class _AlertsScreenState extends State<AlertsScreen> {
       ),
       body: Column(
         children: [
-          // Combined Market Header Strip
           const ZeroMarketHeaderStrip(),
-
           // Search Bar
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
             child: Container(
               height: 40,
               decoration: BoxDecoration(
                 color: colors.surface,
                 borderRadius: BorderRadius.circular(20),
-                border:
-                    Border.all(color: colors.divider.withValues(alpha: 0.5)),
               ),
               child: TextField(
                 controller: _searchController,
-                textAlignVertical: TextAlignVertical.center,
-                style: AppTypography.body(color: colors.textPrimary),
+                onChanged: (_) => setState(() {}),
+                style: TextStyle(color: colors.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  hintText: 'Search by Script Name',
-                  hintStyle: AppTypography.body(color: colors.textSecondary),
-                  prefixIcon:
-                      Icon(LucideIcons.search, color: colors.textSecondary, size: 18),
-                  suffixIcon: _searchController.text.isNotEmpty
+                  hintText: 'Search alerts by symbol...',
+                  hintStyle: TextStyle(color: colors.textSecondary, fontSize: 13),
+                  prefixIcon: Icon(LucideIcons.search, size: 16, color: colors.textSecondary),
+                  suffixIcon: query.isNotEmpty
                       ? IconButton(
-                          icon: Icon(LucideIcons.x,
-                              color: colors.textSecondary, size: 16),
+                          icon: const Icon(LucideIcons.x, size: 14),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {});
@@ -239,150 +255,150 @@ class _AlertsScreenState extends State<AlertsScreen> {
                         )
                       : null,
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-                onChanged: (_) => setState(() {}),
               ),
             ),
           ),
-
-          // Action Pill Strip (Select All | Delete)
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-            child: Container(
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: colors.scriptBarBackground,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  InkWell(
-                    onTap: () {
-                      setState(() {
-                        if (_selectedAlertIds.length == filteredAlerts.length &&
-                            filteredAlerts.isNotEmpty) {
-                          _selectedAlertIds.clear();
-                        } else {
-                          _selectedAlertIds
-                              .addAll(filteredAlerts.map((a) => a.id));
-                        }
-                      });
-                    },
-                    child: Text(
-                      _selectedAlertIds.length == filteredAlerts.length &&
-                              filteredAlerts.isNotEmpty
-                          ? 'Deselect All'
-                          : 'Select All',
-                      style: AppTypography.body(
-                          color: colors.secondary, weight: FontWeight.w600),
-                    ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'Alerts (${filteredAlerts.length})',
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                            color: colors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13.5),
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () {
-                      if (_selectedAlertIds.isNotEmpty) {
-                        setState(() {
-                          _alerts.removeWhere(
-                              (item) => _selectedAlertIds.contains(item.id));
-                          _selectedAlertIds.clear();
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Selected alerts deleted')),
-                        );
-                      }
-                    },
-                    child: Text(
-                      'Delete',
-                      style: AppTypography.body(
-                          color: colors.primary, weight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Body
           Expanded(
-            child: filteredAlerts.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+            child: alertsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.alertTriangle, size: 48, color: colors.loss),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Failed to load alerts',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        err.toString(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: colors.textSecondary, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => ref.invalidate(alertsListProvider),
+                        icon: const Icon(LucideIcons.refreshCw, size: 16),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              data: (alerts) {
+                var filteredAlerts = alerts;
+                if (query.isNotEmpty) {
+                  filteredAlerts = alerts.where((a) {
+                    return a.instrumentSymbol.toLowerCase().contains(query);
+                  }).toList();
+                }
+
+                if (filteredAlerts.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: () async => ref.refresh(alertsListProvider.future),
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        Icon(LucideIcons.bellOff,
-                            size: 40,
-                            color: colors.textSecondary.withValues(alpha: 0.5)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No Alerts Found',
-                          style: GoogleFonts.inter(
-                              color: colors.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500),
+                        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                        EmptyStateView(
+                          icon: LucideIcons.bellOff,
+                          title: query.isEmpty ? 'No Price Alerts Set' : 'No Matching Alerts',
+                          subtitle: query.isEmpty
+                              ? 'Tap the + button to create a real-time price threshold alert.'
+                              : 'No alerts found matching "$query"',
+                          buttonText: query.isEmpty ? 'Create Alert' : null,
+                          onButtonPressed: query.isEmpty ? _showAddAlertDialog : null,
                         ),
                       ],
                     ),
-                  )
-                : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    itemCount: filteredAlerts.length,
-                    separatorBuilder: (_, __) =>
-                        Divider(height: 1, color: colors.divider),
-                    itemBuilder: (context, index) {
-                      final item = filteredAlerts[index];
-                      final isSelected = _selectedAlertIds.contains(item.id);
+                  );
+                }
 
-                      return Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          leading: Checkbox(
-                            value: isSelected,
-                            activeColor: colors.primary,
-                            onChanged: (val) {
-                              setState(() {
-                                if (val == true) {
-                                  _selectedAlertIds.add(item.id);
-                                } else {
-                                  _selectedAlertIds.remove(item.id);
-                                }
-                              });
-                            },
-                          ),
-                          title: Text(item.symbol,
-                              style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w800,
-                                  color: colors.textPrimary)),
-                          subtitle: Text(
-                              'Trigger: ${item.triggerPrice.toStringAsFixed(2)} • ${item.createdTime}',
-                              style: GoogleFonts.inter(
-                                  color: colors.textSecondary, fontSize: 12)),
-                          trailing: Switch(
-                            value: item.isActive,
-                            activeTrackColor: colors.primary.withValues(alpha: 0.5),
-                            activeThumbColor: colors.primary,
-                            onChanged: (val) =>
-                                setState(() => item.isActive = val),
-                          ),
+                return RefreshIndicator(
+                  onRefresh: () async => ref.refresh(alertsListProvider.future),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: filteredAlerts.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final alert = filteredAlerts[index];
+                      final isActive = alert.status == AlertStatus.ACTIVE;
+                      final condText = alert.condition == AlertCondition.GREATER_THAN_OR_EQUAL
+                          ? '>= ${alert.targetValue.toStringAsFixed(2)}'
+                          : '<= ${alert.targetValue.toStringAsFixed(2)}';
+
+                      return SectionCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? colors.primary.withValues(alpha: 0.1)
+                                    : colors.surface,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isActive ? LucideIcons.bell : LucideIcons.bellOff,
+                                color: isActive ? colors.primary : colors.textSecondary,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    alert.instrumentSymbol.isNotEmpty
+                                        ? alert.instrumentSymbol
+                                        : 'Alert',
+                                    style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                      color: colors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Condition: Price $condText',
+                                    style: TextStyle(
+                                      color: colors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: isActive,
+                              onChanged: _isActionInProgress ? null : (_) => _toggleAlert(alert.id),
+                              activeColor: colors.primary,
+                            ),
+                            IconButton(
+                              icon: Icon(LucideIcons.trash2, size: 18, color: colors.loss),
+                              onPressed: _isActionInProgress ? null : () => _deleteAlert(alert.id),
+                              tooltip: 'Delete Alert',
+                            ),
+                          ],
                         ),
                       );
                     },
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),

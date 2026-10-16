@@ -4,8 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../data/real_funds_repository.dart';
 import '../../../data/models/enums.dart';
+import '../../../data/models/funds.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
 class BalanceBreakdownDialog extends ConsumerWidget {
@@ -25,8 +26,13 @@ class BalanceBreakdownDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final breakdown = engine.getBalanceBreakdown(segment);
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+    final funds = fundsAsync.valueOrNull ??
+        const FundsSummary(
+          availableMargin: 0,
+          usedMargin: 0,
+          openingBalance: 0,
+        );
 
     return Container(
       decoration: BoxDecoration(
@@ -105,7 +111,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          CurrencyFormatter.format(breakdown.withdrawableBalance),
+                          CurrencyFormatter.format(funds.withdrawable),
                           style: GoogleFonts.inter(
                             color: colors.textPrimary,
                             fontWeight: FontWeight.w800,
@@ -136,31 +142,31 @@ class BalanceBreakdownDialog extends ConsumerWidget {
 
               _buildBreakdownRow(
                 'Opening Balance',
-                CurrencyFormatter.format(breakdown.openingBalance),
+                CurrencyFormatter.format(funds.openingBalance),
                 'Balance carried forward from previous trading day',
                 colors,
               ),
               _buildBreakdownRow(
                 'Settled Cash',
-                CurrencyFormatter.format(breakdown.settledCash),
+                CurrencyFormatter.format(funds.cash),
                 'Deposits & settled funds available for trading & withdrawal',
                 colors,
               ),
               _buildBreakdownRow(
                 'Unsettled Credits (T+1)',
-                CurrencyFormatter.format(breakdown.unsettledDeliveryCredits),
+                CurrencyFormatter.format(0.0),
                 '80% sale proceeds available today; 20% clears on T+1 settlement',
                 colors,
               ),
               _buildBreakdownRow(
                 'Collateral Margin',
-                CurrencyFormatter.format(breakdown.collateralMargin),
+                CurrencyFormatter.format(0.0),
                 'Margin received against pledged Demat holdings',
                 colors,
               ),
               _buildBreakdownRow(
                 'Blocked for Orders / Positions',
-                CurrencyFormatter.format(breakdown.blockedForOrders),
+                CurrencyFormatter.format(funds.usedMargin),
                 'Margin utilized for active intraday positions and open orders',
                 colors,
                 isDeduction: true,
@@ -184,7 +190,7 @@ class BalanceBreakdownDialog extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    CurrencyFormatter.format(breakdown.totalTradingMargin),
+                    CurrencyFormatter.format(funds.availableMargin),
                     style: GoogleFonts.inter(
                       color: colors.bullish,
                       fontWeight: FontWeight.w800,

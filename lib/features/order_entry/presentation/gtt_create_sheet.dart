@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/mock/seed_instruments.dart';
 import '../../../data/models/models.dart';
+import '../data/gtt_repository.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 
 class GttCreateSheet extends ConsumerStatefulWidget {
@@ -39,7 +38,14 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
   @override
   void initState() {
     super.initState();
-    _instrument = widget.prefilledInstrument ?? SeedInstruments.findByToken('eq_reliance')!;
+    _instrument = widget.prefilledInstrument ??
+        const Instrument(
+          token: 'RELIANCE',
+          symbol: 'RELIANCE',
+          name: 'Reliance Industries',
+          exchange: Exchange.NSE,
+          type: InstrumentType.EQ,
+        );
     _triggerPriceController = TextEditingController(text: '2900.00');
     _orderPriceController = TextEditingController(text: '2900.00');
     _targetTriggerController = TextEditingController(text: '3200.00');
@@ -70,7 +76,7 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -78,36 +84,66 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
               const ZeroDragHandle(padding: EdgeInsets.zero),
               const SizedBox(height: 16),
 
-              Text('Create GTT (Good Till Triggered)', style: AppTypography.h1(color: colors.textPrimary)),
+              Text('Create GTT Order', style: AppTypography.h1(color: colors.textPrimary)),
               const SizedBox(height: 4),
               Text(
-                'Place an order that stays active until your trigger price is reached.',
+                'Good-Till-Triggered order remains active until triggered on server quote tick.',
                 style: AppTypography.caption(color: colors.textSecondary),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-              // Instrument + Side
+              // Instrument Details
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_instrument.symbol, style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
+                          Text('${_instrument.name} • ${_instrument.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Transaction Type: Buy / Sell
+              Text('ACTION', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+              const SizedBox(height: 6),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_instrument.symbol, style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
-                  Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text('BUY'),
-                        selected: _side == TransactionType.BUY,
-                        selectedColor: colors.bullish,
-                        onSelected: (_) => setState(() => _side = TransactionType.BUY),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _side = TransactionType.BUY),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _side == TransactionType.BUY ? colors.bullish : colors.surface,
+                        foregroundColor: _side == TransactionType.BUY ? Colors.white : colors.textPrimary,
+                        elevation: 0,
                       ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('SELL'),
-                        selected: _side == TransactionType.SELL,
-                        selectedColor: colors.bearish,
-                        onSelected: (_) => setState(() => _side = TransactionType.SELL),
+                      child: const Text('BUY'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => setState(() => _side = TransactionType.SELL),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _side == TransactionType.SELL ? colors.bearish : colors.surface,
+                        foregroundColor: _side == TransactionType.SELL ? Colors.white : colors.textPrimary,
+                        elevation: 0,
                       ),
-                    ],
+                      child: const Text('SELL'),
+                    ),
                   ),
                 ],
               ),
@@ -190,24 +226,39 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
                   setState(() => _isSubmitting = true);
 
                   try {
-                    final engine = ref.read(orderSimulationEngineProvider);
+                    final repo = ref.read(gttRepositoryProvider);
                     final triggerPrice = double.tryParse(_triggerPriceController.text) ?? 0.0;
                     final orderPrice = double.tryParse(_orderPriceController.text) ?? 0.0;
 
-                    await engine.createGtt(GttRequest(
-                      instrumentToken: _instrument.token,
-                      side: _side,
-                      type: _type,
-                      quantity: _quantity,
+                    // Contract Section 8.1: POST /api/gtt
+                    await repo.createGtt(
+                      symbol: _instrument.symbol,
+                      market: 'INDIAN',
+                      condition: _side == TransactionType.BUY ? 'LTE' : 'GTE',
                       triggerPrice: triggerPrice,
-                      orderPrice: orderPrice,
-                    ));
+                      orderSide: _side.name,
+                      orderType: 'LIMIT',
+                      price: orderPrice,
+                      quantity: _quantity,
+                      leverage: 1,
+                    );
+
+                    ref.invalidate(gttsListProvider);
 
                     if (mounted) {
                       final messenger = ScaffoldMessenger.of(context);
                       Navigator.pop(context);
                       messenger.showSnackBar(
                         const SnackBar(content: Text('GTT Created Successfully!')),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to create GTT: $e'),
+                          backgroundColor: colors.bearish,
+                        ),
                       );
                     }
                   } finally {

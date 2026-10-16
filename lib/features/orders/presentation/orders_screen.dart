@@ -8,7 +8,8 @@ import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../../order_entry/data/gtt_repository.dart';
+import '../data/real_trading_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
@@ -183,11 +184,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
 
     // Watch orders stream
     final ordersAsync = ref.watch(ordersListProvider);
-    final allOrders = ordersAsync.value ?? engine.orders;
+    final allOrders = ordersAsync.value ?? const <Order>[];
 
     final pendingOrdersRaw = allOrders
         .where((o) =>
@@ -208,7 +208,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         .toList();
 
     final gttAsync = ref.watch(gttsListProvider);
-    final gttsRaw = gttAsync.value ?? engine.gtts;
+    final gttsRaw = gttAsync.value ?? const <GttOrder>[];
 
     // Filtered lists
     final pendingOrders = _applyFiltersAndSort(pendingOrdersRaw);
@@ -898,8 +898,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         return EmptyStateView(
           icon: LucideIcons.filterX,
           title: 'No Matching GTT Orders',
-          subtitle:
-              'No GTT orders match your search or side filter criteria.',
+          subtitle: 'No GTT orders match your search or side filter criteria.',
           buttonText: 'Reset Filters',
           onButtonPressed: _resetFilters,
         );
@@ -907,8 +906,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
       return EmptyStateView(
         icon: LucideIcons.alarmClock,
         title: 'No Active GTTs',
-        subtitle:
-            'Create Good-Till-Triggered orders to automate stoploss and target entries.',
+        subtitle: 'Create Good-Till-Triggered orders to automate stoploss and target entries.',
         buttonText: 'Create GTT',
         onButtonPressed: () => GttCreateSheet.show(context),
       );
@@ -938,8 +936,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
           ),
           trailing: IconButton(
             icon: const Icon(LucideIcons.trash2, size: 18),
-            onPressed: () =>
-                ref.read(orderSimulationEngineProvider).deleteGtt(gtt.id),
+            onPressed: () async {
+              await ref.read(gttRepositoryProvider).deleteGtt(gtt.id);
+              ref.invalidate(gttsListProvider);
+            },
           ),
         );
       },

@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/models.dart';
-import '../data/mock_search_repository.dart';
+import '../data/real_search_repository.dart';
 import '../domain/search_repository.dart';
 
 class SearchState {

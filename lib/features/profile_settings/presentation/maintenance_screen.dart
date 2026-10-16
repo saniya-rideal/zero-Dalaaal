@@ -233,30 +233,6 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 8),
-
-                // Dev/Simulation Exit Action (Quick unlock for testing)
-                OutlinedButton(
-                  onPressed: () {
-                    ref.read(maintenanceServiceProvider.notifier).disableMaintenance();
-                    if (context.canPop()) {
-                      context.pop();
-                    } else {
-                      context.go('/quotes');
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: colors.divider),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  child: Text(
-                    'Resume App (Simulation Demo)',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      color: colors.textSecondary,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),

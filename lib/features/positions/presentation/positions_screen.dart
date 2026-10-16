@@ -6,9 +6,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/mock/ticker_service.dart';
-import '../../../data/models/enums.dart';
+import '../../../core/services/realtime_quote_service.dart';
+import '../../orders/data/real_trading_repository.dart';
+import '../../../data/models/models.dart';
 import '../../../shared_widgets/empty_state_view.dart';
 import '../../../shared_widgets/exchange_chip.dart';
 import '../../../shared_widgets/margin_risk_banner.dart';
@@ -31,11 +31,10 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final tickerService = ref.watch(tickerServiceProvider);
+    final quoteService = ref.watch(realtimeQuoteServiceProvider);
     
     final positionsAsync = ref.watch(positionsListProvider);
-    final allPositions = positionsAsync.value ?? engine.positions;
+    final allPositions = positionsAsync.value ?? const <Position>[];
 
     final basePositions = _isDayView
         ? allPositions.where((p) => p.isDayPosition).toList()
@@ -43,8 +42,8 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
 
     // Attach latest tick prices and compute PnL metrics
     final positionsWithMeta = basePositions.map((p) {
-      final quote = tickerService.getQuote(p.instrument.token);
-      final posWithLtp = p.copyWith(ltp: quote.ltp);
+      final quote = quoteService.getQuote(p.instrument.symbol);
+      final posWithLtp = p.copyWith(ltp: quote.ltp > 0 ? quote.ltp : p.ltp);
       final pnl = posWithLtp.realizedPnl + posWithLtp.unrealizedPnl;
       return (position: posWithLtp, pnl: pnl);
     }).toList();
@@ -262,8 +261,8 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
                           onTap: () => PositionActionSheets.showFullOptions(
                             context,
                             posWithLtp,
-                            engine,
-                            onRefresh: () => setState(() {}),
+                            ref.read(tradingRepositoryProvider),
+                            onRefresh: () => ref.invalidate(positionsListProvider),
                           ),
                           title: Row(
                             children: [

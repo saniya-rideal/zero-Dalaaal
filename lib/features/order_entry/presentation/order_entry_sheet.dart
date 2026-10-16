@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/constants/charges_config.dart';
+import '../../../core/error/app_exception.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/edge_case_service.dart';
 import '../../../core/services/maintenance_service.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/mock/seed_instruments.dart';
-import '../../../data/mock/settings_repository.dart';
-import '../../../data/mock/ticker_service.dart';
 import '../../../data/models/models.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../funds/data/real_funds_repository.dart';
 import '../../funds/presentation/add_funds_sheet.dart';
+import '../../market/data/real_market_repository.dart';
+import '../../orders/data/real_trading_repository.dart';
+import '../../profile_settings/data/settings_repository.dart';
 import 'leverage_education_dialog.dart';
 
 class OrderEntrySheet extends ConsumerStatefulWidget {
@@ -33,13 +36,12 @@ class OrderEntrySheet extends ConsumerStatefulWidget {
     required Instrument instrument,
     TransactionType side = TransactionType.BUY,
   }) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => OrderEntrySheet(
-        instrument: instrument,
-        initialSide: side,
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => OrderEntrySheet(
+          instrument: instrument,
+          initialSide: side,
+        ),
       ),
     );
   }
@@ -64,6 +66,21 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
   double _slPrice = 0.0;
   double _tpPrice = 0.0;
   final TextEditingController _commentController = TextEditingController();
+
+  String? _lastOrderSignature;
+  String? _currentIdempotencyKey;
+
+  String _getIdempotencyKey(TransactionType side, double totalQty, double execPrice) {
+    final rawSym = _currentInstrument.symbol.isNotEmpty ? _currentInstrument.symbol : _currentInstrument.token;
+    final sym = rawSym.contains(':') ? rawSym.split(':').last : rawSym;
+    final cleanSym = sym.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    final signature = '${cleanSym}_${side.name}_${totalQty.toStringAsFixed(2)}_${execPrice.toStringAsFixed(2)}_${_slPrice.toStringAsFixed(2)}_${_tpPrice.toStringAsFixed(2)}_${_orderExecutionType}_${_validity.name}';
+    if (_lastOrderSignature != signature || _currentIdempotencyKey == null) {
+      _lastOrderSignature = signature;
+      _currentIdempotencyKey = 'ord_${DateTime.now().millisecondsSinceEpoch}_$cleanSym';
+    }
+    return _currentIdempotencyKey!;
+  }
 
   @override
   void initState() {
@@ -133,10 +150,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
       maxRisk = (effectivePrice - _slPrice).abs() * totalQuantity;
     }
 
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final availableMargin = engine
-        .getFundsSummary(isCommodity ? Segment.COMMODITY : Segment.EQUITY)
-        .availableMargin;
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+    final availableMargin = fundsAsync.valueOrNull?.availableMargin ?? 0.0;
 
     final isMarginInsufficientBuy = estBuyMargin > availableMargin;
     final isMarginInsufficientSell = estSellMargin > availableMargin;
@@ -146,168 +161,189 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
         postTradeUtilization >= 80.0 && !isMarginInsufficientBuy;
 
     final colors = context.tradingColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.cardBackground,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 12),
-
-              // 1. Header: Symbol Selector & Risk Badges
-              InkWell(
-                onTap: () => _showInstrumentPicker(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _currentInstrument.symbol,
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: colors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(LucideIcons.chevronDown,
-                              size: 20, color: colors.textPrimary),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.center,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (_currentInstrument.isSuspended)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFC62828),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(LucideIcons.ban, size: 10, color: Colors.white),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    'SUSPENDED',
-                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          if (_currentInstrument.surveillanceTag != null)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF57C00),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(LucideIcons.alertTriangle, size: 10, color: Colors.white),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    '${_currentInstrument.surveillanceTag}',
-                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: colors.divider),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(LucideIcons.zap, size: 10, color: Color(0xFF1E88E5)),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${leverage.toStringAsFixed(0)}x Leverage',
-                                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: colors.divider),
-                            ),
-                            child: Text(
-                              'Max: ${_currentInstrument.freezeQty} Qty',
-                              style: GoogleFonts.inter(fontSize: 10, color: colors.textSecondary),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: colors.divider),
-                            ),
-                            child: Text(
-                              'Circuit: ₹${(quote.lowerCircuit > 0 ? quote.lowerCircuit : quote.ltp * 0.9).toStringAsFixed(1)} - ₹${(quote.upperCircuit > 0 ? quote.upperCircuit : quote.ltp * 1.1).toStringAsFixed(1)}',
-                              style: GoogleFonts.inter(fontSize: 10, color: colors.textSecondary),
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () => LeverageEducationDialog.show(context),
-                            borderRadius: BorderRadius.circular(4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(color: const Color(0xFF1E88E5).withValues(alpha: 0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(LucideIcons.graduationCap, size: 12, color: Color(0xFF1E88E5)),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    'Risk Guide',
-                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+    return Scaffold(
+      backgroundColor: colors.background,
+      appBar: AppBar(
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        ),
+        backgroundColor: colors.cardBackground,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        leading: IconButton(
+          icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        titleSpacing: 0,
+        title: InkWell(
+          onTap: () => _showInstrumentPicker(context),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _currentInstrument.symbol,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: colors.textPrimary,
                   ),
                 ),
+                const SizedBox(width: 4),
+                Icon(LucideIcons.chevronDown, size: 18, color: colors.textSecondary),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.graduationCap, color: Color(0xFF1E88E5), size: 20),
+            tooltip: 'Risk & Leverage Guide',
+            onPressed: () => LeverageEducationDialog.show(context),
+          ),
+          const SizedBox(width: 6),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Container(
+            color: colors.divider,
+            height: 1.0,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 1. Risk & Info Badges Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (_currentInstrument.isSuspended)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFC62828),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(LucideIcons.ban, size: 10, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(
+                            'SUSPENDED',
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (_currentInstrument.surveillanceTag != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF57C00),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(LucideIcons.alertTriangle, size: 10, color: Colors.white),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${_currentInstrument.surveillanceTag}',
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: colors.divider),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(LucideIcons.zap, size: 10, color: Color(0xFF1E88E5)),
+                        const SizedBox(width: 3),
+                        Text(
+                          '${leverage.toStringAsFixed(0)}x Leverage',
+                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: colors.divider),
+                    ),
+                    child: Text(
+                      'Max: ${_currentInstrument.freezeQty} Qty',
+                      style: GoogleFonts.inter(fontSize: 10, color: colors.textSecondary),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: colors.surface,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: colors.divider),
+                    ),
+                    child: Text(
+                      'Circuit: ₹${(quote.lowerCircuit > 0 ? quote.lowerCircuit : quote.ltp * 0.9).toStringAsFixed(1)} - ₹${(quote.upperCircuit > 0 ? quote.upperCircuit : quote.ltp * 1.1).toStringAsFixed(1)}',
+                      style: GoogleFonts.inter(fontSize: 10, color: colors.textSecondary),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => LeverageEducationDialog.show(context),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF1E88E5).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(LucideIcons.graduationCap, size: 12, color: Color(0xFF1E88E5)),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Risk Guide',
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Divider(height: 1, thickness: 0.8, color: colors.divider),
+            ),
+            Divider(height: 1, thickness: 0.8, color: colors.divider),
 
               const SizedBox(height: 14),
 
-              // 2. Order Mode: Market | Pending | Stop | Stop-Limit
+              // 2. Order Mode: Market | Pending (Limit)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Wrap(
@@ -321,25 +357,11 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     _buildRadioOption('Pending', _orderExecutionType, (val) {
                       setState(() => _orderExecutionType = val);
                     }),
-                    _buildRadioOption('Stop', _orderExecutionType, (val) {
-                      setState(() {
-                        _orderExecutionType = val;
-                        if (_triggerPrice == 0.0) _triggerPrice = quote.ltp;
-                      });
-                    }),
-                    _buildRadioOption('Stop-Limit', _orderExecutionType, (val) {
-                      setState(() {
-                        _orderExecutionType = val;
-                        if (_triggerPrice == 0.0) _triggerPrice = quote.ltp;
-                        if (_limitPrice == 0.0) _limitPrice = quote.ltp;
-                      });
-                    }),
                   ],
                 ),
               ),
 
               const SizedBox(height: 10),
-
               // 2b. Time-in-Force: DAY | IOC
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1000,74 +1022,47 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
 
               const SizedBox(height: 14),
 
-              // 7. Comment Section
+              // 7. Financial & Margin Breakdown Summary (Estimates)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Comment',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _commentController,
-                      maxLines: 2,
-                      style: TextStyle(color: colors.textPrimary),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'Optional order tag/comment...',
-                        contentPadding: const EdgeInsets.all(10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(4),
-                          borderSide: BorderSide(color: colors.divider, width: 1),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.divider),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildMarginRow('Total Exposure Value:',
+                          CurrencyFormatter.format(totalExposure), colors.textPrimary),
+                      const SizedBox(height: 6),
+                      _buildMarginRow('Instrument Leverage:',
+                          '${leverage.toStringAsFixed(0)}x (${(marginRate * 100).toStringAsFixed(1)}% margin)', const Color(0xFF1E88E5)),
+                      const SizedBox(height: 6),
+                      _buildMarginRow('Est. Buy Margin:',
+                          CurrencyFormatter.format(estBuyMargin), const Color(0xFF00A854)),
+                      const SizedBox(height: 6),
+                      _buildMarginRow('Est. Sell Margin:',
+                          CurrencyFormatter.format(estSellMargin), const Color(0xFFE82B57)),
+                      const SizedBox(height: 6),
+                      _buildMarginRow('Est. Brokerage & Taxes:',
+                          '₹0.00 Brokerage + ₹${calculatedCharges.total.toStringAsFixed(2)} Taxes', colors.textSecondary),
+                      const SizedBox(height: 6),
+                      _buildMarginRow('Available Margin:',
+                          CurrencyFormatter.format(availableMargin), colors.textPrimary),
+                      const SizedBox(height: 6),
+                      _buildMarginRow('Margin Utilization:',
+                          '${postTradeUtilization.toStringAsFixed(1)}%',
+                          postTradeUtilization > 80 ? const Color(0xFFE82B57) : (postTradeUtilization > 50 ? const Color(0xFFF57C00) : colors.textSecondary)),
+                    ],
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 16),
-
-              // 8. Financial & Margin Breakdown Summary
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  children: [
-                    _buildMarginRow('Total Exposure Value:',
-                        CurrencyFormatter.format(totalExposure), colors.textPrimary),
-                    const SizedBox(height: 4),
-                    _buildMarginRow('Instrument Leverage:',
-                        '${leverage.toStringAsFixed(0)}x (${(marginRate * 100).toStringAsFixed(1)}% margin)', const Color(0xFF1E88E5)),
-                    const SizedBox(height: 4),
-                    _buildMarginRow('Est. Buy Margin:',
-                        CurrencyFormatter.format(estBuyMargin), const Color(0xFF2D88C8)),
-                    const SizedBox(height: 4),
-                    _buildMarginRow('Est. Sell Margin:',
-                        CurrencyFormatter.format(estSellMargin), const Color(0xFFE82B57)),
-                    const SizedBox(height: 4),
-                    _buildMarginRow('Est. Brokerage & Taxes:',
-                        '₹0.00 Brokerage + ₹${calculatedCharges.total.toStringAsFixed(2)} Taxes', colors.textSecondary),
-                    const SizedBox(height: 4),
-                    _buildMarginRow('Available Margin:',
-                        CurrencyFormatter.format(availableMargin), colors.textPrimary),
-                    const SizedBox(height: 4),
-                    _buildMarginRow('Margin Utilization:',
-                        '${postTradeUtilization.toStringAsFixed(1)}%',
-                        postTradeUtilization > 80 ? const Color(0xFFE82B57) : (postTradeUtilization > 50 ? const Color(0xFFF57C00) : colors.textSecondary)),
-                  ],
-                ),
-              ),
-
-              // 9. Margin / Risk Alerts
+              // 8. Margin / Risk Alerts
               if (isMarginInsufficientBuy || isMarginInsufficientSell) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Container(
@@ -1121,7 +1116,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                   ),
                 ),
               ] else if (isHighMarginUtilization) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Container(
@@ -1151,7 +1146,50 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                 ),
               ],
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
+
+              // 9. Comment Section (Swapped to last)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Comment',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _commentController,
+                      maxLines: 2,
+                      style: TextStyle(color: colors.textPrimary),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: 'Optional order tag/comment...',
+                        contentPadding: const EdgeInsets.all(10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: colors.divider, width: 1),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: colors.divider, width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
 
               // Notice text — dynamic per order type
               Padding(
@@ -1173,109 +1211,125 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                 ),
               ),
 
-              const SizedBox(height: 18),
-
-              // 10. Bottom SELL & BUY Full-width Action Buttons
-              Row(
-                children: [
-                  // SELL Button (Rose Crimson #E82B57)
-                  Expanded(
-                    child: SizedBox(
-                      height: 52,
-                      child: Semantics(
-                        button: true,
-                        label: 'Place Sell Order',
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting
-                              ? null
-                              : () => _promptOrderReview(
-                                    context,
-                                    side: TransactionType.SELL,
-                                    price: (isPending || isStopLimit) ? _limitPrice : bid,
-                                    totalQty: totalQuantity,
-                                    marginReq: estSellMargin,
-                                    availableMargin: availableMargin,
-                                    charges: calculatedCharges,
-                                  ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE82B57),
-                            foregroundColor: Colors.white,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  'SELL',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: colors.cardBackground,
+            border: Border(
+              top: BorderSide(color: colors.divider, width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Row(
+            children: [
+              // SELL Button (Rose Crimson #E82B57)
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: Semantics(
+                    button: true,
+                    label: 'Place Sell Order',
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _promptOrderReview(
+                                context,
+                                side: TransactionType.SELL,
+                                price: (isPending || isStopLimit) ? _limitPrice : bid,
+                                totalQty: totalQuantity,
+                                marginReq: estSellMargin,
+                                availableMargin: availableMargin,
+                                charges: calculatedCharges,
+                              ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE82B57),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
+                        elevation: 0,
                       ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'SELL',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                     ),
                   ),
-
-                  // BUY Button (Deep Navy #1E2B60)
-                  Expanded(
-                    child: SizedBox(
-                      height: 52,
-                      child: Semantics(
-                        button: true,
-                        label: 'Place Buy Order',
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting
-                              ? null
-                              : () => _promptOrderReview(
-                                    context,
-                                    side: TransactionType.BUY,
-                                    price: (isPending || isStopLimit) ? _limitPrice : ask,
-                                    totalQty: totalQuantity,
-                                    marginReq: estBuyMargin,
-                                    availableMargin: availableMargin,
-                                    charges: calculatedCharges,
-                                  ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E2B60),
-                            foregroundColor: Colors.white,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.zero,
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  'BUY',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // BUY Button (Vibrant Emerald Green #00A854)
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: Semantics(
+                    button: true,
+                    label: 'Place Buy Order',
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _promptOrderReview(
+                                context,
+                                side: TransactionType.BUY,
+                                price: (isPending || isStopLimit) ? _limitPrice : ask,
+                                totalQty: totalQuantity,
+                                marginReq: estBuyMargin,
+                                availableMargin: availableMargin,
+                                charges: calculatedCharges,
+                              ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00A854),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
                         ),
+                        elevation: 0,
                       ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'BUY',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1373,196 +1427,217 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: colors.cardBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (reviewContext) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Order Confirmation',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: (side == TransactionType.BUY ? const Color(0xFF1E2B60) : const Color(0xFFE82B57)),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      side.name,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              _buildReviewRow('Instrument:', _currentInstrument.symbol, colors),
-              _buildReviewRow(
-                'Order Type:',
-                _orderExecutionType == 'Market'
-                    ? 'MARKET (fills at best price)'
-                    : _orderExecutionType == 'Stop'
-                        ? 'STOP-MARKET (SL-M — triggers at ₹${_triggerPrice.toStringAsFixed(2)}, fills at market)'
-                        : _orderExecutionType == 'Stop-Limit'
-                            ? 'STOP-LIMIT (SL — trigger ₹${_triggerPrice.toStringAsFixed(2)}, limit ₹${_limitPrice.toStringAsFixed(2)})'
-                            : 'LIMIT / PENDING',
-                colors,
-              ),
-              _buildReviewRow('Side:', side.name, colors),
-              _buildReviewRow('Order Price:', CurrencyFormatter.format(price), colors),
-              _buildReviewRow('Quantity / Lots:', '${_lots.toStringAsFixed(2)} Lots (≈ ${totalQty.toStringAsFixed(0)} Qty)', colors),
-              _buildReviewRow(
-                'Time-in-Force:',
-                _validity == Validity.DAY
-                    ? 'DAY (valid till end of trading day)'
-                    : 'IOC (Immediate or Cancel)',
-                colors,
-              ),
-              _buildReviewRow('Stop Loss (S/L):', _slPrice > 0 ? CurrencyFormatter.format(_slPrice) : 'None', colors),
-              _buildReviewRow('Take Profit (T/P):', _tpPrice > 0 ? CurrencyFormatter.format(_tpPrice) : 'None', colors),
-              _buildReviewRow('Estimated Margin:', CurrencyFormatter.format(marginReq), colors),
-              _buildReviewRow(
-                'Est. Charges:',
-                '₹0.00 Brokerage + STT ₹${charges.stt.toStringAsFixed(2)} + GST ₹${charges.gst.toStringAsFixed(2)} + Other ₹${(charges.exchangeTxnCharge + charges.sebiCharges + charges.stampDuty).toStringAsFixed(2)}',
-                colors,
-              ),
-              _buildReviewRow('Total Taxes:', '₹${charges.total.toStringAsFixed(2)}', colors),
-              _buildReviewRow('Client / Account ID:', clientDisplay, colors),
-
-              if (_currentInstrument.isSuspended) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFC62828).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFC62828)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(LucideIcons.ban, size: 14, color: Color(0xFFC62828)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'SUSPENDED: Trading in ${_currentInstrument.symbol} is suspended (${_currentInstrument.suspensionReason ?? "Regulatory action"}). Order will be rejected.',
-                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFC62828)),
-                        ),
+          padding: EdgeInsets.only(
+            left: 20.0,
+            right: 20.0,
+            top: 16.0,
+            bottom: 20.0 + MediaQuery.viewInsetsOf(reviewContext).bottom,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(reviewContext).height * 0.85,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Order Confirmation',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: colors.textPrimary,
                       ),
-                    ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: (side == TransactionType.BUY ? const Color(0xFF00A854) : const Color(0xFFE82B57)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        side.name,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildReviewRow('Instrument:', _currentInstrument.symbol, colors),
+                        _buildReviewRow(
+                          'Order Type:',
+                          _orderExecutionType == 'Market'
+                              ? 'MARKET (fills at best price)'
+                              : _orderExecutionType == 'Stop'
+                                  ? 'STOP-MARKET (SL-M — triggers at ₹${_triggerPrice.toStringAsFixed(2)}, fills at market)'
+                                  : _orderExecutionType == 'Stop-Limit'
+                                      ? 'STOP-LIMIT (SL — trigger ₹${_triggerPrice.toStringAsFixed(2)}, limit ₹${_limitPrice.toStringAsFixed(2)})'
+                                      : 'LIMIT / PENDING',
+                          colors,
+                        ),
+                        _buildReviewRow('Side:', side.name, colors),
+                        _buildReviewRow('Order Price:', CurrencyFormatter.format(price), colors),
+                        _buildReviewRow('Quantity / Lots:', '${_lots.toStringAsFixed(2)} Lots (≈ ${totalQty.toStringAsFixed(0)} Qty)', colors),
+                        _buildReviewRow(
+                          'Time-in-Force:',
+                          _validity == Validity.DAY
+                              ? 'DAY (valid till end of trading day)'
+                              : 'IOC (Immediate or Cancel)',
+                          colors,
+                        ),
+                        _buildReviewRow('Stop Loss (S/L):', _slPrice > 0 ? CurrencyFormatter.format(_slPrice) : 'None', colors),
+                        _buildReviewRow('Take Profit (T/P):', _tpPrice > 0 ? CurrencyFormatter.format(_tpPrice) : 'None', colors),
+                        _buildReviewRow('Estimated Margin:', CurrencyFormatter.format(marginReq), colors),
+                        _buildReviewRow(
+                          'Est. Charges:',
+                          '₹0.00 Brokerage + STT ₹${charges.stt.toStringAsFixed(2)} + GST ₹${charges.gst.toStringAsFixed(2)} + Other ₹${(charges.exchangeTxnCharge + charges.sebiCharges + charges.stampDuty).toStringAsFixed(2)}',
+                          colors,
+                        ),
+                        _buildReviewRow('Total Taxes:', '₹${charges.total.toStringAsFixed(2)}', colors),
+                        _buildReviewRow('Client / Account ID:', clientDisplay, colors),
+
+                        if (_currentInstrument.isSuspended) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFC62828).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFC62828)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(LucideIcons.ban, size: 14, color: Color(0xFFC62828)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'SUSPENDED: Trading in ${_currentInstrument.symbol} is suspended (${_currentInstrument.suspensionReason ?? "Regulatory action"}). Order will be rejected.',
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFC62828)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (_currentInstrument.surveillanceTag != null) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF57C00).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFF57C00)),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(LucideIcons.alertTriangle, size: 14, color: Color(0xFFF57C00)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'SURVEILLANCE MEASURE: ${_currentInstrument.symbol} is under ${_currentInstrument.surveillanceTag}. 100% margin required; intraday leverage restricted.',
+                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF57C00)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        if (marginReq > availableMargin * 0.8 && !_currentInstrument.isSuspended) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE82B57).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE82B57).withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(LucideIcons.alertTriangle, size: 16, color: Color(0xFFE82B57)),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'High-Risk Order: Consumes >80% margin. Amplified volatility may lead to liquidation.',
+                                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFFE82B57), fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () => LeverageEducationDialog.show(context),
+                                  child: const Text(' Guide', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1E88E5), decoration: TextDecoration.underline)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-              ] else if (_currentInstrument.surveillanceTag != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF57C00).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFF57C00)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(LucideIcons.alertTriangle, size: 14, color: Color(0xFFF57C00)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'SURVEILLANCE MEASURE: ${_currentInstrument.symbol} is under ${_currentInstrument.surveillanceTag}. 100% margin required; intraday leverage restricted.',
-                          style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF57C00)),
+
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(reviewContext),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
+                        child: const Text('Edit Order'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting
+                            ? null
+                            : () {
+                                Navigator.pop(reviewContext);
+                                _executeOrder(side, price, totalQty);
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: side == TransactionType.BUY ? const Color(0xFF00A854) : const Color(0xFFE82B57),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Confirm & Place', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-
-              if (marginReq > availableMargin * 0.8 && !_currentInstrument.isSuspended) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE82B57).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFFE82B57).withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(LucideIcons.alertTriangle, size: 16, color: Color(0xFFE82B57)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'High-Risk Order: Consumes >80% margin. Amplified volatility may lead to liquidation.',
-                          style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFFE82B57), fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => LeverageEducationDialog.show(context),
-                        child: const Text(' Guide', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1E88E5), decoration: TextDecoration.underline)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 18),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(reviewContext),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text('Edit Order'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting
-                          ? null
-                          : () {
-                              Navigator.pop(reviewContext);
-                              _executeOrder(side, price, totalQty);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: side == TransactionType.BUY ? const Color(0xFF1E2B60) : const Color(0xFFE82B57),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Confirm & Place', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1629,21 +1704,26 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
         return;
       }
 
-      final engine = ref.read(orderSimulationEngineProvider);
+      final tradingRepo = ref.read(tradingRepositoryProvider);
       final edgeService = ref.read(edgeCaseServiceProvider);
 
       final isCommodity = _currentInstrument.exchange == Exchange.MCX ||
           _currentInstrument.token.contains('mcx_');
 
-      // 2. Client-generated idempotency key
-      final idempotencyKey =
-          'ord_${DateTime.now().millisecondsSinceEpoch}_${_currentInstrument.token}';
+      // 2. Client-generated session idempotency key (reused on retry of identical request, refreshed on param changes)
+      final idempotencyKey = _getIdempotencyKey(side, totalQty, execPrice);
+      final rawSymbol = _currentInstrument.symbol.isNotEmpty
+          ? _currentInstrument.symbol
+          : _currentInstrument.token;
+      final targetSymbol = rawSymbol.contains(':') ? rawSymbol.split(':').last : rawSymbol;
 
       final request = OrderRequest(
         idempotencyKey: idempotencyKey,
-        instrumentToken: _currentInstrument.token,
+        instrumentToken: targetSymbol,
         side: side,
         product: isCommodity ? ProductType.NRML : ProductType.MIS,
+        leverage: _currentInstrument.defaultLeverage > 0 ? _currentInstrument.defaultLeverage : 5.0,
+        market: _currentInstrument.market,
         kind: _orderExecutionType == 'Market'
             ? OrderKind.MARKET
             : _orderExecutionType == 'Stop'
@@ -1670,7 +1750,11 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
       // 3. Record in journal before dispatch to recover if app is killed
       edgeService.recordInFlightOrder(request, idempotencyKey);
 
-      final placedOrder = await engine.placeOrder(request);
+      final placedOrder = await tradingRepo.placeOrder(request);
+
+      ref.invalidate(ordersListProvider);
+      ref.invalidate(positionsListProvider);
+      ref.invalidate(fundsSummaryProvider);
 
       // 4. Mark persisted in journal
       edgeService.markOrderPersisted(idempotencyKey, placedOrder.effectiveServerOrderId);
@@ -1706,7 +1790,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
             '${side.name} order placed! Ref: ${placedOrder.orderId} • ${_lots.toStringAsFixed(2)} lots @ ${execPrice.toStringAsFixed(2)}',
           ),
           backgroundColor: side == TransactionType.BUY
-              ? const Color(0xFF1E2B60)
+              ? const Color(0xFF00A854)
               : const Color(0xFFE82B57),
           duration: const Duration(seconds: 4),
           action: SnackBarAction(
@@ -1716,6 +1800,29 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
           ),
         ),
       );
+    } catch (e, stack) {
+      debugPrint('[OrderEntry] Order execution failed: $e\n$stack');
+      if (mounted) {
+        final message = e is AppException ? e.message : e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(LucideIcons.alertCircle, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFFC62828),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -1725,7 +1832,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
 
   void _showInstrumentPicker(BuildContext context) {
     final colors = context.tradingColors;
-    final allInstruments = SeedInstruments.all;
+    final repo = ref.read(marketRepositoryProvider);
+    final allInstruments = repo.cachedInstruments;
 
     showModalBottomSheet(
       context: context,

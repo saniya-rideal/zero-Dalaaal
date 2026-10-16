@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import '../../../data/mock/ticker_service.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/exchange_chip.dart';
 import '../../../shared_widgets/price_text.dart';
@@ -240,7 +240,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
             const SizedBox(height: 24),
           ],
-          Text('TRENDING ON KITE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+          Text('TRENDING INSTRUMENTS', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,

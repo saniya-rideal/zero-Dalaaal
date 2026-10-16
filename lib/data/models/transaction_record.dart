@@ -107,25 +107,54 @@ class TransactionRecord {
     'feeBreakdown': feeBreakdown,
   };
 
-  factory TransactionRecord.fromJson(Map<String, dynamic> json) => TransactionRecord(
-    id: json['id'] as String,
-    orderId: json['orderId'] as String?,
-    category: TransactionCategory.values.byName(json['category'] as String),
-    title: json['title'] as String,
-    narration: json['narration'] as String,
-    instrumentSymbol: json['instrumentSymbol'] as String?,
-    quantity: json['quantity'] as int?,
-    price: (json['price'] as num?)?.toDouble(),
-    amount: (json['amount'] as num).toDouble(),
-    isCredit: json['isCredit'] as bool,
-    runningBalance: (json['runningBalance'] as num).toDouble(),
-    timestamp: DateTime.parse(json['timestamp'] as String),
-    status: json['status'] as String,
-    account: json['account'] as String,
-    feeBreakdown: (json['feeBreakdown'] as Map<String, dynamic>?)?.map(
-      (k, v) => MapEntry(k, (v as num).toDouble()),
-    ),
-  );
+  factory TransactionRecord.fromJson(Map<String, dynamic> json) {
+    final typeStr = (json['type'] ?? json['category'] ?? 'TRANSFER').toString().toUpperCase();
+    TransactionCategory cat = TransactionCategory.TRANSFER;
+    bool isCredit = false;
+
+    if (typeStr.contains('DEPOSIT') || typeStr.contains('BONUS') || typeStr.contains('PROFIT')) {
+      cat = typeStr.contains('PROFIT') ? TransactionCategory.TRADE : TransactionCategory.DEPOSIT;
+      isCredit = true;
+    } else if (typeStr.contains('WITHDRAW')) {
+      cat = TransactionCategory.WITHDRAWAL;
+      isCredit = false;
+    } else if (typeStr.contains('LOSS') || typeStr.contains('TRADE')) {
+      cat = TransactionCategory.TRADE;
+      isCredit = false;
+    } else if (typeStr.contains('FEE')) {
+      cat = TransactionCategory.FEE_CHARGE;
+      isCredit = false;
+    }
+
+    if (json['isCredit'] != null) {
+      isCredit = json['isCredit'] == true;
+    }
+
+    final amt = (json['amount'] as num?)?.toDouble().abs() ?? 0.0;
+    final bal = (json['runningBalance'] ?? json['balance'] as num?)?.toDouble() ?? 0.0;
+    final narr = (json['narration'] ?? json['description'] ?? json['title'] ?? '').toString();
+    final title = (json['title'] ?? json['type'] ?? cat.name).toString();
+
+    return TransactionRecord(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      orderId: json['orderId']?.toString(),
+      category: cat,
+      title: title,
+      narration: narr,
+      instrumentSymbol: json['instrumentSymbol']?.toString() ?? json['symbol']?.toString(),
+      quantity: (json['quantity'] as num?)?.toInt(),
+      price: (json['price'] as num?)?.toDouble(),
+      amount: amt,
+      isCredit: isCredit,
+      runningBalance: bal,
+      timestamp: DateTime.tryParse((json['timestamp'] ?? json['createdAt'] ?? json['date'] ?? '').toString()) ?? DateTime.now(),
+      status: (json['status'] ?? 'COMPLETED').toString(),
+      account: (json['account'] ?? 'Trading Ledger').toString(),
+      feeBreakdown: (json['feeBreakdown'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, (v as num).toDouble()),
+      ),
+    );
+  }
 
   /// Formats row for CSV statement export
   String toCsvRow() {

@@ -22,8 +22,9 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
   int _lockoutSeconds = 0;
   Timer? _lockoutTimer;
 
-  int _resendCooldown = 30;
-  Timer? _resendTimer;
+  // For PIN setup mode
+  String? _firstEnteredPin;
+  bool _isConfirmingSetup = false;
   late final SecurityPrivacyService _securityService;
 
   @override
@@ -33,27 +34,13 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _securityService.setScreenProtection(true);
     });
-    _startResendTimer();
   }
 
   @override
   void dispose() {
     _lockoutTimer?.cancel();
-    _resendTimer?.cancel();
     _securityService.setScreenProtection(false);
     super.dispose();
-  }
-
-  void _startResendTimer() {
-    setState(() => _resendCooldown = 30);
-    _resendTimer?.cancel();
-    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendCooldown > 0) {
-        setState(() => _resendCooldown--);
-      } else {
-        timer.cancel();
-      }
-    });
   }
 
   void _startLockoutTimer(int seconds) {
@@ -75,24 +62,65 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
     });
   }
 
-  Future<void> _handleTotpSubmitted(String pin) async {
+  Future<void> _handlePinSubmitted(String pin) async {
     if (_isLocked) return;
 
+    final authState = ref.read(authControllerProvider);
+    final isSetup = authState.requiresPinSetup;
+
+    if (isSetup) {
+      if (!_isConfirmingSetup) {
+        // Step 1 of setup: record first entry and prompt for confirmation
+        setState(() {
+          _firstEnteredPin = pin;
+          _isConfirmingSetup = true;
+        });
+        return;
+      } else {
+        // Step 2 of setup: verify matches
+        if (pin != _firstEnteredPin) {
+          setState(() {
+            _firstEnteredPin = null;
+            _isConfirmingSetup = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('PINs did not match. Please try setting your PIN again.'),
+              backgroundColor: Color(0xFFC62828),
+            ),
+          );
+          return;
+        }
+
+        final success = await ref.read(authControllerProvider.notifier).setPin(pin);
+        if (success && mounted) {
+          context.go('/quotes');
+        }
+        return;
+      }
+    }
+
+    // Standard verify PIN mode
     final security = ref.read(securityPrivacyServiceProvider);
-    final success = await ref.read(authControllerProvider.notifier).verifyTotp(pin);
+    final success = await ref.read(authControllerProvider.notifier).verifyPin(pin);
 
     if (success) {
       _failedAttempts = 0;
-      security.resetAttempts('totp_verification');
+      security.resetAttempts('pin_verification');
       if (mounted) {
         context.go('/quotes');
       }
     } else {
-      setState(() => _failedAttempts++);
-      security.recordFailedAttempt('totp_verification', maxAttempts: 3, lockoutDurationSeconds: 60);
+      final currentAuthState = ref.read(authControllerProvider);
+      if (currentAuthState.errorMessage != null && currentAuthState.errorMessage!.contains('ACCOUNT_LOCKED')) {
+        _startLockoutTimer(900);
+      } else {
+        setState(() => _failedAttempts++);
+        security.recordFailedAttempt('pin_verification', maxAttempts: 5, lockoutDurationSeconds: 900);
 
-      if (_failedAttempts >= 3) {
-        _startLockoutTimer(60);
+        if (_failedAttempts >= 5) {
+          _startLockoutTimer(900);
+        }
       }
     }
   }
@@ -101,13 +129,41 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final authState = ref.watch(authControllerProvider);
+    final isSetup = authState.requiresPinSetup;
+
+    String titleText;
+    String subtitleText;
+
+    if (isSetup) {
+      if (_isConfirmingSetup) {
+        titleText = 'Confirm Security PIN';
+        subtitleText = 'Re-enter your 6-digit PIN to confirm';
+      } else {
+        titleText = 'Create Security PIN';
+        subtitleText = 'Set a 6-digit PIN to protect your account';
+      }
+    } else {
+      titleText = 'Security PIN Verification';
+      subtitleText = _isLocked
+          ? 'Account temporarily locked due to failed attempts.'
+          : 'Enter your 6-digit Security PIN to authenticate';
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(LucideIcons.arrowLeft, size: 22),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (_isConfirmingSetup) {
+              setState(() {
+                _firstEnteredPin = null;
+                _isConfirmingSetup = false;
+              });
+            } else {
+              context.pop();
+            }
+          },
         ),
       ),
       body: SafeArea(
@@ -130,7 +186,7 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
                       Icon(LucideIcons.clock, color: colors.bearish, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        'OTP Locked. Try again in $_lockoutSeconds s',
+                        'Account Locked. Try again in ${(_lockoutSeconds / 60).ceil()}m',
                         style: GoogleFonts.inter(
                           color: colors.bearish,
                           fontWeight: FontWeight.w700,
@@ -142,40 +198,26 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
                 ),
 
               PinInputPad(
-                title: 'Two-Factor Auth (2FA)',
-                subtitle: _isLocked
-                    ? 'Too many incorrect OTP entries. Cooldown active.'
-                    : 'Enter the 6-digit TOTP / App PIN to authenticate',
+                title: titleText,
+                subtitle: subtitleText,
                 hasError: authState.errorMessage != null || _isLocked,
-                onCompleted: _isLocked ? (_) {} : _handleTotpSubmitted,
+                onCompleted: _isLocked ? (_) {} : _handlePinSubmitted,
               ),
+
+              if (authState.errorMessage != null && !_isLocked) ...[
+                const SizedBox(height: 12),
+                Text(
+                  authState.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: colors.bearish,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 20),
-
-              // Resend OTP Countdown & Action
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _resendCooldown > 0
-                        ? 'Resend OTP via SMS in $_resendCooldown s'
-                        : 'Did not receive code?',
-                    style: GoogleFonts.inter(fontSize: 12.5, color: colors.textSecondary),
-                  ),
-                  if (_resendCooldown == 0 && !_isLocked) ...[
-                    const SizedBox(width: 6),
-                    TextButton(
-                      onPressed: () {
-                        _startResendTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('New 6-digit OTP dispatched to verified mobile.')),
-                        );
-                      },
-                      child: Text('Resend OTP', style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ],
-              ),
 
               if (authState.isLoading) ...[
                 const SizedBox(height: 24),

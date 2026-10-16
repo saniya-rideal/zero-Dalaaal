@@ -6,11 +6,10 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../../orders/data/real_trading_repository.dart';
+import '../../orders/domain/trading_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/margin_risk_banner.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../positions/presentation/position_action_sheets.dart';
@@ -46,9 +45,18 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    var openOrders = List<Order>.from(engine.pendingOrders);
-    var activePositions = List<Position>.from(engine.positions);
+    final tradingRepo = ref.read(tradingRepositoryProvider);
+    final ordersAsync = ref.watch(ordersListProvider);
+    final positionsAsync = ref.watch(positionsListProvider);
+
+    final allOrders = ordersAsync.value ?? const <Order>[];
+    var openOrders = allOrders
+        .where((o) =>
+            o.status == OrderStatus.OPEN ||
+            o.status == OrderStatus.SUBMITTED ||
+            o.status == OrderStatus.TRIGGER_PENDING)
+        .toList();
+    var activePositions = List<Position>.from(positionsAsync.value ?? const <Position>[]);
 
     // Apply Search Filter
     final query = _searchController.text.trim().toLowerCase();
@@ -90,12 +98,6 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
-
           // Search Bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
@@ -179,7 +181,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                             style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w700),
                           ),
                           InkWell(
-                            onTap: () => _showBatchActionSheet(context, engine, colors),
+                            onTap: () => _showBatchActionSheet(context, tradingRepo, colors),
                             child: Text(
                               'Action',
                               style: AppTypography.body(color: colors.primary, weight: FontWeight.w600),
@@ -310,8 +312,8 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                             onTap: () => PositionActionSheets.showFullOptions(
                               context,
                               pos,
-                              engine,
-                              onRefresh: () => setState(() {}),
+                              tradingRepo,
+                              onRefresh: () => ref.invalidate(positionsListProvider),
                             ),
                             leading: Checkbox(
                               value: isSelected,
@@ -520,15 +522,18 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                             ),
                           ),
                           InkWell(
-                            onTap: () {
+                            onTap: () async {
                               if (_selectedOrders.isNotEmpty) {
                                 for (final orderId in _selectedOrders) {
-                                  engine.cancelOrder(orderId);
+                                  await tradingRepo.cancelOrder(orderId);
                                 }
                                 _selectedOrders.clear();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Selected orders cancelled')),
-                                );
+                                ref.invalidate(ordersListProvider);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Selected orders cancelled')),
+                                  );
+                                }
                               }
                             },
                             child: Text(
@@ -564,7 +569,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                         return Material(
                           color: Colors.transparent,
                           child: ListTile(
-                            onTap: () => _showOrderOptionsSheet(context, order, engine, colors),
+                            onTap: () => _showOrderOptionsSheet(context, order, tradingRepo, colors),
                             leading: Checkbox(
                               value: isSelected,
                               activeColor: colors.primary,
@@ -604,7 +609,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
   }
 
   void _showOrderOptionsSheet(
-      BuildContext context, Order order, OrderSimulationEngine engine, TradingColors colors) {
+      BuildContext context, Order order, TradingRepository tradingRepo, TradingColors colors) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -663,13 +668,16 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
                     ),
                   );
                   if (confirmed == true && context.mounted) {
-                    engine.cancelOrder(order.orderId);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Order ${order.orderId} cancelled'),
-                        backgroundColor: colors.bearish,
-                      ),
-                    );
+                    await tradingRepo.cancelOrder(order.id);
+                    ref.invalidate(ordersListProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Order ${order.orderId} cancelled'),
+                          backgroundColor: colors.bearish,
+                        ),
+                      );
+                    }
                   }
                 },
               ),
@@ -690,7 +698,7 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
   }
 
   void _showBatchActionSheet(
-      BuildContext context, OrderSimulationEngine engine, TradingColors colors) {
+      BuildContext context, TradingRepository tradingRepo, TradingColors colors) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

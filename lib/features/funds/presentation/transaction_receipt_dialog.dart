@@ -6,7 +6,6 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
 import '../../../data/models/funds.dart';
 
 class TransactionReceiptDialog extends ConsumerWidget {
@@ -193,48 +192,6 @@ class TransactionReceiptDialog extends ConsumerWidget {
             ),
 
             const SizedBox(height: 20),
-
-            // Pending Withdrawal Cancel Button
-            if (transaction.isWithdrawal && transaction.status == WalletTransactionStatus.PENDING) ...[
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final engine = ref.read(orderSimulationEngineProvider);
-                  try {
-                    await engine.cancelWithdrawal(transaction.id);
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Withdrawal ${transaction.referenceId} cancelled. Margin restored!'),
-                          backgroundColor: colors.primary,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: $e'), backgroundColor: colors.bearish),
-                      );
-                    }
-                  }
-                },
-                icon: Icon(LucideIcons.xCircle, size: 18, color: colors.bearish),
-                label: Text(
-                  'Cancel Withdrawal Request',
-                  style: GoogleFonts.inter(
-                    color: colors.bearish,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: colors.bearish),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
 
             // Close Button
             ElevatedButton(

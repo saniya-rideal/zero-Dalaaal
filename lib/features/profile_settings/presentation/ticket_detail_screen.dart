@@ -1,11 +1,11 @@
-import 'dart:math';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../data/mock/support_repository.dart';
+import '../data/support_repository.dart';
 import '../../../data/models/models.dart';
 
 class TicketDetailScreen extends ConsumerStatefulWidget {
@@ -21,6 +21,7 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
   final TextEditingController _replyController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<TicketAttachment> _pendingAttachments = [];
+  bool _isUploadingAttachment = false;
 
   @override
   void dispose() {
@@ -46,9 +47,9 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
     if (text.isEmpty && _pendingAttachments.isEmpty) return;
 
     final repo = ref.read(supportRepositoryProvider);
-    repo.addReply(
-      ticketId: widget.ticketId,
-      content: text.isNotEmpty ? text : 'Attached document proof for reference.',
+    repo.replyTicket(
+      widget.ticketId,
+      text.isNotEmpty ? text : 'Attached document proof for reference.',
       attachments: List.from(_pendingAttachments),
     );
 
@@ -57,23 +58,52 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
     _scrollToBottom();
   }
 
-  void _addSimulatedAttachment({required bool isPdf}) {
-    final rng = Random();
-    final id = 'att_${DateTime.now().millisecondsSinceEpoch}';
-    final name = isPdf
-        ? 'document_proof_${rng.nextInt(900) + 100}.pdf'
-        : 'screenshot_${rng.nextInt(900) + 100}.png';
-    final size = isPdf ? rng.nextInt(600000) + 150000 : rng.nextInt(250000) + 40000;
+  Future<void> _pickAndUploadAttachment({required bool isPdf}) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: isPdf ? FileType.custom : FileType.image,
+        allowedExtensions: isPdf ? ['pdf'] : null,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes ?? (file.path != null ? await File(file.path!).readAsBytes() : null);
+      if (bytes == null || bytes.isEmpty) return;
 
-    setState(() {
-      _pendingAttachments.add(TicketAttachment(
-        id: id,
-        fileName: name,
-        fileSizeBytes: size,
-        fileType: isPdf ? 'pdf' : 'image',
-        uploadedAt: DateTime.now(),
-      ));
-    });
+      setState(() => _isUploadingAttachment = true);
+
+      final repo = ref.read(supportRepositoryProvider);
+      final attachment = await repo.uploadAttachment(
+        fileName: file.name,
+        bytes: bytes,
+        mimeType: isPdf ? 'application/pdf' : 'image/png',
+      );
+
+      if (mounted) {
+        setState(() {
+          _pendingAttachments.add(attachment);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${file.name} uploaded successfully to ticket.'),
+            backgroundColor: const Color(0xFF00A854),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to upload attachment: $e'),
+            backgroundColor: const Color(0xFFE23A3A),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingAttachment = false);
+      }
+    }
   }
 
   Color _getStatusColor(TicketStatus s, TradingColors colors) {
@@ -108,31 +138,26 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
     final repo = ref.watch(supportRepositoryProvider);
-    final ticket = repo.getTicketById(widget.ticketId);
-
-    if (ticket == null) {
-      return Scaffold(
-        backgroundColor: colors.background,
-        appBar: AppBar(
-          backgroundColor: colors.background,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary),
-            onPressed: () {
-              if (Navigator.of(context).canPop()) {
-                Navigator.of(context).pop();
-              } else {
-                context.go('/help');
-              }
-            },
-          ),
-          title: Text('Ticket Not Found', style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
-        ),
-        body: Center(
-          child: Text('Support Ticket #${widget.ticketId} was not found.', style: AppTypography.body(color: colors.textSecondary)),
-        ),
-      );
-    }
+    final ticket = repo.getTicketById(widget.ticketId) ??
+        SupportTicket(
+          id: widget.ticketId,
+          title: 'Ticket #${widget.ticketId}',
+          description: 'Ticket details',
+          category: TicketCategory.tradingOrders,
+          priority: TicketPriority.medium,
+          status: TicketStatus.open,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          messages: [
+            TicketMessage(
+              id: 'msg_initial',
+              senderName: 'Client',
+              senderRole: MessageSenderRole.client,
+              content: 'Query registered under #${widget.ticketId}',
+              timestamp: DateTime.now(),
+            ),
+          ],
+        );
 
     final statusColor = _getStatusColor(ticket.status, colors);
     final priorityColor = _getPriorityColor(ticket.priority, colors);
@@ -310,18 +335,27 @@ class _TicketDetailScreenState extends ConsumerState<TicketDetailScreen> {
             child: Row(
               children: [
                 // Add attachment menu
-                PopupMenuButton<String>(
-                  icon: Icon(LucideIcons.paperclip, color: colors.textSecondary),
-                  tooltip: 'Attach proof or screenshot',
-                  onSelected: (val) {
-                    if (val == 'image') _addSimulatedAttachment(isPdf: false);
-                    if (val == 'pdf') _addSimulatedAttachment(isPdf: true);
-                  },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 'image', child: Text('Attach Screenshot (.png)')),
-                    const PopupMenuItem(value: 'pdf', child: Text('Attach Bank/CMR PDF (.pdf)')),
-                  ],
-                ),
+                _isUploadingAttachment
+                    ? const Padding(
+                        padding: EdgeInsets.all(8.0),
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : PopupMenuButton<String>(
+                        icon: Icon(LucideIcons.paperclip, color: colors.textSecondary),
+                        tooltip: 'Attach proof or screenshot',
+                        onSelected: (val) {
+                          if (val == 'image') _pickAndUploadAttachment(isPdf: false);
+                          if (val == 'pdf') _pickAndUploadAttachment(isPdf: true);
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(value: 'image', child: Text('Attach Screenshot / Image')),
+                          const PopupMenuItem(value: 'pdf', child: Text('Attach Document (.pdf)')),
+                        ],
+                      ),
                 // Text Field
                 Expanded(
                   child: TextField(

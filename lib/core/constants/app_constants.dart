@@ -13,12 +13,6 @@ class AppConstants {
   static const int maxWatchlists = 25;
   static const int maxInstrumentsPerWatchlist = 250;
 
-  // Demo user defaults
-  static const String demoUserId = 'ZERO1234';
-  static const String demoUserName = 'Anurag Sharma';
-  static const String demoEmail = 'anurag@zero.com';
-  static const String demoPan = 'ABCDE1234F';
-  static const String defaultPin = '123456';
 
   // Seed initial capital
   static const double initialEquityMargin = 250000.00;
@@ -32,13 +26,13 @@ class AppConstants {
   static const String supportHelpUrl = 'https://zerodalali.com/support';
   static const String accountDeletionUrl = 'https://zerodalali.com/account/delete';
 
-  // Statutory SEBI & Regulatory Identifiers
-  static const String regulatoryCin = 'U67120KA2024PTC189201';
-  static const String sebiRegistrationNo = 'INZ000312345';
-  static const String cdslDpId = 'IN-DP-CDSL-892-2024';
+  // Statutory Regulatory Identifiers & Disclaimers (Configured from API)
+  static const String paperTradingDisclaimer = 'Regulatory disclaimer unavailable';
+  static const String regulatoryCin = 'Unavailable';
+  static const String sebiRegistrationNo = 'Unavailable';
+  static const String cdslDpId = 'Unavailable';
   static const int minimumAge = 18;
-  static const String sebiFnoLossWarning =
-      '9 out of 10 individual traders in equity Futures and Options Segment incurred net losses.';
+  static const String sebiFnoLossWarning = 'Regulatory warning unavailable';
 
   // Ticker interval
   static const int tickerIntervalMs = 1200;

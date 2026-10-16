@@ -8,7 +8,7 @@ import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
+import '../data/real_funds_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
@@ -16,6 +16,7 @@ import '../../../shared_widgets/section_card.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
+import '../../profile_settings/data/app_config_repository.dart';
 
 class FundsScreen extends ConsumerStatefulWidget {
   const FundsScreen({super.key});
@@ -44,15 +45,16 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
     final isHidden = ref.watch(balancePrivacyProvider);
-    final equitySummary = engine.getFundsSummary(Segment.EQUITY);
-    final commoditySummary = engine.getFundsSummary(Segment.COMMODITY);
-    final ledger = engine.ledger;
+    final fundsAsync = ref.watch(fundsSummaryProvider);
+    final ledgerAsync = ref.watch(walletLedgerProvider);
+    final equitySummary = fundsAsync.value ?? FundsSummary.zero();
+    final commoditySummary = fundsAsync.value ?? FundsSummary.zero();
+    final ledger = ledgerAsync.value ?? const <LedgerEntry>[];
 
     // Watch wallet transactions reactively
     final walletTxnsAsync = ref.watch(walletTransactionsListProvider);
-    final walletTxns = walletTxnsAsync.valueOrNull ?? engine.walletTransactions;
+    final walletTxns = walletTxnsAsync.value ?? const <WalletTransaction>[];
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -145,6 +147,12 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
     TradingColors colors,
     Segment segment,
   ) {
+    final disclaimerAsync = ref.watch(fundsLegalDisclaimerProvider);
+    final disclaimerText = disclaimerAsync.when(
+      data: (text) => text.isNotEmpty ? text : 'Regulatory disclosure unavailable',
+      loading: () => 'Loading regulatory disclosure...',
+      error: (_, __) => 'Regulatory disclosure unavailable',
+    );
     final isHidden = ref.watch(balancePrivacyProvider);
     final avail = isHidden ? '••••••' : CurrencyFormatter.format(summary.availableMargin);
     final used = isHidden ? '••••••' : CurrencyFormatter.format(summary.usedMargin);
@@ -289,7 +297,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'SEBI Registered • 256-bit SSL • NPCI UPI • Segregated Client Funds Escrow',
+                      disclaimerText,
                       style: GoogleFonts.inter(
                         color: colors.textSecondary,
                         fontSize: 10.5,
@@ -591,25 +599,13 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                       style: GoogleFonts.inter(color: colors.textSecondary, fontSize: 11),
                     ),
                     TextButton.icon(
-                      onPressed: () async {
-                        final engine = ref.read(orderSimulationEngineProvider);
-                        try {
-                          await engine.cancelWithdrawal(txn.id);
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Withdrawal ${txn.referenceId} cancelled. Margin restored!'),
-                                backgroundColor: colors.primary,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error: $e'), backgroundColor: colors.bearish),
-                            );
-                          }
-                        }
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Withdrawal request #${txn.referenceId} is currently pending review by compliance.'),
+                            backgroundColor: colors.warning,
+                          ),
+                        );
                       },
                       icon: Icon(LucideIcons.xCircle, size: 14, color: colors.bearish),
                       label: Text(

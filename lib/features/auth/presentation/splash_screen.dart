@@ -22,15 +22,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    await Future.delayed(const Duration(milliseconds: 1200));
+    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
 
     final authController = ref.read(authControllerProvider.notifier);
     await authController.checkInitialSession();
 
     if (!mounted) return;
-    // Go directly to Quotes home screen without 2FA / PIN screen
-    context.go('/quotes');
+    final authState = ref.read(authControllerProvider);
+
+    if (authState.isAuthenticated && authState.session != null) {
+      if (authState.requiresPinUnlock) {
+        context.go('/pin-unlock');
+      } else {
+        context.go('/quotes');
+      }
+    } else {
+      context.go('/login');
+    }
   }
 
   @override

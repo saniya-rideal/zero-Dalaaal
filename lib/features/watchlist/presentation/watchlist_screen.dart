@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
-import '../../../data/mock/seed_instruments.dart';
-import '../../../data/mock/ticker_service.dart';
 import '../../../data/models/models.dart';
+import '../../market/data/real_market_repository.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
@@ -70,6 +70,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
     final state = ref.watch(watchlistControllerProvider);
     final activeGroup = state.activeWatchlist;
     final tickerService = ref.watch(tickerServiceProvider);
+    final repo = ref.watch(marketRepositoryProvider);
 
     // Subscribe visible tokens to ticker
     if (activeGroup != null && activeGroup.instrumentTokens.isNotEmpty) {
@@ -162,7 +163,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                             ref.read(watchlistControllerProvider.notifier).reorder(oldIdx, newIdx),
                         itemBuilder: (context, index) {
                           final token = activeGroup.instrumentTokens[index];
-                          final instrument = SeedInstruments.findByToken(token) ??
+                          final instrument = repo.findBySymbol(token) ??
                               Instrument(
                                 token: token,
                                 symbol: token.toUpperCase(),

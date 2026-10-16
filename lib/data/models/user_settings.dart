@@ -120,6 +120,9 @@ class UserSettings {
   final bool twoFactorEnabled;
   final String totpSecretKey;
   final bool securityAlertsEnabled;
+  final int autoLockTimeoutMinutes;
+  final bool orderNotificationSound;
+  final bool priceAlertSound;
   final List<ActiveSessionItem> activeSessions;
 
   // ─── 3. Trading Preferences ────────────────────────────────────────────────
@@ -159,6 +162,9 @@ class UserSettings {
     this.twoFactorEnabled = true,
     this.totpSecretKey = 'JBSWY3DPEHPK3PXP',
     this.securityAlertsEnabled = true,
+    this.autoLockTimeoutMinutes = 5,
+    this.orderNotificationSound = true,
+    this.priceAlertSound = true,
     this.activeSessions = const [
       ActiveSessionItem(
         id: 'sess_cur',
@@ -240,6 +246,9 @@ class UserSettings {
     bool? quotesGrouping,
     bool? keepScreenAwake,
     bool? muteAllSounds,
+    int? autoLockTimeoutMinutes,
+    bool? orderNotificationSound,
+    bool? priceAlertSound,
     bool? openWhereLeft,
   }) {
     return UserSettings(
@@ -255,6 +264,9 @@ class UserSettings {
       twoFactorEnabled: twoFactorEnabled ?? this.twoFactorEnabled,
       totpSecretKey: totpSecretKey ?? this.totpSecretKey,
       securityAlertsEnabled: securityAlertsEnabled ?? this.securityAlertsEnabled,
+      autoLockTimeoutMinutes: autoLockTimeoutMinutes ?? this.autoLockTimeoutMinutes,
+      orderNotificationSound: orderNotificationSound ?? this.orderNotificationSound,
+      priceAlertSound: priceAlertSound ?? this.priceAlertSound,
       activeSessions: activeSessions ?? this.activeSessions,
       defaultOrderType: defaultOrderType ?? this.defaultOrderType,
       defaultProductType: defaultProductType ?? this.defaultProductType,

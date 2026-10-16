@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
+import 'auth_controller.dart';
 
-class ForgotPasswordSheet extends StatefulWidget {
+class ForgotPasswordSheet extends ConsumerStatefulWidget {
   const ForgotPasswordSheet({super.key});
 
   static Future<void> show(BuildContext context) {
@@ -17,11 +20,11 @@ class ForgotPasswordSheet extends StatefulWidget {
   }
 
   @override
-  State<ForgotPasswordSheet> createState() => _ForgotPasswordSheetState();
+  ConsumerState<ForgotPasswordSheet> createState() => _ForgotPasswordSheetState();
 }
 
-class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
-  int _step = 1; // 1: Input Mobile/User ID, 2: OTP & New Password, 3: Success
+class _ForgotPasswordSheetState extends ConsumerState<ForgotPasswordSheet> {
+  int _step = 1; // 1: Input Identifier, 2: OTP & New Password, 3: Success
 
   final _identifierController = TextEditingController();
   final _otpController = TextEditingController();
@@ -30,7 +33,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
 
   bool _obscureNew = true;
   bool _obscureConfirm = true;
-  int _countdown = 30;
+  int _countdown = 60;
   Timer? _timer;
   String? _errorMessage;
 
@@ -64,13 +67,13 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
   Color _getStrengthColor(int strength) {
     switch (strength) {
       case 1:
-        return const Color(0xFFE82B57); // Red
+        return const Color(0xFFE82B57);
       case 2:
-        return const Color(0xFFF5A623); // Orange
+        return const Color(0xFFF5A623);
       case 3:
-        return const Color(0xFF2F80ED); // Blue
+        return const Color(0xFF2F80ED);
       case 4:
-        return const Color(0xFF00A854); // Green
+        return const Color(0xFF00A854);
       default:
         return Colors.grey.shade400;
     }
@@ -93,7 +96,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
 
   void _startCountdown() {
     _timer?.cancel();
-    setState(() => _countdown = 30);
+    setState(() => _countdown = 60);
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_countdown > 0) {
         setState(() => _countdown--);
@@ -103,30 +106,32 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     });
   }
 
-  void _sendOtp() {
+  Future<void> _sendOtp() async {
     final id = _identifierController.text.trim();
     if (id.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your registered User ID or Mobile number');
+      setState(() => _errorMessage = 'Please enter your Client ID, email or phone');
       return;
     }
-    setState(() {
-      _errorMessage = null;
-      _step = 2;
-    });
-    _startCountdown();
+
+    setState(() => _errorMessage = null);
+    final success = await ref.read(authControllerProvider.notifier).forgotPassword(id);
+
+    if (success && mounted) {
+      setState(() => _step = 2);
+      _startCountdown();
+    } else {
+      final authState = ref.read(authControllerProvider);
+      setState(() => _errorMessage = authState.errorMessage ?? 'Failed to send reset code.');
+    }
   }
 
-  void _resetPassword() {
+  Future<void> _resetPassword() async {
     final otp = _otpController.text.trim();
     final newPass = _newPasswordController.text;
     final confirmPass = _confirmPasswordController.text;
 
-    if (_countdown == 0) {
-      setState(() => _errorMessage = 'OTP has expired. Please click Resend Code.');
-      return;
-    }
-    if (otp != '1234') {
-      setState(() => _errorMessage = 'Invalid verification OTP. Please check or resend.');
+    if (otp.length != 6) {
+      setState(() => _errorMessage = 'Please enter a valid 6-digit OTP.');
       return;
     }
     if (newPass.length < 8) {
@@ -142,16 +147,26 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
       return;
     }
 
-    _timer?.cancel();
-    setState(() {
-      _errorMessage = null;
-      _step = 3;
-    });
+    setState(() => _errorMessage = null);
+    final success = await ref.read(authControllerProvider.notifier).resetPassword(
+          identifier: _identifierController.text.trim(),
+          otp: otp,
+          newPassword: newPass,
+        );
+
+    if (success && mounted) {
+      _timer?.cancel();
+      setState(() => _step = 3);
+    } else {
+      final authState = ref.read(authControllerProvider);
+      setState(() => _errorMessage = authState.errorMessage ?? 'Password reset failed.');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final authState = ref.watch(authControllerProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -177,7 +192,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                   Text(
                     _step == 1
                         ? 'Reset Password'
-                        : (_step == 2 ? 'Verify & Set New Password' : 'Password Reset Complete'),
+                        : (_step == 2 ? 'Verify & Set Password' : 'Password Reset Complete'),
                     style: GoogleFonts.inter(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
@@ -208,8 +223,8 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
                 ),
               ],
 
-              if (_step == 1) _buildStep1(colors),
-              if (_step == 2) _buildStep2(colors),
+              if (_step == 1) _buildStep1(colors, authState),
+              if (_step == 2) _buildStep2(colors, authState),
               if (_step == 3) _buildStep3(colors),
             ],
           ),
@@ -218,12 +233,12 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
     );
   }
 
-  Widget _buildStep1(TradingColors colors) {
+  Widget _buildStep1(TradingColors colors, AuthState authState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Enter your registered User ID or 10-digit mobile number. We will send a one-time verification code.',
+          'Enter your registered Client ID (e.g. ZD482915), email, or mobile number.',
           style: GoogleFonts.inter(fontSize: 13, color: colors.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 18),
@@ -231,7 +246,7 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
           controller: _identifierController,
           style: TextStyle(color: colors.textPrimary),
           decoration: InputDecoration(
-            labelText: 'User ID or Mobile Number',
+            labelText: 'Client ID / Email / Phone',
             prefixIcon: Icon(LucideIcons.user, color: colors.primary, size: 18),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
@@ -240,39 +255,55 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
         SizedBox(
           height: 48,
           child: ElevatedButton(
-            onPressed: _sendOtp,
+            onPressed: authState.isLoading ? null : _sendOtp,
             style: ElevatedButton.styleFrom(
               backgroundColor: colors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('SEND VERIFICATION CODE', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: authState.isLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('SEND RESET CODE', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStep2(TradingColors colors) {
+  Widget _buildStep2(TradingColors colors, AuthState authState) {
     final strength = _calculatePasswordStrength(_newPasswordController.text);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Enter the 4-digit code sent to ${_identifierController.text.trim()} (Demo OTP: 1234)',
+          'If the account exists, a 6-digit password reset OTP has been sent.',
           style: GoogleFonts.inter(fontSize: 13, color: colors.textSecondary),
         ),
+        if (kDebugMode) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '💡 Dev Hint: Check the backend terminal console for the generated 6-digit OTP.',
+              style: GoogleFonts.inter(fontSize: 11.5, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         TextField(
           controller: _otpController,
           keyboardType: TextInputType.number,
-          maxLength: 4,
+          maxLength: 6,
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 16, color: colors.textPrimary),
+          style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 12, color: colors.textPrimary),
           decoration: InputDecoration(
             counterText: '',
-            hintText: '••••',
+            hintText: '••••••',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
@@ -351,13 +382,15 @@ class _ForgotPasswordSheetState extends State<ForgotPasswordSheet> {
         SizedBox(
           height: 48,
           child: ElevatedButton(
-            onPressed: _resetPassword,
+            onPressed: authState.isLoading ? null : _resetPassword,
             style: ElevatedButton.styleFrom(
               backgroundColor: colors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('UPDATE PASSWORD', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: authState.isLoading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('UPDATE PASSWORD', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
       ],

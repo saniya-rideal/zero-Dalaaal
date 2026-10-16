@@ -1,17 +1,20 @@
 class UserProfile {
-  final String userId;
+  final String userId; // maps to clientId (e.g. ZD482915)
   final String name;
   final String email;
   final String phone;
   final String pan;
   final String bankName;
-  final String bankAccountNumber;
+  final String bankAccountNumber; // already masked (e.g. •••• •••• 1234)
   final bool equitySegment;
   final bool fnoSegment;
   final bool commoditySegment;
   final bool currencySegment;
   final bool biometricEnabled;
   final String kycStatus;
+  final String? dob;
+  final String? address;
+  final bool hasPin;
 
   const UserProfile({
     required this.userId,
@@ -27,7 +30,12 @@ class UserProfile {
     this.currencySegment = false,
     this.biometricEnabled = false,
     this.kycStatus = 'VERIFIED',
+    this.dob,
+    this.address,
+    this.hasPin = true,
   });
+
+  String get clientId => userId;
 
   UserProfile copyWith({
     String? userId,
@@ -43,6 +51,9 @@ class UserProfile {
     bool? currencySegment,
     bool? biometricEnabled,
     String? kycStatus,
+    String? dob,
+    String? address,
+    bool? hasPin,
   }) {
     return UserProfile(
       userId: userId ?? this.userId,
@@ -58,6 +69,9 @@ class UserProfile {
       currencySegment: currencySegment ?? this.currencySegment,
       biometricEnabled: biometricEnabled ?? this.biometricEnabled,
       kycStatus: kycStatus ?? this.kycStatus,
+      dob: dob ?? this.dob,
+      address: address ?? this.address,
+      hasPin: hasPin ?? this.hasPin,
     );
   }
 
@@ -75,22 +89,28 @@ class UserProfile {
     'currencySegment': currencySegment,
     'biometricEnabled': biometricEnabled,
     'kycStatus': kycStatus,
+    'dob': dob,
+    'address': address,
+    'hasPin': hasPin,
   };
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-    userId: json['userId'] as String,
-    name: json['name'] as String,
-    email: json['email'] as String,
-    phone: json['phone'] as String,
-    pan: json['pan'] as String,
-    bankName: json['bankName'] as String,
-    bankAccountNumber: json['bankAccountNumber'] as String,
+    userId: (json['userId'] ?? json['clientId'] ?? json['id'] ?? json['_id'] ?? '').toString(),
+    name: (json['name'] ?? '').toString(),
+    email: (json['email'] ?? '').toString(),
+    phone: (json['phone'] ?? json['mobile'] ?? '').toString(),
+    pan: (json['pan'] ?? '').toString(),
+    bankName: (json['bankName'] ?? '').toString(),
+    bankAccountNumber: (json['bankAccountNumber'] ?? json['bankAccountLast4'] ?? '').toString(),
     equitySegment: json['equitySegment'] as bool? ?? true,
     fnoSegment: json['fnoSegment'] as bool? ?? true,
     commoditySegment: json['commoditySegment'] as bool? ?? true,
     currencySegment: json['currencySegment'] as bool? ?? false,
     biometricEnabled: json['biometricEnabled'] as bool? ?? false,
-    kycStatus: json['kycStatus'] as String? ?? 'VERIFIED',
+    kycStatus: (json['kycStatus'] ?? 'NOT_STARTED').toString(),
+    dob: json['dob']?.toString(),
+    address: json['address']?.toString(),
+    hasPin: json['hasPin'] as bool? ?? true,
   );
 }
 
@@ -117,9 +137,15 @@ class Session {
   };
 
   factory Session.fromJson(Map<String, dynamic> json) => Session(
-    token: json['token'] as String,
-    profile: UserProfile.fromJson(json['profile'] as Map<String, dynamic>),
-    loggedInAt: DateTime.parse(json['loggedInAt'] as String),
-    expiresAt: DateTime.parse(json['expiresAt'] as String),
+    token: (json['token'] ?? json['accessToken'] ?? '').toString(),
+    profile: UserProfile.fromJson(json['profile'] is Map<String, dynamic>
+        ? json['profile'] as Map<String, dynamic>
+        : (json['user'] is Map<String, dynamic> ? json['user'] as Map<String, dynamic> : {})),
+    loggedInAt: json['loggedInAt'] != null
+        ? DateTime.tryParse(json['loggedInAt'].toString()) ?? DateTime.now()
+        : DateTime.now(),
+    expiresAt: json['expiresAt'] != null
+        ? DateTime.tryParse(json['expiresAt'].toString()) ?? DateTime.now().add(const Duration(days: 365))
+        : DateTime.now().add(const Duration(days: 365)),
   );
 }

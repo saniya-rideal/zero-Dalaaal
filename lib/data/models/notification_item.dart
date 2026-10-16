@@ -30,6 +30,39 @@ enum NotificationCategory {
   security,
 }
 
+extension NotificationTypeCategoryX on NotificationType {
+  NotificationCategory get category {
+    switch (this) {
+      case NotificationType.orderSubmitted:
+      case NotificationType.orderFilled:
+      case NotificationType.orderPartiallyFilled:
+      case NotificationType.orderRejected:
+      case NotificationType.orderCancelled:
+        return NotificationCategory.orders;
+      case NotificationType.depositSuccess:
+      case NotificationType.depositPending:
+      case NotificationType.depositFailed:
+      case NotificationType.withdrawalInitiated:
+      case NotificationType.withdrawalCompleted:
+      case NotificationType.withdrawalFailed:
+        return NotificationCategory.funds;
+      case NotificationType.marginWarning:
+      case NotificationType.liquidationWarning:
+        return NotificationCategory.riskMargin;
+      case NotificationType.priceAlert:
+        return NotificationCategory.priceAlerts;
+      case NotificationType.newsAlert:
+        return NotificationCategory.news;
+      case NotificationType.securityAlert:
+      case NotificationType.loginNewDevice:
+      case NotificationType.passwordChanged:
+      case NotificationType.kycStatusChanged:
+      case NotificationType.accountNotice:
+        return NotificationCategory.security;
+    }
+  }
+}
+
 class NotificationItem {
   final String id;
   final NotificationType type;
@@ -50,7 +83,7 @@ class NotificationItem {
     required this.body,
     required this.timestamp,
     this.isRead = false,
-    required this.deepLink,
+    this.deepLink = '',
     this.metadata = const {},
     this.isCritical = false,
   });
@@ -103,18 +136,52 @@ class NotificationItem {
     'isCritical': isCritical,
   };
 
-  factory NotificationItem.fromJson(Map<String, dynamic> json) => NotificationItem(
-    id: json['id'] as String,
-    type: NotificationType.values.byName(json['type'] as String),
-    category: NotificationCategory.values.byName(json['category'] as String),
-    title: json['title'] as String,
-    body: json['body'] as String,
-    timestamp: DateTime.parse(json['timestamp'] as String),
-    isRead: json['isRead'] as bool? ?? false,
-    deepLink: json['deepLink'] as String? ?? '/notifications',
-    metadata: (json['metadata'] as Map<String, dynamic>?) ?? {},
-    isCritical: json['isCritical'] as bool? ?? false,
-  );
+  factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    NotificationType nType = NotificationType.accountNotice;
+    final typeStr = (json['type'] ?? '').toString();
+    try {
+      nType = NotificationType.values.byName(typeStr);
+    } catch (_) {
+      if (typeStr.contains('ORDER')) {
+        nType = NotificationType.orderFilled;
+      } else if (typeStr.contains('DEPOSIT') || typeStr.contains('FUNDS')) {
+        nType = NotificationType.depositSuccess;
+      } else if (typeStr.contains('WITHDRAW')) {
+        nType = NotificationType.withdrawalInitiated;
+      } else if (typeStr.contains('ALERT')) {
+        nType = NotificationType.priceAlert;
+      }
+    }
+
+    NotificationCategory nCat = NotificationCategory.orders;
+    final catStr = (json['category'] ?? '').toString();
+    try {
+      nCat = NotificationCategory.values.byName(catStr);
+    } catch (_) {
+      if (catStr.contains('FUND') || catStr.contains('WALLET')) {
+        nCat = NotificationCategory.funds;
+      } else if (catStr.contains('ALERT')) {
+        nCat = NotificationCategory.priceAlerts;
+      } else if (catStr.contains('NEWS')) {
+        nCat = NotificationCategory.news;
+      } else if (catStr.contains('SEC') || catStr.contains('AUTH')) {
+        nCat = NotificationCategory.security;
+      }
+    }
+
+    return NotificationItem(
+      id: (json['id'] ?? json['_id'] ?? '').toString(),
+      type: nType,
+      category: nCat,
+      title: (json['title'] ?? '').toString(),
+      body: (json['body'] ?? json['message'] ?? '').toString(),
+      timestamp: DateTime.tryParse((json['timestamp'] ?? json['createdAt'] ?? '').toString()) ?? DateTime.now(),
+      isRead: (json['isRead'] ?? json['read'] ?? false) == true,
+      deepLink: (json['deepLink'] ?? '/notifications').toString(),
+      metadata: (json['metadata'] ?? json['data'] as Map<String, dynamic>?) ?? {},
+      isCritical: (json['isCritical'] ?? false) == true,
+    );
+  }
 }
 
 class NotificationPreferences {
@@ -224,5 +291,39 @@ class NotificationPreferences {
     }
 
     return true;
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'ordersEnabled': ordersEnabled,
+      'fundsEnabled': fundsEnabled,
+      'riskMarginEnabled': riskMarginEnabled,
+      'priceAlertsEnabled': priceAlertsEnabled,
+      'newsEnabled': newsEnabled,
+      'securityEnabled': securityEnabled,
+      'quietHoursEnabled': quietHoursEnabled,
+      'quietHoursStartHour': quietHoursStartHour,
+      'quietHoursStartMinute': quietHoursStartMinute,
+      'quietHoursEndHour': quietHoursEndHour,
+      'quietHoursEndMinute': quietHoursEndMinute,
+      'allowCriticalInQuietHours': allowCriticalInQuietHours,
+    };
+  }
+
+  factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
+    return NotificationPreferences(
+      ordersEnabled: json['ordersEnabled'] as bool? ?? true,
+      fundsEnabled: json['fundsEnabled'] as bool? ?? true,
+      riskMarginEnabled: json['riskMarginEnabled'] as bool? ?? true,
+      priceAlertsEnabled: json['priceAlertsEnabled'] as bool? ?? true,
+      newsEnabled: json['newsEnabled'] as bool? ?? true,
+      securityEnabled: json['securityEnabled'] as bool? ?? true,
+      quietHoursEnabled: json['quietHoursEnabled'] as bool? ?? false,
+      quietHoursStartHour: json['quietHoursStartHour'] as int? ?? 22,
+      quietHoursStartMinute: json['quietHoursStartMinute'] as int? ?? 0,
+      quietHoursEndHour: json['quietHoursEndHour'] as int? ?? 8,
+      quietHoursEndMinute: json['quietHoursEndMinute'] as int? ?? 0,
+      allowCriticalInQuietHours: json['allowCriticalInQuietHours'] as bool? ?? true,
+    );
   }
 }

@@ -5,11 +5,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
-import '../../../data/mock/order_simulation_engine.dart';
-import '../../../data/mock/ticker_service.dart';
+import '../../../core/services/realtime_quote_service.dart';
+import '../../orders/data/real_trading_repository.dart';
 import '../../../data/models/position.dart';
-import '../../../shared_widgets/news_ticker_strip.dart';
-import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/zero_app_bar.dart';
 import '../../../shared_widgets/zero_drawer.dart';
 import '../../positions/presentation/position_action_sheets.dart';
@@ -33,9 +31,9 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
-    final engine = ref.watch(orderSimulationEngineProvider);
-    final tickerService = ref.watch(tickerServiceProvider);
-    var positions = List<Position>.from(engine.positions);
+    final quoteService = ref.watch(realtimeQuoteServiceProvider);
+    final positionsAsync = ref.watch(positionsListProvider);
+    var positions = List<Position>.from(positionsAsync.value ?? const <Position>[]);
 
     // Apply Search Filter
     final query = _searchController.text.trim().toLowerCase();
@@ -50,8 +48,8 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
     // Compute Net Totals
     double totalNetPnl = 0.0;
     for (final pos in positions) {
-      final quote = tickerService.getQuote(pos.instrument.token);
-      final currentPrice = quote.ltp;
+      final quote = quoteService.getQuote(pos.instrument.symbol);
+      final currentPrice = quote.ltp > 0 ? quote.ltp : pos.ltp;
       final unrealized = pos.netQty *
           (currentPrice - (pos.buyAvg > 0 ? pos.buyAvg : pos.sellAvg));
       totalNetPnl += (pos.realizedPnl + unrealized);
@@ -68,12 +66,6 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
       ),
       body: Column(
         children: [
-          // Public & Private News Ticker Strip
-          const NewsTickerStrip(),
-
-          // Dual Script Selector Bar
-          const ScriptSelectorBar(),
-
           // Search Bar
           Padding(
             padding:
@@ -180,8 +172,8 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
                     itemBuilder: (context, index) {
                       final pos = positions[index];
                       final quote =
-                          tickerService.getQuote(pos.instrument.token);
-                      final currentPrice = quote.ltp;
+                          quoteService.getQuote(pos.instrument.symbol);
+                      final currentPrice = quote.ltp > 0 ? quote.ltp : pos.ltp;
                       final posWithLtp = pos.copyWith(ltp: currentPrice);
                       final itemPnl = posWithLtp.realizedPnl + posWithLtp.unrealizedPnl;
                       final pnlColor =
@@ -193,8 +185,8 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
                           onTap: () => PositionActionSheets.showFullOptions(
                             context,
                             posWithLtp,
-                            engine,
-                            onRefresh: () => setState(() {}),
+                            ref.read(tradingRepositoryProvider),
+                            onRefresh: () => ref.invalidate(positionsListProvider),
                           ),
                           title: Row(
                             children: [
