@@ -150,7 +150,7 @@ class UserSettings {
   final bool openWhereLeft;
 
   const UserSettings({
-    this.themeMode = ThemeMode.system,
+    this.themeMode = ThemeMode.light,
     this.language = AppLanguage.english,
     this.numberFormat = NumberFormattingMode.indian,
     this.dateFormat = DateFormattingMode.ddMmYyyy,
@@ -159,7 +159,7 @@ class UserSettings {
     this.biometricEnabled = false,
     this.pinLockEnabled = true,
     this.appPin = '1234',
-    this.twoFactorEnabled = true,
+    this.twoFactorEnabled = false,
     this.totpSecretKey = 'JBSWY3DPEHPK3PXP',
     this.securityAlertsEnabled = true,
     this.autoLockTimeoutMinutes = 5,

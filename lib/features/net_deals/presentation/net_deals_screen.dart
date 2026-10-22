@@ -33,7 +33,7 @@ class _NetDealsScreenState extends ConsumerState<NetDealsScreen> {
     final colors = context.tradingColors;
     final quoteService = ref.watch(realtimeQuoteServiceProvider);
     final positionsAsync = ref.watch(positionsListProvider);
-    var positions = List<Position>.from(positionsAsync.value ?? const <Position>[]);
+    var positions = List<Position>.from(positionsAsync.valueOrNull ?? const <Position>[]);
 
     // Apply Search Filter
     final query = _searchController.text.trim().toLowerCase();

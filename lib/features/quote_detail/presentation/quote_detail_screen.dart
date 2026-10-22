@@ -15,6 +15,7 @@ import '../../market/data/real_market_repository.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import '../../watchlist/presentation/watchlist_controller.dart';
 import '../data/fundamentals_repository.dart';
+import '../../../shared_widgets/quote_status_badge.dart';
 import 'widgets/financials_tab.dart';
 import 'widgets/fundamentals_tab.dart';
 import 'widgets/shareholding_tab.dart';
@@ -104,8 +105,11 @@ class _QuoteDetailScreenState extends ConsumerState<QuoteDetailScreen> {
     final askColor = colors.bearish;
 
     final watchlistState = ref.watch(watchlistControllerProvider);
-    final isInWatchlist = watchlistState.activeWatchlist?.instrumentTokens
-            .contains(instrument.token) ??
+    final isInWatchlist = watchlistState.watchlist?.instrumentTokens.any(
+          (t) =>
+              t.trim().toUpperCase() == instrument.token.trim().toUpperCase() ||
+              t.trim().toUpperCase() == instrument.symbol.trim().toUpperCase(),
+        ) ??
         false;
 
     // Dual Bid / Ask calculation
@@ -146,39 +150,58 @@ class _QuoteDetailScreenState extends ConsumerState<QuoteDetailScreen> {
           ),
         ),
         actions: [
-          // Favorite / Watchlist Star Toggle
+          // Watchlist Add / Added Indicator
           IconButton(
             icon: Icon(
-              isInWatchlist ? LucideIcons.star : LucideIcons.star,
-              color:
-                  isInWatchlist ? const Color(0xFFFFB800) : colors.textPrimary,
+              isInWatchlist ? LucideIcons.check : LucideIcons.plus,
+              color: isInWatchlist ? colors.bullish : colors.textPrimary,
               size: 22,
             ),
-            tooltip:
-                isInWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist',
-            onPressed: () {
+            tooltip: isInWatchlist ? 'In Watchlist' : 'Add to Watchlist',
+            onPressed: () async {
+              final notifier = ref.read(watchlistControllerProvider.notifier);
               if (isInWatchlist) {
-                ref
-                    .read(watchlistControllerProvider.notifier)
-                    .removeInstrument(instrument.token);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Removed ${instrument.symbol} from ${watchlistState.activeWatchlist?.name ?? "Watchlist"}'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
+                final success = await notifier.removeInstrument(instrument.symbol);
+                if (context.mounted && success) {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Removed ${instrument.symbol} from Watchlist'),
+                      action: SnackBarAction(
+                        label: 'UNDO',
+                        textColor: Colors.white,
+                        onPressed: () => notifier.addInstrument(instrument.symbol),
+                      ),
+                    ),
+                  );
+                }
               } else {
-                ref
-                    .read(watchlistControllerProvider.notifier)
-                    .addInstrumentToActive(instrument.token);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Added ${instrument.symbol} to ${watchlistState.activeWatchlist?.name ?? "Watchlist"}'),
-                    duration: const Duration(seconds: 1),
-                  ),
-                );
+                final success = await notifier.addInstrument(instrument.symbol);
+                if (context.mounted) {
+                  if (success) {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Added ${instrument.symbol} to Watchlist'),
+                        action: SnackBarAction(
+                          label: 'UNDO',
+                          textColor: Colors.white,
+                          onPressed: () => notifier.removeInstrument(instrument.symbol),
+                        ),
+                      ),
+                    );
+                  } else {
+                    final err = ref.read(watchlistControllerProvider).errorMessage;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(err == 'MAX_SYMBOLS_EXCEEDED'
+                            ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
+                            : (err ?? 'Failed to add ${instrument.symbol}')),
+                        backgroundColor: const Color(0xFFC62828),
+                      ),
+                    );
+                  }
+                }
               }
             },
           ),
@@ -304,20 +327,26 @@ class _QuoteDetailScreenState extends ConsumerState<QuoteDetailScreen> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text(
-                            isCrypto
-                                ? '\$${NumberFormat('#,##0.00').format(quote.ltp)}'
-                                : CurrencyFormatter.format(quote.ltp),
-                            style: GoogleFonts.inter(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: colors.textPrimary,
-                              letterSpacing: -0.5,
+                          Opacity(
+                            opacity: (quote.status == QuoteStatus.stale || quote.status == QuoteStatus.closed) ? 0.5 : 1.0,
+                            child: Text(
+                              quote.ltp <= 0
+                                  ? '—'
+                                  : (isCrypto
+                                      ? '\$${NumberFormat('#,##0.00').format(quote.ltp)}'
+                                      : CurrencyFormatter.format(quote.ltp)),
+                              style: GoogleFonts.inter(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: colors.textPrimary,
+                                letterSpacing: -0.5,
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          QuoteStatusBadge(status: quote.status),
                           const SizedBox(width: 10),
                           Container(
                             padding: const EdgeInsets.symmetric(

@@ -7,6 +7,7 @@ import '../../../data/models/alert.dart';
 import '../../../data/models/enums.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../../market/data/real_market_repository.dart';
 import '../data/alerts_repository.dart';
 
 final alertsListProvider = FutureProvider.autoDispose<List<PriceAlert>>((ref) async {
@@ -33,7 +34,8 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
 
   void _showAddAlertDialog() {
     final colors = context.tradingColors;
-    final scriptController = TextEditingController(text: 'RELIANCE');
+    final defaultSym = ref.read(cachedInstrumentsProvider).value?.firstOrNull?.symbol ?? '';
+    final scriptController = TextEditingController(text: defaultSym);
     final priceController = TextEditingController();
     String condition = 'GTE';
     bool isCreating = false;

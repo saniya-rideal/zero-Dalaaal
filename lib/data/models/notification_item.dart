@@ -177,7 +177,11 @@ class NotificationItem {
       body: (json['body'] ?? json['message'] ?? '').toString(),
       timestamp: DateTime.tryParse((json['timestamp'] ?? json['createdAt'] ?? '').toString()) ?? DateTime.now(),
       isRead: (json['isRead'] ?? json['read'] ?? false) == true,
-      deepLink: (json['deepLink'] ?? '/notifications').toString(),
+      deepLink: (json['deepLink'] ??
+              (json['data'] is Map ? json['data']['route'] : null) ??
+              json['route'] ??
+              '/notifications')
+          .toString(),
       metadata: (json['metadata'] ?? json['data'] as Map<String, dynamic>?) ?? {},
       isCritical: (json['isCritical'] ?? false) == true,
     );

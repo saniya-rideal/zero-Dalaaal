@@ -17,6 +17,8 @@ import 'package:zero_dalali/features/orders/domain/trading_repository.dart';
 import 'package:zero_dalali/features/profile_settings/data/pinned_instruments_repository.dart';
 import 'package:zero_dalali/features/profile_settings/data/settings_repository.dart';
 import 'package:zero_dalali/features/quotes/presentation/quotes_screen.dart';
+import 'package:zero_dalali/features/watchlist/data/real_watchlist_repository.dart';
+import 'fixtures/fake_watchlist_repository.dart';
 import 'package:zero_dalali/shared_widgets/margin_risk_banner.dart';
 import 'package:zero_dalali/shared_widgets/script_selector_bar.dart';
 import 'package:zero_dalali/shared_widgets/zero_app_bar.dart';
@@ -90,6 +92,18 @@ class StubTradingRepository implements TradingRepository {
       createOrder(symbol: request.instrumentToken, side: request.side, orderType: request.kind, quantity: request.quantity);
 
   @override
+  Future<OrderPreview> previewOrder(OrderPreviewRequest request) async {
+    return OrderPreview(
+      requiredMargin: 1000.0,
+      availableMargin: 50000.0,
+      marginAfterTrade: 49000.0,
+      charges: ChargesBreakdown.zero(),
+      canPlace: true,
+      executionPrice: request.limitPrice ?? 100.0,
+    );
+  }
+
+  @override
   Future<List<Order>> getOrders() async => [];
 
   @override
@@ -157,6 +171,14 @@ ProviderContainer _createTestContainer({SettingsRepository? settingsRepo}) {
             usedMargin: 20000,
             openingBalance: 120000,
           )),
+      watchlistRepositoryProvider.overrideWith((ref) => FakeWatchlistRepository([
+            const WatchlistGroup(
+              id: 'wl_default',
+              name: 'Watchlist',
+              instrumentTokens: ['idx_nifty50', 'mcx_copper'],
+              isDefault: true,
+            ),
+          ])),
     ],
   );
 }

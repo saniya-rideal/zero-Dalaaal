@@ -78,15 +78,69 @@ class AuthController extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final result = await _repo.login(identifier, password);
+      Session? savedSession;
+      if (!result.requiresPin) {
+        savedSession = await _repo.getSavedSession();
+      }
       state = state.copyWith(
         isLoading: false,
+        session: savedSession ?? state.session,
+        isAuthenticated: savedSession != null || (!result.requiresPin && state.isAuthenticated),
         tempToken: result.tempToken,
+        requiresPinUnlock: result.requiresPin,
         requiresPinSetup: result.requiresPinSetup,
       );
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
       return null;
+    }
+  }
+
+  Future<LoginResult?> loginWithGoogle(String idToken) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final result = await _repo.loginWithGoogle(idToken);
+      Session? savedSession;
+      if (!result.requiresPin) {
+        savedSession = await _repo.getSavedSession();
+      }
+      state = state.copyWith(
+        isLoading: false,
+        session: savedSession ?? state.session,
+        isAuthenticated: savedSession != null || (!result.requiresPin && state.isAuthenticated),
+        tempToken: result.tempToken,
+        requiresPinUnlock: result.requiresPin,
+        requiresPinSetup: result.requiresPinSetup,
+      );
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return null;
+    }
+  }
+
+  Future<bool> sendOtp({required String identifier, String type = 'REGISTER'}) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      await _repo.sendOtp(identifier: identifier, type: type);
+      state = state.copyWith(isLoading: false);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
+    }
+  }
+
+  Future<bool> verifyOtp({required String identifier, required String otp, String type = 'REGISTER'}) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final ok = await _repo.verifyOtp(identifier: identifier, otp: otp, type: type);
+      state = state.copyWith(isLoading: false);
+      return ok;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
+      return false;
     }
   }
 

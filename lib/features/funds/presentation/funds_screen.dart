@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/balance_privacy_service.dart';
-import '../../../core/services/web_redirect_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
@@ -14,6 +13,8 @@ import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
 import '../../../shared_widgets/section_card.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import 'add_funds_sheet.dart';
+import 'withdraw_funds_sheet.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
 import '../../profile_settings/data/app_config_repository.dart';
@@ -48,13 +49,13 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
     final isHidden = ref.watch(balancePrivacyProvider);
     final fundsAsync = ref.watch(fundsSummaryProvider);
     final ledgerAsync = ref.watch(walletLedgerProvider);
-    final equitySummary = fundsAsync.value ?? FundsSummary.zero();
-    final commoditySummary = fundsAsync.value ?? FundsSummary.zero();
-    final ledger = ledgerAsync.value ?? const <LedgerEntry>[];
+    final equitySummary = fundsAsync.valueOrNull ?? FundsSummary.zero();
+    final commoditySummary = fundsAsync.valueOrNull ?? FundsSummary.zero();
+    final ledger = ledgerAsync.valueOrNull ?? const <LedgerEntry>[];
 
     // Watch wallet transactions reactively
     final walletTxnsAsync = ref.watch(walletTransactionsListProvider);
-    final walletTxns = walletTxnsAsync.value ?? const <WalletTransaction>[];
+    final walletTxns = walletTxnsAsync.valueOrNull ?? const <WalletTransaction>[];
 
     return Scaffold(
       backgroundColor: colors.background,
@@ -241,7 +242,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                   children: [
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => WebRedirectService.openDepositWebsite(context: context),
+                        onPressed: () => AddFundsSheet.show(context),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.bullish,
                           foregroundColor: Colors.white,
@@ -260,7 +261,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => WebRedirectService.openWithdrawWebsite(context: context),
+                        onPressed: () => WithdrawFundsSheet.show(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: colors.primary,
                           side: BorderSide(color: colors.primary),
@@ -470,6 +471,7 @@ class _FundsScreenState extends ConsumerState<FundsScreen>
         badgeText = colors.warning;
         break;
       case WalletTransactionStatus.PROCESSING:
+      case WalletTransactionStatus.APPROVED:
         badgeBg = colors.primary.withValues(alpha: 0.1);
         badgeText = colors.primary;
         break;

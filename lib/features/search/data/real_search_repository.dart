@@ -6,7 +6,7 @@ import '../domain/search_repository.dart';
 
 class RealSearchRepository implements SearchRepository {
   final MarketRepository _marketRepository;
-  final List<String> _recentSearches = ['RELIANCE', 'TCS', 'INFY', 'NIFTY'];
+  final List<String> _recentSearches = [];
 
   RealSearchRepository({required MarketRepository marketRepository})
       : _marketRepository = marketRepository;

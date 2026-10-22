@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -64,39 +66,69 @@ class AboutScreen extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     // Website Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(LucideIcons.globe,
-                            color: colors.textPrimary, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'www.Zero.life',
-                          style: AppTypography.body(
-                            color: colors.textPrimary,
-                            weight: FontWeight.w500,
+                    InkWell(
+                      onTap: () async {
+                        final uri = Uri.parse('https://zerodalali.com');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } else {
+                          Clipboard.setData(const ClipboardData(text: 'https://zerodalali.com'));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: const Text('Website URL copied to clipboard: https://zerodalali.com'), backgroundColor: colors.surface),
+                            );
+                          }
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.globe,
+                              color: colors.textPrimary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'www.Zero.life',
+                            style: AppTypography.body(
+                              color: colors.primary,
+                              weight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 12),
 
                     // Email Link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(LucideIcons.mail,
-                            color: colors.textPrimary, size: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'mgmt1@Zero.life',
-                          style: AppTypography.body(
-                            color: colors.textPrimary,
-                            weight: FontWeight.w500,
+                    InkWell(
+                      onTap: () async {
+                        final uri = Uri.parse('mailto:support@zerodalali.com');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        } else {
+                          Clipboard.setData(const ClipboardData(text: 'support@zerodalali.com'));
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: const Text('Support email copied to clipboard: support@zerodalali.com'), backgroundColor: colors.surface),
+                            );
+                          }
+                        }
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(LucideIcons.mail,
+                              color: colors.textPrimary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'support@zerodalali.com',
+                            style: AppTypography.body(
+                              color: colors.primary,
+                              weight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 28),
@@ -107,7 +139,23 @@ class AboutScreen extends StatelessWidget {
                       children: [
                         // WhatsApp Green Circle
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () async {
+                            const phone = '+919876543210';
+                            final whatsappUrl = Uri.parse('whatsapp://send?phone=$phone&text=Hello%20Zero%20Support');
+                            if (await canLaunchUrl(whatsappUrl)) {
+                              await launchUrl(whatsappUrl);
+                            } else {
+                              Clipboard.setData(const ClipboardData(text: phone));
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('WhatsApp support number copied: +91 98765 43210'),
+                                    backgroundColor: colors.surface,
+                                  ),
+                                );
+                              }
+                            }
+                          },
                           child: Container(
                             width: 52,
                             height: 52,
@@ -125,7 +173,16 @@ class AboutScreen extends StatelessWidget {
                         const SizedBox(width: 24),
                         // Share Pink Circle
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () {
+                            const shareUrl = 'https://zerodalali.com/invite/TRADE';
+                            Clipboard.setData(const ClipboardData(text: shareUrl));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Referral link copied to clipboard: https://zerodalali.com/invite/TRADE'),
+                                backgroundColor: colors.primary,
+                              ),
+                            );
+                          },
                           child: Container(
                             width: 52,
                             height: 52,

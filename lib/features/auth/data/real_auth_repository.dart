@@ -31,10 +31,54 @@ class RealAuthRepository implements AuthRepository {
     );
 
     final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    final bool requiresPin = map['requiresPin'] as bool? ?? false;
+    final bool requiresPinSetup = map['requiresPinSetup'] as bool? ?? false;
+    final String tempToken = (map['tempToken'] ?? '').toString();
+
+    if (!requiresPin && (map.containsKey('token') || map.containsKey('accessToken') || map.containsKey('user'))) {
+      try {
+        final session = AuthMapper.sessionFromData(map);
+        final refreshToken = map['refreshToken']?.toString();
+        await _tokenStorage.saveSession(session, refreshToken: refreshToken);
+      } catch (_) {}
+    }
+
     return LoginResult(
-      requiresPin: map['requiresPin'] as bool? ?? true,
-      requiresPinSetup: map['requiresPinSetup'] as bool? ?? false,
-      tempToken: (map['tempToken'] ?? '').toString(),
+      requiresPin: requiresPin,
+      requiresPinSetup: requiresPinSetup,
+      tempToken: tempToken,
+      message: (map['message'] ?? '').toString(),
+    );
+  }
+
+  @override
+  Future<LoginResult> loginWithGoogle(String idToken) async {
+    // Contract Phase 4: POST /api/auth/google
+    final data = await _apiClient.post(
+      ApiPaths.authGoogle,
+      data: {
+        'idToken': idToken,
+        'token': idToken,
+      },
+    );
+
+    final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    final bool requiresPin = map['requiresPin'] as bool? ?? false;
+    final bool requiresPinSetup = map['requiresPinSetup'] as bool? ?? false;
+    final String tempToken = (map['tempToken'] ?? '').toString();
+
+    if (!requiresPin && (map.containsKey('token') || map.containsKey('accessToken') || map.containsKey('user'))) {
+      try {
+        final session = AuthMapper.sessionFromData(map);
+        final refreshToken = map['refreshToken']?.toString();
+        await _tokenStorage.saveSession(session, refreshToken: refreshToken);
+      } catch (_) {}
+    }
+
+    return LoginResult(
+      requiresPin: requiresPin,
+      requiresPinSetup: requiresPinSetup,
+      tempToken: tempToken,
       message: (map['message'] ?? '').toString(),
     );
   }
@@ -93,6 +137,11 @@ class RealAuthRepository implements AuthRepository {
           'pin': pin,
         },
       );
+      if (data is Map<String, dynamic>) {
+        final session = AuthMapper.sessionFromData(data);
+        final refreshToken = data['refreshToken']?.toString();
+        await _tokenStorage.saveSession(session, refreshToken: refreshToken);
+      }
       return data != null;
     } catch (_) {
       return false;
@@ -106,6 +155,37 @@ class RealAuthRepository implements AuthRepository {
       data: {'pin': newPin},
     );
     return data != null;
+  }
+
+  @override
+  Future<void> sendOtp({required String identifier, String type = 'REGISTER'}) async {
+    // Contract Phase 4: POST /api/auth/send-otp
+    await _apiClient.post(
+      ApiPaths.authSendOtp,
+      data: {
+        'identifier': identifier.trim(),
+        'email': identifier.trim(),
+        'phone': identifier.trim(),
+        'type': type,
+      },
+    );
+  }
+
+  @override
+  Future<bool> verifyOtp({required String identifier, required String otp, String type = 'REGISTER'}) async {
+    // Contract Phase 4: POST /api/auth/verify-otp
+    final res = await _apiClient.post(
+      ApiPaths.authVerifyOtp,
+      data: {
+        'identifier': identifier.trim(),
+        'email': identifier.trim(),
+        'phone': identifier.trim(),
+        'otp': otp.trim(),
+        'type': type,
+      },
+    );
+    final map = res is Map<String, dynamic> ? res : <String, dynamic>{};
+    return map['verified'] == true || map['success'] == true || res != null;
   }
 
   @override
@@ -232,6 +312,9 @@ class RealAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async {
+    try {
+      await _apiClient.post(ApiPaths.authLogout);
+    } catch (_) {}
     await _tokenStorage.clearSession();
   }
 }

@@ -813,6 +813,28 @@ void main() {
       expect(rec.path, '/api/market/corporate-actions');
     });
 
+    test('22b. Candle.fromJson safely parses simulated backend openTime format and num types', () {
+      final json = {
+        '_id': '6ad1ae339b19d2e6b68ac851',
+        'openTime': '2026-10-16T00:00:00.000Z',
+        'closeTime': '2026-10-17T00:00:00.000Z',
+        'symbol': 'RELIANCE',
+        'interval': '1d',
+        'open': 2982.3,
+        'high': 3077.55,
+        'low': 2898.95,
+        'close': 3033.4,
+        'volume': 314452.88,
+      };
+      final candle = Candle.fromJson(json);
+      expect(candle.open, 2982.3);
+      expect(candle.close, 3033.4);
+      expect(candle.volume, 314452);
+      expect(candle.time.year, 2026);
+      expect(candle.time.month, 10);
+      expect(candle.time.day, 16);
+    });
+
     test('23. User Profile, KYC & Compliance: all endpoints match contract', () async {
       final rec = CallRecording();
       final apiClient = _createMockApiClient({

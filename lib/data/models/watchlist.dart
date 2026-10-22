@@ -39,12 +39,14 @@ class WatchlistGroup {
   final String name;
   final List<String> instrumentTokens;
   final List<WatchlistFolder> folders;
+  final bool isDefault;
 
   const WatchlistGroup({
     required this.id,
     required this.name,
     required this.instrumentTokens,
     this.folders = const [],
+    this.isDefault = false,
   });
 
   WatchlistGroup copyWith({
@@ -52,12 +54,14 @@ class WatchlistGroup {
     String? name,
     List<String>? instrumentTokens,
     List<WatchlistFolder>? folders,
+    bool? isDefault,
   }) {
     return WatchlistGroup(
       id: id ?? this.id,
       name: name ?? this.name,
       instrumentTokens: instrumentTokens ?? this.instrumentTokens,
       folders: folders ?? this.folders,
+      isDefault: isDefault ?? this.isDefault,
     );
   }
 
@@ -66,6 +70,7 @@ class WatchlistGroup {
     'name': name,
     'instrumentTokens': instrumentTokens,
     'folders': folders.map((e) => e.toJson()).toList(),
+    'isDefault': isDefault,
   };
 
   factory WatchlistGroup.fromJson(Map<String, dynamic> json) {
@@ -87,6 +92,7 @@ class WatchlistGroup {
       name: (json['name'] ?? 'Watchlist').toString(),
       instrumentTokens: tokens,
       folders: fList,
+      isDefault: json['isDefault'] == true,
     );
   }
 }

@@ -187,7 +187,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
 
     // Watch orders stream
     final ordersAsync = ref.watch(ordersListProvider);
-    final allOrders = ordersAsync.value ?? const <Order>[];
+    final allOrders = ordersAsync.valueOrNull ?? const <Order>[];
 
     final pendingOrdersRaw = allOrders
         .where((o) =>
@@ -208,7 +208,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen>
         .toList();
 
     final gttAsync = ref.watch(gttsListProvider);
-    final gttsRaw = gttAsync.value ?? const <GttOrder>[];
+    final gttsRaw = gttAsync.valueOrNull ?? const <GttOrder>[];
 
     // Filtered lists
     final pendingOrders = _applyFiltersAndSort(pendingOrdersRaw);

@@ -107,10 +107,15 @@ class _CandlestickChartViewState extends ConsumerState<CandlestickChartView> {
         _scrollOffset = 0.0;
         _edgeCtrl.onCandlesLoaded(candles, isMarketClosed: _isMarketClosed());
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('Error loading candles in CandlestickChartView: $e\n$st');
       if (!mounted) return;
       setState(() {
-        _edgeCtrl.onCandlesLoaded(_candles, isMarketClosed: _isMarketClosed());
+        if (_candles.isEmpty) {
+          _edgeCtrl.onNetworkError();
+        } else {
+          _edgeCtrl.onCandlesLoaded(_candles, isMarketClosed: _isMarketClosed());
+        }
       });
     }
   }

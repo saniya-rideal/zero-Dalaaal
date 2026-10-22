@@ -7,14 +7,24 @@ enum PriceColorMode { normal, blue, red }
 class MtPriceText extends StatelessWidget {
   final double price;
   final PriceColorMode colorMode;
-  final int decimals;
+  final int? decimals;
+  final double fontSize;
 
   const MtPriceText({
     super.key,
     required this.price,
     this.colorMode = PriceColorMode.normal,
-    this.decimals = 2,
+    this.decimals,
+    this.fontSize = 16.5,
   });
+
+  int get _resolvedDecimals {
+    if (decimals != null) return decimals!;
+    if (price > 0 && price < 10 && (price * 100).truncateToDouble() != price * 100) {
+      return 4;
+    }
+    return 2;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,78 +43,29 @@ class MtPriceText extends StatelessWidget {
         break;
     }
 
-    final str = price.toStringAsFixed(decimals);
-    final dotIndex = str.indexOf('.');
-
-    String prefix = '';
-    String core = '';
-    String superscript = '';
-
-    if (dotIndex != -1) {
-      final whole = str.substring(0, dotIndex);
-      final fractional = str.substring(dotIndex + 1);
-
-      if (fractional.length >= 2) {
-        prefix = whole.length > 1 ? whole.substring(0, whole.length - 1) : '';
-        final lastWhole = whole.isNotEmpty ? whole.substring(whole.length - 1) : '0';
-        core = '$lastWhole.${fractional.substring(0, fractional.length - 1)}';
-        superscript = fractional.substring(fractional.length - 1);
-      } else {
-        prefix = whole;
-        core = '.$fractional';
-        superscript = '0';
-      }
-    } else {
-      if (str.length > 2) {
-        prefix = str.substring(0, str.length - 2);
-        core = str.substring(str.length - 2, str.length - 1);
-        superscript = str.substring(str.length - 1);
-      } else {
-        core = str;
-      }
+    if (price <= 0) {
+      return Text(
+        '—',
+        style: GoogleFonts.inter(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+          color: colors.textSecondary,
+        ),
+      );
     }
+
+    final priceStr = price.toStringAsFixed(_resolvedDecimals);
 
     return FittedBox(
       fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          if (prefix.isNotEmpty)
-            Text(
-              prefix,
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: textColor,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          Text(
-            core,
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: textColor,
-              letterSpacing: -0.5,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          if (superscript.isNotEmpty)
-            Transform.translate(
-              offset: const Offset(1, -6),
-              child: Text(
-                superscript,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ),
-        ],
+      child: Text(
+        priceStr,
+        style: GoogleFonts.inter(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+          color: textColor,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
     );
   }

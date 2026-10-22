@@ -420,19 +420,22 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Wrap(
-                              spacing: 6,
-                              children: faq.tags.map((t) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: colors.surface,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: colors.divider),
-                                  ),
-                                  child: Text('#$t', style: AppTypography.labelSmall(color: colors.textSecondary)),
-                                );
-                              }).toList(),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: faq.tags.map((t) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colors.surface,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: colors.divider),
+                                    ),
+                                    child: Text('#$t', style: AppTypography.labelSmall(color: colors.textSecondary)),
+                                  );
+                                }).toList(),
+                              ),
                             ),
                             InkWell(
                               onTap: () {
@@ -481,17 +484,24 @@ class _HelpSupportScreenState extends ConsumerState<HelpSupportScreen>
       children: [
         // Status Filter Bar
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Wrap(
-              spacing: 6,
-              children: [
-                _buildTicketFilterChip('All', _selectedTicketFilter == null, () => setState(() => _selectedTicketFilter = null), colors),
-                _buildTicketFilterChip('Open', _selectedTicketFilter == TicketStatus.open, () => setState(() => _selectedTicketFilter = TicketStatus.open), colors),
-                _buildTicketFilterChip('In Progress', _selectedTicketFilter == TicketStatus.inProgress, () => setState(() => _selectedTicketFilter = TicketStatus.inProgress), colors),
-                _buildTicketFilterChip('Resolved', _selectedTicketFilter == TicketStatus.resolved, () => setState(() => _selectedTicketFilter = TicketStatus.resolved), colors),
-              ],
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildTicketFilterChip('All', _selectedTicketFilter == null, () => setState(() => _selectedTicketFilter = null), colors),
+                    const SizedBox(width: 6),
+                    _buildTicketFilterChip('Open', _selectedTicketFilter == TicketStatus.open, () => setState(() => _selectedTicketFilter = TicketStatus.open), colors),
+                    const SizedBox(width: 6),
+                    _buildTicketFilterChip('In Progress', _selectedTicketFilter == TicketStatus.inProgress, () => setState(() => _selectedTicketFilter = TicketStatus.inProgress), colors),
+                    const SizedBox(width: 6),
+                    _buildTicketFilterChip('Resolved', _selectedTicketFilter == TicketStatus.resolved, () => setState(() => _selectedTicketFilter = TicketStatus.resolved), colors),
+                  ],
+                ),
+              ),
             ),
+            const SizedBox(width: 6),
             IconButton(
               icon: Icon(LucideIcons.plusCircle, color: colors.primary),
               tooltip: 'New Ticket',

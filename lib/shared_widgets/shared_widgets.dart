@@ -14,4 +14,6 @@ export 'transaction_side_badge.dart';
 export 'zero_market_header_strip.dart';
 export 'news_ticker_strip.dart';
 export 'script_selector_bar.dart';
+export 'quote_status_badge.dart';
+export 'market_closed_banner.dart';
 

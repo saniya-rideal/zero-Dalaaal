@@ -5,102 +5,238 @@ import '../domain/watchlist_repository.dart';
 
 class WatchlistState {
   final bool isLoading;
-  final List<WatchlistGroup> watchlists;
-  final int activeIndex;
+  final WatchlistGroup? watchlist;
   final String? errorMessage;
+  final String? lastAddedSymbol;
 
   const WatchlistState({
     this.isLoading = false,
-    this.watchlists = const [],
-    this.activeIndex = 0,
+    this.watchlist,
     this.errorMessage,
+    this.lastAddedSymbol,
   });
 
-  WatchlistGroup? get activeWatchlist =>
-      watchlists.isNotEmpty && activeIndex < watchlists.length
-          ? watchlists[activeIndex]
-          : null;
+  // Backward compatibility getters
+  List<WatchlistGroup> get watchlists => watchlist != null ? [watchlist!] : const [];
+  WatchlistGroup? get activeWatchlist => watchlist;
+  int get activeIndex => 0;
+  int get symbolCount => watchlist?.instrumentTokens.length ?? 0;
+  bool get isFull => symbolCount >= 50;
 
   WatchlistState copyWith({
     bool? isLoading,
-    List<WatchlistGroup>? watchlists,
-    int? activeIndex,
+    WatchlistGroup? watchlist,
     String? errorMessage,
+    String? lastAddedSymbol,
+    bool clearError = false,
+    bool clearLastAdded = false,
   }) {
     return WatchlistState(
       isLoading: isLoading ?? this.isLoading,
-      watchlists: watchlists ?? this.watchlists,
-      activeIndex: activeIndex ?? this.activeIndex,
-      errorMessage: errorMessage,
+      watchlist: watchlist ?? this.watchlist,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      lastAddedSymbol: clearLastAdded ? null : (lastAddedSymbol ?? this.lastAddedSymbol),
     );
   }
 }
 
 class WatchlistController extends StateNotifier<WatchlistState> {
   final WatchlistRepository _repo;
+  static const int maxSymbols = 50;
 
   WatchlistController(this._repo) : super(const WatchlistState()) {
-    loadWatchlists();
+    loadWatchlist();
   }
 
-  Future<void> loadWatchlists() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+  Future<void> loadWatchlist() async {
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
       final list = await _repo.getAllWatchlists();
+      WatchlistGroup? defaultGroup;
+      for (final w in list) {
+        if (w.isDefault) {
+          defaultGroup = w;
+          break;
+        }
+      }
+      if (defaultGroup == null) {
+        if (list.isNotEmpty) {
+          defaultGroup = list.first;
+        } else {
+          defaultGroup = await _repo.createWatchlist('Watchlist');
+        }
+      }
       state = state.copyWith(
         isLoading: false,
-        watchlists: list,
-        activeIndex: state.activeIndex < list.length ? state.activeIndex : 0,
+        watchlist: defaultGroup,
+        clearError: true,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
 
-  void setActiveIndex(int index) {
-    if (index >= 0 && index < state.watchlists.length) {
-      state = state.copyWith(activeIndex: index);
+  // Alias for backward compatibility
+  Future<void> loadWatchlists() => loadWatchlist();
+
+  void clearError() {
+    if (state.errorMessage != null) {
+      state = state.copyWith(clearError: true);
     }
   }
 
-  Future<void> createWatchlist(String name) async {
-    final newGroup = await _repo.createWatchlist(name);
-    final updated = List<WatchlistGroup>.from(state.watchlists)..add(newGroup);
+  void clearLastAdded() {
+    if (state.lastAddedSymbol != null) {
+      state = state.copyWith(clearLastAdded: true);
+    }
+  }
+
+  // Multi-watchlist deprecated stubs for compatibility
+  void setActiveIndex(int index) {}
+  Future<void> createWatchlist(String name) async => loadWatchlist();
+  Future<void> renameWatchlist(String id, String newName) async => loadWatchlist();
+  Future<void> deleteWatchlist(String id) async => loadWatchlist();
+
+  Future<bool> addInstrument(String token) async {
+    var wl = state.watchlist;
+    if (wl == null) {
+      await loadWatchlist();
+      wl = state.watchlist;
+      if (wl == null) return false;
+    }
+
+    final tokenClean = token.trim();
+    final tokens = List<String>.from(wl.instrumentTokens);
+    final exists = tokens.any((t) => t.trim().toUpperCase() == tokenClean.toUpperCase());
+    if (exists) return true;
+
+    // Check 50-symbol limit
+    if (tokens.length >= maxSymbols) {
+      state = state.copyWith(errorMessage: 'MAX_SYMBOLS_EXCEEDED');
+      return false;
+    }
+
+    final previousTokens = List<String>.from(tokens);
+    tokens.insert(0, tokenClean);
+    final updatedWl = wl.copyWith(instrumentTokens: tokens);
+
+    // Optimistically show at top and trigger scroll
     state = state.copyWith(
-      watchlists: updated,
-      activeIndex: updated.length - 1,
+      watchlist: updatedWl,
+      lastAddedSymbol: tokenClean,
+      clearError: true,
     );
+
+    try {
+      await _repo.addInstrument(wl.id, tokenClean);
+      return true;
+    } catch (e) {
+      // Rollback on failure
+      final rolledBack = wl.copyWith(instrumentTokens: previousTokens);
+      final errMsg = e.toString().contains('MAX_SYMBOLS_EXCEEDED')
+          ? 'MAX_SYMBOLS_EXCEEDED'
+          : e.toString();
+      state = state.copyWith(
+        watchlist: rolledBack,
+        errorMessage: errMsg,
+        clearLastAdded: true,
+      );
+      return false;
+    }
   }
 
-  Future<void> renameWatchlist(String id, String newName) async {
-    await _repo.renameWatchlist(id, newName);
-    await loadWatchlists();
+  // Alias for backward compatibility
+  Future<bool> addInstrumentToActive(String token) => addInstrument(token);
+
+  Future<bool> removeInstrument(String token) async {
+    var wl = state.watchlist;
+    if (wl == null) {
+      await loadWatchlist();
+      wl = state.watchlist;
+      if (wl == null) return false;
+    }
+
+    final tokenClean = token.trim().toUpperCase();
+    final previousTokens = List<String>.from(wl.instrumentTokens);
+    if (!previousTokens.any((t) => t.trim().toUpperCase() == tokenClean)) {
+      return true;
+    }
+
+    final newTokens = List<String>.from(previousTokens)
+      ..removeWhere((t) => t.trim().toUpperCase() == tokenClean);
+
+    // Await backend response first, update UI only after success (or roll back with error)
+    try {
+      await _repo.removeInstrument(wl.id, token.trim());
+      final updatedWl = wl.copyWith(instrumentTokens: newTokens);
+      state = state.copyWith(watchlist: updatedWl, clearError: true);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to remove $token: $e');
+      return false;
+    }
   }
 
-  Future<void> deleteWatchlist(String id) async {
-    await _repo.deleteWatchlist(id);
-    await loadWatchlists();
+  Future<bool> removeMultiple(List<String> tokensToRemove) async {
+    var wl = state.watchlist;
+    if (wl == null) {
+      await loadWatchlist();
+      wl = state.watchlist;
+      if (wl == null) return false;
+    }
+    if (tokensToRemove.isEmpty) return false;
+
+    final previousTokens = List<String>.from(wl.instrumentTokens);
+    final removeSet = tokensToRemove.map((t) => t.trim().toUpperCase()).toSet();
+    final newTokens = previousTokens
+        .where((t) => !removeSet.contains(t.trim().toUpperCase()))
+        .toList();
+
+    try {
+      for (final t in tokensToRemove) {
+        await _repo.removeInstrument(wl.id, t.trim());
+      }
+      final updatedWl = wl.copyWith(instrumentTokens: newTokens);
+      state = state.copyWith(watchlist: updatedWl, clearError: true);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: 'Failed to remove selected scripts: $e');
+      return false;
+    }
   }
 
-  Future<void> removeInstrument(String token) async {
-    final active = state.activeWatchlist;
-    if (active == null) return;
-    await _repo.removeInstrument(active.id, token);
-    await loadWatchlists();
-  }
+  Future<bool> reorder(int oldIndex, int newIndex) async {
+    var wl = state.watchlist;
+    if (wl == null) {
+      await loadWatchlist();
+      wl = state.watchlist;
+      if (wl == null) return false;
+    }
 
-  Future<void> addInstrumentToActive(String token) async {
-    final active = state.activeWatchlist;
-    if (active == null) return;
-    await _repo.addInstrument(active.id, token);
-    await loadWatchlists();
-  }
+    final tokens = List<String>.from(wl.instrumentTokens);
+    if (oldIndex < 0 || oldIndex >= tokens.length) return false;
+    int targetIndex = newIndex;
+    if (targetIndex > oldIndex) targetIndex -= 1;
+    if (targetIndex < 0 || targetIndex >= tokens.length) return false;
 
-  Future<void> reorder(int oldIndex, int newIndex) async {
-    final active = state.activeWatchlist;
-    if (active == null) return;
-    await _repo.reorderInstruments(active.id, oldIndex, newIndex);
-    await loadWatchlists();
+    final previousTokens = List<String>.from(tokens);
+    final item = tokens.removeAt(oldIndex);
+    tokens.insert(targetIndex, item);
+
+    // Optimistically update
+    state = state.copyWith(watchlist: wl.copyWith(instrumentTokens: tokens), clearError: true);
+
+    try {
+      await _repo.reorderInstruments(wl.id, oldIndex, newIndex);
+      return true;
+    } catch (e) {
+      // Rollback
+      state = state.copyWith(
+        watchlist: wl.copyWith(instrumentTokens: previousTokens),
+        errorMessage: 'Failed to persist reorder: $e',
+      );
+      return false;
+    }
   }
 }
 

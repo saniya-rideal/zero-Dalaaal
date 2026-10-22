@@ -1,10 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/theme/trading_colors.dart';
+import '../../../core/theme/typography.dart';
 import 'auth_controller.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -15,7 +18,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  int _currentStep = 1; // 1: Form, 2: Success
+  int _currentStep = 1; // 1: Form, 2: OTP Verification, 3: Success
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -25,6 +28,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _pinController = TextEditingController();
   final _confirmPinController = TextEditingController();
+  final _otpController = TextEditingController();
 
   String _countryCode = '+91';
   bool _obscurePassword = true;
@@ -38,6 +42,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   String? _generatedClientId;
 
+  // Registration OTP state
+  int _otpCooldown = 0;
+  Timer? _otpCooldownTimer;
+  int _otpAttempts = 0;
+  bool _isSendingOtp = false;
+  bool _isVerifyingOtp = false;
+
+  // Google Sign-Up state
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  bool _isGoogleSigningIn = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +64,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   void dispose() {
+    _otpCooldownTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _mobileController.dispose();
@@ -56,6 +72,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _confirmPasswordController.dispose();
     _pinController.dispose();
     _confirmPinController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -114,6 +131,172 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return hasName && hasEmail && hasMobile && hasMinPassword && strength >= 2 && passwordsMatch && pinValid && legalAccepted;
   }
 
+  void _startOtpCooldown([int seconds = 60]) {
+    setState(() => _otpCooldown = seconds);
+    _otpCooldownTimer?.cancel();
+    _otpCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_otpCooldown > 0) {
+        setState(() => _otpCooldown--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  Future<void> _sendRegistrationOtp() async {
+    if (_otpCooldown > 0 || _isSendingOtp) return;
+    setState(() => _isSendingOtp = true);
+    try {
+      final email = _emailController.text.trim();
+      final ok = await ref.read(authControllerProvider.notifier).sendOtp(
+            identifier: email,
+            type: 'REGISTER',
+          );
+      if (ok) {
+        _startOtpCooldown(60);
+        if (_currentStep == 1) {
+          setState(() {
+            _currentStep = 2;
+            _otpAttempts = 0;
+            _otpController.clear();
+          });
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Verification code resent successfully.')),
+          );
+        }
+      } else {
+        final err = ref.read(authControllerProvider).errorMessage ?? 'Failed to send OTP';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(err), backgroundColor: const Color(0xFFC62828)),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isSendingOtp = false);
+    }
+  }
+
+  Future<void> _handleOtpVerificationAndRegister() async {
+    final otp = _otpController.text.trim();
+    if (otp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid 6-digit verification code.')),
+      );
+      return;
+    }
+
+    if (_otpAttempts >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum verification attempts reached. Please request a new code.'),
+          backgroundColor: Color(0xFFC62828),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isVerifyingOtp = true);
+    try {
+      final email = _emailController.text.trim();
+      final verified = await ref.read(authControllerProvider.notifier).verifyOtp(
+            identifier: email,
+            otp: otp,
+            type: 'REGISTER',
+          );
+
+      if (!verified) {
+        setState(() => _otpAttempts++);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Invalid OTP code. (${5 - _otpAttempts} attempts remaining)'),
+              backgroundColor: const Color(0xFFC62828),
+            ),
+          );
+        }
+        return;
+      }
+
+      // OTP verified successfully! Now complete registration
+      final formattedPhone = _mobileController.text.trim().startsWith('+')
+          ? _mobileController.text.trim()
+          : '$_countryCode${_mobileController.text.trim()}';
+
+      final result = await ref.read(authControllerProvider.notifier).register(
+            name: _nameController.text.trim(),
+            email: email,
+            phone: formattedPhone,
+            password: _passwordController.text,
+            pin: _pinController.text.trim(),
+          );
+
+      if (result != null && mounted) {
+        setState(() {
+          _generatedClientId = result.clientId;
+          _currentStep = 3;
+        });
+      } else {
+        final err = ref.read(authControllerProvider).errorMessage ?? 'Registration failed';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(err), backgroundColor: const Color(0xFFC62828)),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isVerifyingOtp = false);
+    }
+  }
+
+  Future<void> _handleGoogleSignUp() async {
+    if (_isGoogleSigningIn) return;
+    if (ref.read(isOfflineProvider)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot sign up while offline.')),
+      );
+      return;
+    }
+
+    setState(() => _isGoogleSigningIn = true);
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => _isGoogleSigningIn = false);
+        return;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken ?? googleAuth.accessToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to obtain Google token.')),
+          );
+        }
+        setState(() => _isGoogleSigningIn = false);
+        return;
+      }
+
+      final result = await ref.read(authControllerProvider.notifier).loginWithGoogle(idToken);
+      if (result != null && mounted) {
+        context.push('/totp');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Sign-Up failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleSigningIn = false);
+      }
+    }
+  }
+
   Future<void> _handleRegister() async {
     if (ref.read(isOfflineProvider)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -125,24 +308,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
 
-    final formattedPhone = _mobileController.text.trim().startsWith('+')
-        ? _mobileController.text.trim()
-        : '$_countryCode${_mobileController.text.trim()}';
+    if (!_isFormValid) return;
 
-    final result = await ref.read(authControllerProvider.notifier).register(
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          phone: formattedPhone,
-          password: _passwordController.text,
-          pin: _pinController.text.trim(),
-        );
-
-    if (result != null && mounted) {
-      setState(() {
-        _generatedClientId = result.clientId;
-        _currentStep = 2;
-      });
-    }
+    // Trigger OTP sending step
+    await _sendRegistrationOtp();
   }
 
   @override
@@ -158,10 +327,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (_currentStep == 2) {
+              setState(() => _currentStep = 1);
+            } else {
+              context.pop();
+            }
+          },
         ),
         title: Text(
-          _currentStep == 1 ? 'Create Zero Account' : 'Account Created',
+          _currentStep == 1
+              ? 'Create Zero Account'
+              : _currentStep == 2
+                  ? 'Verify Identity'
+                  : 'Account Created',
           style: GoogleFonts.inter(
             color: colors.textPrimary,
             fontSize: 18,
@@ -174,7 +353,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: _currentStep == 1
               ? _buildForm(colors, authState)
-              : _buildSuccess(colors),
+              : _currentStep == 2
+                  ? _buildOtpVerification(colors, authState)
+                  : _buildSuccess(colors),
         ),
       ),
     );
@@ -470,21 +651,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: (_isFormValid && !authState.isLoading) ? _handleRegister : null,
+              onPressed: (_isFormValid && !authState.isLoading && !_isSendingOtp) ? _handleRegister : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: colors.primary,
                 disabledBackgroundColor: colors.surface,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: authState.isLoading
+              child: (_isSendingOtp || authState.isLoading)
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : Text(
-                      'CREATE ACCOUNT',
+                      'CONTINUE & VERIFY',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
@@ -494,6 +675,79 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // Divider OR
+          Row(
+            children: [
+              Expanded(child: Divider(color: colors.divider)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'OR',
+                  style: AppTypography.caption(
+                    color: colors.textSecondary,
+                    weight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(child: Divider(color: colors.divider)),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Google Sign-Up Button
+          OutlinedButton(
+            onPressed: (_isGoogleSigningIn || authState.isLoading)
+                ? null
+                : _handleGoogleSignUp,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: colors.textPrimary,
+              side: BorderSide(color: colors.divider),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: _isGoogleSigningIn
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          'G',
+                          style: GoogleFonts.roboto(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                            color: const Color(0xFF4285F4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Sign up with Google',
+                        style: AppTypography.body(
+                          color: colors.textPrimary,
+                          weight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+
+          const SizedBox(height: 20),
 
           Center(
             child: Wrap(
@@ -508,6 +762,173 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOtpVerification(TradingColors colors, AuthState authState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Center(
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(LucideIcons.shieldCheck, size: 36, color: colors.primary),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Verify Your Details',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: colors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'We have sent a 6-digit verification code to:\n${_emailController.text.trim()} & $_countryCode${_mobileController.text.trim()}',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(
+            fontSize: 13.5,
+            color: colors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 32),
+
+        // 6-digit OTP input
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: colors.cardBackground,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colors.divider),
+          ),
+          child: TextField(
+            controller: _otpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            autofocus: true,
+            style: GoogleFonts.sourceCodePro(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 12,
+              color: colors.textPrimary,
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              border: InputBorder.none,
+              hintText: '••••••',
+              hintStyle: GoogleFonts.sourceCodePro(
+                fontSize: 28,
+                letterSpacing: 12,
+                color: colors.textSecondary.withValues(alpha: 0.3),
+              ),
+            ),
+            onChanged: (val) {
+              if (val.length == 6) {
+                _handleOtpVerificationAndRegister();
+              }
+            },
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Resend OTP & Cooldown
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_otpCooldown > 0)
+              Text(
+                'Resend code in ${_otpCooldown}s',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: colors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              )
+            else
+              TextButton(
+                onPressed: _isSendingOtp ? null : _sendRegistrationOtp,
+                child: Text(
+                  'Resend OTP Code',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+          ],
+        ),
+
+        if (_otpAttempts > 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Failed attempts: $_otpAttempts / 5',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: colors.bearish,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 24),
+
+        SizedBox(
+          height: 48,
+          child: ElevatedButton(
+            onPressed: (_isVerifyingOtp || authState.isLoading)
+                ? null
+                : _handleOtpVerificationAndRegister,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colors.primary,
+              disabledBackgroundColor: colors.surface,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: (_isVerifyingOtp || authState.isLoading)
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Text(
+                    'VERIFY & CREATE ACCOUNT',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        TextButton(
+          onPressed: () => setState(() => _currentStep = 1),
+          child: Text(
+            'Edit Registration Details',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: colors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

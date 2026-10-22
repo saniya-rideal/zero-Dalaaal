@@ -234,6 +234,9 @@ class ApiClient {
     }
   }
 
+  /// Public token refresh accessor for external services (like SocketService) needing session refresh
+  Future<String?> refreshToken() => _performTokenRefresh();
+
   // --- HTTP Methods Unwrapping Backend Envelope with Safe GET Retries ---
 
   /// Safe GET request with automatic exponential backoff retry on transient 5xx or network drops.

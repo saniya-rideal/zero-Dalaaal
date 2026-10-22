@@ -4,17 +4,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../config/app_config.dart';
 import '../../data/models/models.dart';
+import 'api_client.dart';
 import 'api_paths.dart';
 import 'token_storage.dart';
 
 class SocketService {
   final AppConfig _config;
   final TokenStorage _tokenStorage;
+  final ApiClient? _apiClient;
   io.Socket? _socket;
+
+  static const int _maxBatchSize = 50;
 
   final Map<String, Quote> _latestQuotes = {};
   final Set<String> _subscribedSymbols = {};
   String? _activeTicketId;
+  bool _isRefreshingToken = false;
 
   // Stream controllers
   final StreamController<Map<String, Quote>> _quotesStreamController =
@@ -35,6 +40,10 @@ class SocketService {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<Map<String, dynamic>> _supportMessageController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _paymentUpdatesController =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<Map<String, dynamic>> _withdrawalUpdatesController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   bool _isConnected = false;
   bool get isConnected => _isConnected;
@@ -49,6 +58,8 @@ class SocketService {
   Stream<Map<String, dynamic>> get sipExecutedStream => _sipExecutedController.stream;
   Stream<Map<String, dynamic>> get notificationStream => _notificationController.stream;
   Stream<Map<String, dynamic>> get supportMessageStream => _supportMessageController.stream;
+  Stream<Map<String, dynamic>> get paymentUpdatesStream => _paymentUpdatesController.stream;
+  Stream<Map<String, dynamic>> get withdrawalUpdatesStream => _withdrawalUpdatesController.stream;
 
   // REST polling fallback timer (only active when socket is down)
   Timer? _restFallbackTimer;
@@ -57,8 +68,10 @@ class SocketService {
   SocketService({
     required AppConfig config,
     required TokenStorage tokenStorage,
+    ApiClient? apiClient,
   })  : _config = config,
-        _tokenStorage = tokenStorage {
+        _tokenStorage = tokenStorage,
+        _apiClient = apiClient {
     _initSocket();
   }
 
@@ -86,6 +99,12 @@ class SocketService {
       if (!_connectionStateController.isClosed) {
         _connectionStateController.add(true);
       }
+      // Dual auth: handshake auth option is sent during connection, and authenticate event for post-connect listeners
+      _tokenStorage.getAccessToken().then((t) {
+        if (t != null && t.isNotEmpty && _socket != null && _isConnected) {
+          _socket?.emit('authenticate', {'token': 'Bearer $t'});
+        }
+      });
       _resubscribeAll();
     });
 
@@ -97,12 +116,17 @@ class SocketService {
       _startRestFallback();
     });
 
-    _socket?.onConnectError((_) {
+    _socket?.onConnectError((err) {
       _isConnected = false;
       if (!_connectionStateController.isClosed) {
         _connectionStateController.add(false);
       }
       _startRestFallback();
+      _checkAuthError(err);
+    });
+
+    _socket?.on('error', (err) {
+      _checkAuthError(err);
     });
 
     // Contract Section 12.3: Server-Emitted Events
@@ -114,6 +138,37 @@ class SocketService {
     _socket?.on('sip:executed', (data) => _handleSafeMapEvent(data, _sipExecutedController));
     _socket?.on('notification:new', (data) => _handleSafeMapEvent(data, _notificationController));
     _socket?.on('support:message', (data) => _handleSafeMapEvent(data, _supportMessageController));
+    _socket?.on('payment:update', (data) => _handleSafeMapEvent(data, _paymentUpdatesController));
+    _socket?.on('withdrawal:update', (data) => _handleSafeMapEvent(data, _withdrawalUpdatesController));
+  }
+
+  void _checkAuthError(dynamic err) {
+    if (err == null) return;
+    final errStr = err.toString().toLowerCase();
+    if (errStr.contains('401') ||
+        errStr.contains('unauthorized') ||
+        errStr.contains('jwt') ||
+        errStr.contains('token') ||
+        errStr.contains('auth')) {
+      _handleAuthFailureAndReconnect();
+    }
+  }
+
+  Future<void> _handleAuthFailureAndReconnect() async {
+    if (_isRefreshingToken || _apiClient == null) return;
+    _isRefreshingToken = true;
+    try {
+      final newToken = await _apiClient.refreshToken();
+      if (newToken != null && newToken.isNotEmpty) {
+        if (_socket != null) {
+          _socket?.io.options?['auth'] = {'token': 'Bearer $newToken'};
+          _socket?.disconnect().connect();
+        }
+      }
+    } catch (_) {
+    } finally {
+      _isRefreshingToken = false;
+    }
   }
 
   void _handleSafeMapEvent(
@@ -130,26 +185,92 @@ class SocketService {
   }
 
   /// Update auth token on socket (e.g., after login or token refresh)
-  Future<void> updateAuthToken() async {
-    final token = await _tokenStorage.getAccessToken();
-    if (_socket != null && token != null) {
-      _socket?.io.options?['auth'] = {'token': 'Bearer $token'};
-      if (_socket!.connected) {
-        // Re-authenticate or reconnect
-        _socket?.disconnect().connect();
+  Future<void> updateAuthToken([String? explicitToken]) async {
+    final token = explicitToken ?? await _tokenStorage.getAccessToken();
+    if (_socket != null) {
+      if (token != null && token.isNotEmpty) {
+        _socket?.io.options?['auth'] = {'token': 'Bearer $token'};
+        if (_socket!.connected) {
+          _socket?.emit('authenticate', {'token': 'Bearer $token'});
+        } else {
+          _socket?.connect();
+        }
+      } else {
+        _socket?.io.options?['auth'] = {};
+        if (_socket!.connected) {
+          _socket?.disconnect();
+        }
+      }
+    }
+  }
+
+  /// Emit subscribe batches using canonical `quotes:subscribe` with { symbols: [...] }
+  void _emitSubscribeBatches(List<String> symbols) {
+    if (symbols.isEmpty) return;
+    for (var i = 0; i < symbols.length; i += _maxBatchSize) {
+      final end = (i + _maxBatchSize < symbols.length) ? i + _maxBatchSize : symbols.length;
+      final batch = symbols.sublist(i, end);
+      _emitSubscribeBatch(batch);
+    }
+  }
+
+  void _emitSubscribeBatch(List<String> batch) {
+    if (_socket == null || !_isConnected) return;
+    try {
+      _socket?.emitWithAck(
+        'quotes:subscribe',
+        {'symbols': batch},
+        ack: (dynamic ackData) {
+          _handleSubscriptionAck(ackData);
+        },
+      );
+    } catch (_) {
+      _socket?.emit('quotes:subscribe', {'symbols': batch});
+    }
+  }
+
+  /// Emit unsubscribe batches using canonical `quotes:unsubscribe` with { symbols: [...] }
+  void _emitUnsubscribeBatches(List<String> symbols) {
+    if (symbols.isEmpty) return;
+    for (var i = 0; i < symbols.length; i += _maxBatchSize) {
+      final end = (i + _maxBatchSize < symbols.length) ? i + _maxBatchSize : symbols.length;
+      final batch = symbols.sublist(i, end);
+      _emitUnsubscribeBatch(batch);
+    }
+  }
+
+  void _emitUnsubscribeBatch(List<String> batch) {
+    if (_socket == null || !_isConnected) return;
+    try {
+      _socket?.emitWithAck(
+        'quotes:unsubscribe',
+        {'symbols': batch},
+        ack: (dynamic ackData) {},
+      );
+    } catch (_) {
+      _socket?.emit('quotes:unsubscribe', {'symbols': batch});
+    }
+  }
+
+  void _handleSubscriptionAck(dynamic ackData) {
+    if (ackData is Map) {
+      final rejected = ackData['rejected'];
+      if (rejected is List) {
+        for (final item in rejected) {
+          if (item != null) {
+            _subscribedSymbols.remove(item.toString());
+          }
+        }
       }
     }
   }
 
   void _resubscribeAll() {
-    if (_socket != null && _socket!.connected) {
-      // Contract Section 12.2: subscribe:symbol per symbol
-      for (final sym in _subscribedSymbols) {
-        _socket?.emit('subscribe:symbol', {'symbol': sym});
-      }
-      if (_activeTicketId != null) {
-        _socket?.emit('ticket:join', {'ticketId': _activeTicketId});
-      }
+    if (_socket != null && _isConnected && _subscribedSymbols.isNotEmpty) {
+      _emitSubscribeBatches(_subscribedSymbols.toList());
+    }
+    if (_socket != null && _isConnected && _activeTicketId != null) {
+      _socket?.emit('ticket:join', {'ticketId': _activeTicketId});
     }
   }
 
@@ -252,31 +373,45 @@ class SocketService {
 
   Map<String, Quote> getAllQuotes() => Map.unmodifiable(_latestQuotes);
 
-  /// Subscribe to live quote ticks for a symbol
+  /// Subscribe to live quote ticks for a symbol using canonical events
   void subscribe(String symbol) {
-    _subscribedSymbols.add(symbol);
-    if (_socket != null && _socket!.connected) {
-      _socket?.emit('subscribe:symbol', {'symbol': symbol});
+    final clean = symbol.trim();
+    if (clean.isEmpty) return;
+    _subscribedSymbols.add(clean);
+    if (_socket != null && _isConnected) {
+      _emitSubscribeBatches([clean]);
+    } else {
+      _startRestFallback();
     }
   }
 
   void subscribeAll(Iterable<String> symbols) {
-    for (final s in symbols) {
-      subscribe(s);
+    final validSymbols = symbols.map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    if (validSymbols.isEmpty) return;
+    _subscribedSymbols.addAll(validSymbols);
+    if (_socket != null && _isConnected) {
+      _emitSubscribeBatches(validSymbols);
+    } else {
+      _startRestFallback();
     }
   }
 
-  /// Unsubscribe from symbol quote ticks
+  /// Unsubscribe from symbol quote ticks using canonical events
   void unsubscribe(String symbol) {
-    _subscribedSymbols.remove(symbol);
-    if (_socket != null && _socket!.connected) {
-      _socket?.emit('unsubscribe:symbol', {'symbol': symbol});
+    final clean = symbol.trim();
+    _subscribedSymbols.remove(clean);
+    if (_socket != null && _isConnected) {
+      _emitUnsubscribeBatches([clean]);
     }
   }
 
   void unsubscribeAll(Iterable<String> symbols) {
-    for (final s in symbols) {
-      unsubscribe(s);
+    final validSymbols = symbols.map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    for (final s in validSymbols) {
+      _subscribedSymbols.remove(s);
+    }
+    if (_socket != null && _isConnected) {
+      _emitUnsubscribeBatches(validSymbols);
     }
   }
 
@@ -301,7 +436,7 @@ class SocketService {
   // --- REST Polling Fallback when Socket is Down ---
 
   void _startRestFallback() {
-    _stopRestFallback();
+    if (_restFallbackTimer != null) return;
     _fallbackDio ??= Dio(
       BaseOptions(
         baseUrl: _config.apiBaseUrl,
@@ -310,29 +445,36 @@ class SocketService {
       ),
     );
 
-    // Conservative 8-second interval poll for visible symbols only
+    // Initial poll immediately if disconnected and symbols exist
+    if (_subscribedSymbols.isNotEmpty && !_isConnected) {
+      _pollRestQuotes();
+    }
+
     _restFallbackTimer = Timer.periodic(const Duration(seconds: 8), (_) async {
       if (_subscribedSymbols.isEmpty || _isConnected) {
         return;
       }
-      try {
-        final symbols = _subscribedSymbols.take(15).join(',');
-        final response = await _fallbackDio!.get(
-          ApiPaths.marketQuotes,
-          queryParameters: {'symbols': symbols},
-        );
-        if (response.statusCode == 200) {
-          final data = response.data;
-          if (data is Map && data.containsKey('data')) {
-            _handleIncomingQuote(data['data']);
-          } else {
-            _handleIncomingQuote(data);
-          }
-        }
-      } catch (_) {
-        // Safe silent swallow on fallback polling error
-      }
+      await _pollRestQuotes();
     });
+  }
+
+  Future<void> _pollRestQuotes() async {
+    if (_subscribedSymbols.isEmpty || _isConnected) return;
+    try {
+      final symbols = _subscribedSymbols.take(_maxBatchSize).join(',');
+      final response = await _fallbackDio!.get(
+        ApiPaths.marketQuotes,
+        queryParameters: {'symbols': symbols},
+      );
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data is Map && data.containsKey('data')) {
+          _handleIncomingQuote(data['data']);
+        } else {
+          _handleIncomingQuote(data);
+        }
+      }
+    } catch (_) {}
   }
 
   void _stopRestFallback() {
@@ -368,13 +510,20 @@ class SocketService {
     if (!_sipExecutedController.isClosed) _sipExecutedController.close();
     if (!_notificationController.isClosed) _notificationController.close();
     if (!_supportMessageController.isClosed) _supportMessageController.close();
+    if (!_paymentUpdatesController.isClosed) _paymentUpdatesController.close();
+    if (!_withdrawalUpdatesController.isClosed) _withdrawalUpdatesController.close();
   }
 }
 
 final socketServiceProvider = Provider<SocketService>((ref) {
   final config = ref.watch(appConfigProvider);
   final tokenStorage = ref.watch(tokenStorageProvider);
-  final service = SocketService(config: config, tokenStorage: tokenStorage);
+  final apiClient = ref.watch(apiClientProvider);
+  final service = SocketService(
+    config: config,
+    tokenStorage: tokenStorage,
+    apiClient: apiClient,
+  );
   ref.onDispose(() => service.dispose());
   return service;
 });

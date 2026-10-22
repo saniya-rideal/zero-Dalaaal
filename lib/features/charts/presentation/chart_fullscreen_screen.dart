@@ -36,8 +36,8 @@ class ChartFullscreenScreen extends ConsumerStatefulWidget {
 class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
   late String _currentToken;
   double _tradeLots = 0.10;
-  String _selectedTimeframe = '4h';
-  Timeframe _timeframeEnum = Timeframe.ONE_HOUR;
+  String _selectedTimeframe = '1D';
+  Timeframe _timeframeEnum = Timeframe.ONE_DAY;
   ChartType _chartType = ChartType.candle;
   String _activeTool = 'crosshair';
   bool _showDrawings = true;
@@ -240,6 +240,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                         child: _TradingViewInteractiveCanvas(
                           token: _currentToken,
                           timeframeEnum: _timeframeEnum,
+                          selectedTimeframe: _selectedTimeframe,
                           chartType: _chartType,
                           colors: colors,
                           ltp: ltp,
@@ -259,9 +260,11 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
                             }
                           },
                           onCrosshairUpdate: (_, candle) {
-                            setState(() {
-                              _hoveredCandle = candle;
-                            });
+                            if (_hoveredCandle != candle) {
+                              setState(() {
+                                _hoveredCandle = candle;
+                              });
+                            }
                           },
                           overlays: [
                             // Legend in Top-Left of Chart Canvas
@@ -1335,6 +1338,7 @@ class _ChartFullscreenScreenState extends ConsumerState<ChartFullscreenScreen> {
 class _TradingViewInteractiveCanvas extends ConsumerStatefulWidget {
   final String token;
   final Timeframe timeframeEnum;
+  final String selectedTimeframe;
   final ChartType chartType;
   final TradingColors colors;
   final double ltp;
@@ -1352,6 +1356,7 @@ class _TradingViewInteractiveCanvas extends ConsumerStatefulWidget {
   const _TradingViewInteractiveCanvas({
     required this.token,
     required this.timeframeEnum,
+    required this.selectedTimeframe,
     required this.chartType,
     required this.colors,
     required this.ltp,
@@ -1431,6 +1436,9 @@ class _TradingViewInteractiveCanvasState
             close: newClose,
             volume: last.volume + rand.nextInt(10),
           );
+          _edgeCtrl.checkPriceMovement(newClose, () {
+            if (mounted) setState(() {});
+          });
         });
       }
     });
@@ -1440,7 +1448,8 @@ class _TradingViewInteractiveCanvasState
   void didUpdateWidget(covariant _TradingViewInteractiveCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.token != widget.token ||
-        oldWidget.timeframeEnum != widget.timeframeEnum) {
+        oldWidget.timeframeEnum != widget.timeframeEnum ||
+        oldWidget.selectedTimeframe != widget.selectedTimeframe) {
       // Reset edge-case state on symbol/timeframe change
       _edgeCtrl.onSymbolChanged();
       final isLarge = widget.timeframeEnum == Timeframe.ONE_WEEK ||
@@ -1466,7 +1475,7 @@ class _TradingViewInteractiveCanvasState
       final repo = ref.read(marketRepositoryProvider);
       final candles = await repo.getCandles(
         widget.token,
-        interval: widget.timeframeEnum.name,
+        interval: widget.selectedTimeframe,
         limit: isLargeRange ? 500 : 100,
       );
       if (!mounted) return;
@@ -1475,25 +1484,41 @@ class _TradingViewInteractiveCanvasState
         _scrollOffset = 0.0;
         _edgeCtrl.onCandlesLoaded(candles, isMarketClosed: _isMarketClosed());
       });
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('Error loading candles in ChartFullscreenScreen: $e\n$st');
       if (mounted) {
         setState(() {
-          _edgeCtrl.onCandlesLoaded([], isMarketClosed: _isMarketClosed());
+          _edgeCtrl.onNetworkError();
         });
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Check live price ticks for fast-movement detection
-    if (_candles.isNotEmpty) {
-      final livePrice = _candles.last.close;
-      if (_edgeCtrl.checkPriceMovement(livePrice, () => setState(() {}))) {
-        // setState already triggered inside checkPriceMovement callback
-      }
+  void _updateHoveredCandle(Offset? touchPos) {
+    if (touchPos == null || _candles.isEmpty) {
+      widget.onCrosshairUpdate(touchPos, null);
+      return;
     }
 
+    final totalCandles = _candles.length;
+    final fullStep = _candleWidth * 1.35;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    final totalWidth = renderBox?.hasSize == true ? renderBox!.size.width : 350.0;
+    const priceAxisWidth = 68.0;
+    final chartWidth = max(50.0, totalWidth - priceAxisWidth);
+
+    final maxScroll = max(0.0, (totalCandles * fullStep) - chartWidth);
+    final clampedOffset = _scrollOffset.clamp(-maxScroll, 0.0);
+
+    final double rawIndex = (totalCandles - 1) - ((chartWidth + clampedOffset - touchPos.dx) / fullStep);
+    final int index = rawIndex.round().clamp(0, totalCandles - 1);
+    final candle = _candles[index];
+
+    widget.onCrosshairUpdate(touchPos, candle);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final chartCanvas = Listener(
       onPointerSignal: (event) {
         if (event is PointerScrollEvent) {
@@ -1517,6 +1542,7 @@ class _TradingViewInteractiveCanvasState
             setState(() {});
           } else {
             setState(() => _touchPos = details.localFocalPoint);
+            _updateHoveredCandle(details.localFocalPoint);
           }
         },
         onScaleUpdate: (details) {
@@ -1538,6 +1564,9 @@ class _TradingViewInteractiveCanvasState
               _touchPos = details.localFocalPoint;
             }
           });
+          if (widget.activeTool == 'crosshair' || widget.activeTool == 'zoom') {
+            _updateHoveredCandle(details.localFocalPoint);
+          }
         },
         onScaleEnd: (_) {
           if (widget.activeTool != 'crosshair' &&
@@ -1569,7 +1598,6 @@ class _TradingViewInteractiveCanvasState
               userStrokes: widget.userStrokes,
               currentStroke: _inProgressStroke,
               crosshairPos: _touchPos,
-              onCandleHover: (c) => widget.onCrosshairUpdate(_touchPos, c),
             ),
           ),
         ),
@@ -1613,7 +1641,6 @@ class _TvChartCanvasPainter extends CustomPainter {
   final List<List<Offset>> userStrokes;
   final List<Offset> currentStroke;
   final Offset? crosshairPos;
-  final ValueChanged<Candle?> onCandleHover;
 
   _TvChartCanvasPainter({
     required this.candles,
@@ -1630,7 +1657,6 @@ class _TvChartCanvasPainter extends CustomPainter {
     required this.userStrokes,
     required this.currentStroke,
     required this.crosshairPos,
-    required this.onCandleHover,
   });
 
   @override
@@ -1721,22 +1747,11 @@ class _TvChartCanvasPainter extends CustomPainter {
     const bullColor = Color(0xFF00897B); // Teal-Cyan Bullish
     const bearColor = Color(0xFFE53935); // Crimson-Red Bearish
 
-    Candle? closestCandle;
-    double closestDist = double.infinity;
-
     for (int i = 0; i < totalCandles; i++) {
       final candle = candles[i];
       final x = chartWidth - ((totalCandles - 1 - i) * fullStep) + clampedOffset;
 
       if (x < -candleWidth || x > chartWidth + candleWidth) continue;
-
-      if (crosshairPos != null) {
-        final dist = (crosshairPos!.dx - x).abs();
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestCandle = candle;
-        }
-      }
 
       final isBull = candle.isBullish;
       final candleColor = isBull ? bullColor : bearColor;
@@ -1769,10 +1784,6 @@ class _TvChartCanvasPainter extends CustomPainter {
         canvas.drawLine(Offset(x - (candleWidth / 2), openY), Offset(x, openY), barPaint);
         canvas.drawLine(Offset(x + (candleWidth / 2), closeY), Offset(x, closeY), barPaint);
       }
-    }
-
-    if (closestCandle != null) {
-      onCandleHover(closestCandle);
     }
 
     // Draw Line Chart

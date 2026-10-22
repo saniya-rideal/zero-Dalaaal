@@ -7,6 +7,7 @@ import '../../../core/theme/trading_colors.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../../market/data/real_market_repository.dart';
 import '../data/baskets_repository.dart';
 
 final basketsListProvider = FutureProvider.autoDispose<List<Basket>>((ref) async {
@@ -282,7 +283,8 @@ class _BasketsScreenState extends ConsumerState<BasketsScreen> {
   void _showCreateBasketDialog() {
     final colors = context.tradingColors;
     final nameController = TextEditingController();
-    final symbolController = TextEditingController(text: 'RELIANCE');
+    final defaultSym = ref.read(cachedInstrumentsProvider).value?.firstOrNull?.symbol ?? '';
+    final symbolController = TextEditingController(text: defaultSym);
     final qtyController = TextEditingController(text: '1');
     String side = 'BUY';
     bool isCreating = false;

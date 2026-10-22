@@ -40,6 +40,8 @@ class OrderRequest {
   final String? idempotencyKey;
   final double? leverage;
   final String? market;
+  final DateTime? expiresAt;
+  final String? comment;
 
   const OrderRequest({
     required this.instrumentToken,
@@ -56,6 +58,8 @@ class OrderRequest {
     this.idempotencyKey,
     this.leverage,
     this.market,
+    this.expiresAt,
+    this.comment,
   });
 
   OrderRequest copyWith({
@@ -73,6 +77,8 @@ class OrderRequest {
     String? idempotencyKey,
     double? leverage,
     String? market,
+    DateTime? expiresAt,
+    String? comment,
   }) {
     return OrderRequest(
       instrumentToken: instrumentToken ?? this.instrumentToken,
@@ -89,71 +95,195 @@ class OrderRequest {
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
       leverage: leverage ?? this.leverage,
       market: market ?? this.market,
+      expiresAt: expiresAt ?? this.expiresAt,
+      comment: comment ?? this.comment,
     );
   }
 
   Map<String, dynamic> toJson() => {
     'instrumentToken': instrumentToken,
+    'symbol': instrumentToken,
     'side': side.name,
     'product': product.name,
-    'kind': kind.name,
+    'kind': kind.toBackendString(),
+    'orderType': kind.toBackendString(),
+    'type': kind.toBackendString(),
     'quantity': quantity,
-    'price': price,
-    'triggerPrice': triggerPrice,
+    if (price != null && price! > 0) 'price': price,
+    if (price != null && price! > 0) 'limitPrice': price,
+    if (triggerPrice != null && triggerPrice! > 0) 'triggerPrice': triggerPrice,
     'validity': validity.name,
     'disclosedQty': disclosedQty,
     'variety': variety.name,
-    'bracket': bracket?.toJson(),
-    'idempotencyKey': idempotencyKey,
-    if (leverage != null) 'leverage': leverage,
+    if (bracket != null) 'bracket': bracket!.toJson(),
+    if (bracket?.stopLoss != null && bracket!.stopLoss > 0) 'stopLoss': bracket!.stopLoss,
+    if (bracket?.target != null && bracket!.target > 0) 'takeProfit': bracket!.target,
+    if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+    if (leverage != null && leverage! > 0) 'leverage': leverage,
     if (market != null) 'market': market,
+    if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
+    if (comment != null && comment!.trim().isNotEmpty) 'comment': comment!.trim(),
   };
 
   factory OrderRequest.fromJson(Map<String, dynamic> json) {
-    final sym = (json['symbol'] ?? json['instrumentToken'] ?? '').toString();
-    final sideStr = (json['side'] ?? 'BUY').toString().toUpperCase();
-    final side = sideStr == 'SELL' ? TransactionType.SELL : TransactionType.BUY;
-
-    final prodStr = (json['product'] ?? 'MIS').toString().toUpperCase();
-    final product = prodStr == 'CNC' ? ProductType.CNC : ProductType.MIS;
-
-    final typeStr = (json['type'] ?? json['kind'] ?? 'MARKET').toString().toUpperCase();
-    final kind = typeStr == 'LIMIT' ? OrderKind.LIMIT : OrderKind.MARKET;
-
-    final qty = (json['quantity'] as num?)?.toInt() ?? 1;
-    final price = (json['price'] as num?)?.toDouble();
-    final trig = (json['triggerPrice'] as num?)?.toDouble();
-
-    Validity val = Validity.DAY;
-    if (json['validity'] != null) {
-      try {
-        val = Validity.values.byName(json['validity'].toString());
-      } catch (_) {}
+    OrderKind parsedKind = OrderKind.MARKET;
+    final rawKind = (json['orderType'] ?? json['type'] ?? json['kind'] ?? '').toString().toUpperCase();
+    for (final k in OrderKind.values) {
+      if (k.name == rawKind || k.toBackendString() == rawKind) {
+        parsedKind = k;
+        break;
+      }
     }
 
-    OrderVariety varType = OrderVariety.REGULAR;
-    if (json['variety'] != null) {
-      try {
-        varType = OrderVariety.values.byName(json['variety'].toString());
-      } catch (_) {}
+    ProductType parsedProd = ProductType.MIS;
+    final rawProd = (json['product'] ?? '').toString().toUpperCase();
+    for (final p in ProductType.values) {
+      if (p.name == rawProd) {
+        parsedProd = p;
+        break;
+      }
+    }
+
+    Validity parsedVal = Validity.DAY;
+    final rawVal = (json['validity'] ?? '').toString().toUpperCase();
+    for (final v in Validity.values) {
+      if (v.name == rawVal) {
+        parsedVal = v;
+        break;
+      }
     }
 
     return OrderRequest(
-      instrumentToken: sym,
-      side: side,
-      product: product,
-      kind: kind,
-      quantity: qty,
-      price: price,
-      triggerPrice: trig,
-      validity: val,
+      instrumentToken: (json['instrumentToken'] ?? json['symbol'] ?? '').toString(),
+      side: json['side'] == 'SELL' ? TransactionType.SELL : TransactionType.BUY,
+      product: parsedProd,
+      kind: parsedKind,
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      price: (json['price'] ?? json['limitPrice'] as num?)?.toDouble(),
+      triggerPrice: (json['triggerPrice'] as num?)?.toDouble(),
+      validity: parsedVal,
       disclosedQty: (json['disclosedQty'] as num?)?.toInt() ?? 0,
-      variety: varType,
+      variety: OrderVariety.REGULAR,
       bracket: json['bracket'] != null ? BracketParams.fromJson(json['bracket'] as Map<String, dynamic>) : null,
       idempotencyKey: json['idempotencyKey'] as String?,
+      leverage: (json['leverage'] as num?)?.toDouble(),
+      market: json['market'] as String?,
+      expiresAt: json['expiresAt'] != null ? DateTime.tryParse(json['expiresAt'].toString()) : null,
+      comment: json['comment'] as String?,
     );
   }
 }
+
+class OrderPreviewRequest {
+  final String symbol;
+  final TransactionType side;
+  final OrderKind orderType;
+  final num quantity;
+  final double? limitPrice;
+  final double? triggerPrice;
+  final double? leverage;
+  final ProductType product;
+  final Validity validity;
+
+  const OrderPreviewRequest({
+    required this.symbol,
+    required this.side,
+    required this.orderType,
+    required this.quantity,
+    this.limitPrice,
+    this.triggerPrice,
+    this.leverage,
+    this.product = ProductType.MIS,
+    this.validity = Validity.DAY,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'symbol': symbol,
+    'side': side.name,
+    'orderType': orderType.toBackendString(),
+    'quantity': quantity,
+    if (limitPrice != null && limitPrice! > 0) 'limitPrice': limitPrice,
+    if (triggerPrice != null && triggerPrice! > 0) 'triggerPrice': triggerPrice,
+    if (leverage != null && leverage! > 0) 'leverage': leverage,
+    'product': product.name,
+    'validity': validity.name,
+  };
+}
+
+class OrderPreview {
+  final double requiredMargin;
+  final double availableMargin;
+  final double marginAfterTrade;
+  final double? marginLevel;
+  final ChargesBreakdown charges;
+  final List<String> warnings;
+  final bool canPlace;
+  final String? blockingReason;
+  final double executionPrice;
+
+  const OrderPreview({
+    required this.requiredMargin,
+    required this.availableMargin,
+    required this.marginAfterTrade,
+    this.marginLevel,
+    required this.charges,
+    this.warnings = const [],
+    required this.canPlace,
+    this.blockingReason,
+    this.executionPrice = 0.0,
+  });
+
+  factory OrderPreview.fromJson(Map<String, dynamic> json) {
+    final reqMargin = (json['requiredMargin'] ?? json['marginRequired'] as num?)?.toDouble() ?? 0.0;
+    final availMargin = (json['availableMargin'] ?? json['freeMarginBefore'] ?? json['freeMargin'] as num?)?.toDouble() ?? 0.0;
+    final afterTrade = (json['marginAfterTrade'] ?? json['freeMarginAfter'] as num?)?.toDouble() ??
+        (availMargin - reqMargin);
+    final marginLvl = (json['marginLevel'] as num?)?.toDouble();
+
+    ChargesBreakdown brk;
+    if (json['charges'] is Map<String, dynamic>) {
+      brk = ChargesBreakdown.fromJson(json['charges'] as Map<String, dynamic>);
+    } else {
+      brk = ChargesBreakdown.fromJson(json);
+    }
+
+    final warnList = <String>[];
+    if (json['warnings'] is List) {
+      for (final w in json['warnings'] as List) {
+        if (w != null && w.toString().isNotEmpty) {
+          warnList.add(w.toString());
+        }
+      }
+    }
+
+    final totalChg = (json['totalCharges'] as num?)?.toDouble() ?? brk.total;
+    final canBePlaced = json['canPlace'] is bool
+        ? json['canPlace'] as bool
+        : (availMargin >= (reqMargin + totalChg));
+
+    String? blockReason;
+    if (json['blockingReason'] != null) {
+      blockReason = json['blockingReason'].toString();
+    } else if (!canBePlaced) {
+      blockReason = 'Insufficient available margin (₹${availMargin.toStringAsFixed(2)}) for required margin (₹${reqMargin.toStringAsFixed(2)})';
+    }
+
+    final execPrice = (json['executionPrice'] ?? json['price'] as num?)?.toDouble() ?? 0.0;
+
+    return OrderPreview(
+      requiredMargin: reqMargin,
+      availableMargin: availMargin,
+      marginAfterTrade: afterTrade,
+      marginLevel: marginLvl,
+      charges: brk,
+      warnings: warnList,
+      canPlace: canBePlaced,
+      blockingReason: blockReason,
+      executionPrice: execPrice,
+    );
+  }
+}
+
 
 class OrderEvent {
   final OrderStatus status;
@@ -207,13 +337,22 @@ class ChargesBreakdown {
     'stampDuty': stampDuty,
   };
 
+  factory ChargesBreakdown.zero() => const ChargesBreakdown(
+    brokerage: 0.0,
+    stt: 0.0,
+    exchangeTxnCharge: 0.0,
+    gst: 0.0,
+    sebiCharges: 0.0,
+    stampDuty: 0.0,
+  );
+
   factory ChargesBreakdown.fromJson(Map<String, dynamic> json) => ChargesBreakdown(
     brokerage: (json['brokerage'] as num?)?.toDouble() ?? 0.0,
-    stt: (json['stt'] as num).toDouble(),
-    exchangeTxnCharge: (json['exchangeTxnCharge'] as num).toDouble(),
-    gst: (json['gst'] as num).toDouble(),
-    sebiCharges: (json['sebiCharges'] as num).toDouble(),
-    stampDuty: (json['stampDuty'] as num).toDouble(),
+    stt: (json['stt'] as num?)?.toDouble() ?? 0.0,
+    exchangeTxnCharge: (json['exchangeTxnCharge'] ?? json['exchangeTxn'] ?? json['exchangeTurnoverFee'] as num?)?.toDouble() ?? 0.0,
+    gst: (json['gst'] as num?)?.toDouble() ?? 0.0,
+    sebiCharges: (json['sebiCharges'] as num?)?.toDouble() ?? 0.0,
+    stampDuty: (json['stampDuty'] as num?)?.toDouble() ?? 0.0,
   );
 }
 

@@ -17,9 +17,26 @@ class RealMarketRepository implements MarketRepository {
   @override
   Instrument? findBySymbol(String symbol) {
     final clean = symbol.trim().toUpperCase();
-    return _cachedInstruments
+    final found = _cachedInstruments
         ?.where((i) => i.symbol.toUpperCase() == clean || i.token.toUpperCase() == clean)
         .firstOrNull;
+    if (found != null) return found;
+
+    return Instrument(
+      token: clean,
+      symbol: clean,
+      name: clean.replaceAll('_', ' '),
+      exchange: clean.contains('MCX')
+          ? Exchange.MCX
+          : (clean.contains('USDT') || clean.contains('USD') ? Exchange.CDS : Exchange.NSE),
+      type: RegExp(r'\d+CE$', caseSensitive: false).hasMatch(clean)
+          ? InstrumentType.CE
+          : (RegExp(r'\d+PE$', caseSensitive: false).hasMatch(clean)
+              ? InstrumentType.PE
+              : (clean.endsWith('FUT') || RegExp(r'\d+(SEP|OCT|NOV|DEC|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG)$', caseSensitive: false).hasMatch(clean)
+                  ? InstrumentType.FUT
+                  : InstrumentType.EQ)),
+    );
   }
 
   @override
@@ -30,7 +47,6 @@ class RealMarketRepository implements MarketRepository {
 
     final data = await _apiClient.get(
       ApiPaths.marketInstruments,
-      queryParameters: {'market': 'INDIAN'},
     );
 
     final items = ResponseReader.list(data, 'instruments');
@@ -105,6 +121,43 @@ class RealMarketRepository implements MarketRepository {
     return quotes.values.firstOrNull;
   }
 
+  static String _normalizeResolution(String interval) {
+    final s = interval.trim().toLowerCase();
+    switch (s) {
+      case '1m':
+      case 'one_min':
+        return '1m';
+      case '5m':
+      case 'five_min':
+        return '5m';
+      case '15m':
+      case 'fifteen_min':
+      case '30m':
+      case 'thirty_min':
+        return '15m';
+      case '1h':
+      case 'one_hour':
+      case '4h':
+        return '1h';
+      case '1d':
+      case 'one_day':
+      case '1w':
+      case 'one_week':
+      case '1month':
+      case 'one_month':
+        return '1D';
+      default:
+        if (s.contains('hour') || s.endsWith('h')) return '1h';
+        if (s.contains('day') || s.endsWith('d') || s.contains('week') || s.contains('month')) return '1D';
+        if (s.contains('min') || s.endsWith('m')) {
+          if (s.startsWith('15') || s.startsWith('30')) return '15m';
+          if (s.startsWith('5')) return '5m';
+          return '1m';
+        }
+        return interval;
+    }
+  }
+
   @override
   Future<List<Candle>> getCandles(
     String symbol, {
@@ -113,12 +166,16 @@ class RealMarketRepository implements MarketRepository {
     int? from,
     int? to,
   }) async {
+    // Resolve symbol if a token or lowercase symbol was supplied
+    final cleanSymbol = symbol.trim().toUpperCase();
+    final matchedInst = findBySymbol(cleanSymbol);
+    final effectiveSymbol = matchedInst?.symbol ?? cleanSymbol;
+
     // Contract supported resolution: 1m, 5m, 15m, 1h, 1d, 1D
-    String resolution = interval;
-    if (interval.toLowerCase() == '1d') resolution = '1D';
+    final String resolution = _normalizeResolution(interval);
 
     final Map<String, dynamic> params = {
-      'symbol': symbol,
+      'symbol': effectiveSymbol,
       'resolution': resolution,
     };
     if (from != null) params['from'] = from;
@@ -212,3 +269,9 @@ final marketHolidaysProvider = FutureProvider<List<dynamic>>((ref) async {
   final repo = ref.watch(marketRepositoryProvider);
   return repo.getMarketHolidays();
 });
+
+final cachedInstrumentsProvider = FutureProvider<List<Instrument>>((ref) async {
+  final repo = ref.watch(marketRepositoryProvider);
+  return repo.getInstruments();
+});
+

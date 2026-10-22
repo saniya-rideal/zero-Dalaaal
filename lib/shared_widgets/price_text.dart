@@ -91,11 +91,13 @@ class _PriceTextState extends State<PriceText> with SingleTickerProviderStateMix
       }
     }
 
-    final formattedPrice = CurrencyFormatter.format(
-      widget.value,
-      showSymbol: widget.showCurrencySymbol,
-      decimalDigits: widget.decimalDigits,
-    );
+    final formattedPrice = widget.value <= 0
+        ? '—'
+        : CurrencyFormatter.format(
+            widget.value,
+            showSymbol: widget.showCurrencySymbol,
+            decimalDigits: widget.decimalDigits,
+          );
 
     final defaultStyle = AppTypography.body(
       color: textColor,

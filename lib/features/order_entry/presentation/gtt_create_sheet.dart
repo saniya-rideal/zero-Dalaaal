@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/models/models.dart';
-import '../data/gtt_repository.dart';
 import '../../../shared_widgets/shared_widgets.dart';
+import '../../market/data/real_market_repository.dart';
+import '../data/gtt_repository.dart';
 
 class GttCreateSheet extends ConsumerStatefulWidget {
   final Instrument? prefilledInstrument;
@@ -38,18 +41,51 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
   @override
   void initState() {
     super.initState();
+    final cached = ref.read(cachedInstrumentsProvider).value;
     _instrument = widget.prefilledInstrument ??
-        const Instrument(
-          token: 'RELIANCE',
-          symbol: 'RELIANCE',
-          name: 'Reliance Industries',
-          exchange: Exchange.NSE,
-          type: InstrumentType.EQ,
-        );
-    _triggerPriceController = TextEditingController(text: '2900.00');
-    _orderPriceController = TextEditingController(text: '2900.00');
-    _targetTriggerController = TextEditingController(text: '3200.00');
-    _targetOrderController = TextEditingController(text: '3200.00');
+        (cached != null && cached.isNotEmpty
+            ? cached.first
+            : const Instrument(
+                token: 'NIFTY',
+                symbol: 'NIFTY',
+                name: 'Nifty 50 Index',
+                exchange: Exchange.NSE,
+                type: InstrumentType.INDEX,
+              ));
+
+    final initialPrice = ref.read(quoteDetailStreamProvider(_instrument.symbol)).value?.ltp ?? 0.0;
+    final priceStr = initialPrice > 0 ? initialPrice.toStringAsFixed(2) : '';
+    final targetStr = initialPrice > 0 ? (initialPrice * 1.05).toStringAsFixed(2) : '';
+
+    _triggerPriceController = TextEditingController(text: priceStr);
+    _orderPriceController = TextEditingController(text: priceStr);
+    _targetTriggerController = TextEditingController(text: targetStr);
+    _targetOrderController = TextEditingController(text: targetStr);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (initialPrice <= 0) {
+        final liveQuote = ref.read(quoteDetailStreamProvider(_instrument.symbol)).value;
+        if (liveQuote != null && liveQuote.ltp > 0) {
+          _triggerPriceController.text = liveQuote.ltp.toStringAsFixed(2);
+          _orderPriceController.text = liveQuote.ltp.toStringAsFixed(2);
+          _targetTriggerController.text = (liveQuote.ltp * 1.05).toStringAsFixed(2);
+          _targetOrderController.text = (liveQuote.ltp * 1.05).toStringAsFixed(2);
+        }
+      }
+    });
+  }
+
+  void _onSelectInstrument(Instrument newInst) {
+    setState(() {
+      _instrument = newInst;
+    });
+    final quote = ref.read(quoteDetailStreamProvider(newInst.symbol)).value;
+    if (quote != null && quote.ltp > 0) {
+      _triggerPriceController.text = quote.ltp.toStringAsFixed(2);
+      _orderPriceController.text = quote.ltp.toStringAsFixed(2);
+      _targetTriggerController.text = (quote.ltp * 1.05).toStringAsFixed(2);
+      _targetOrderController.text = (quote.ltp * 1.05).toStringAsFixed(2);
+    }
   }
 
   @override
@@ -93,25 +129,36 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
 
               const SizedBox(height: 16),
 
-              // Instrument Details
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_instrument.symbol, style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
-                          Text('${_instrument.name} • ${_instrument.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
-                        ],
+              // Instrument Details (Tappable to pick instrument)
+              InkWell(
+                onTap: () => _showInstrumentPicker(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.divider.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(_instrument.symbol, style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700)),
+                                const SizedBox(width: 6),
+                                Icon(LucideIcons.chevronDown, size: 14, color: colors.textSecondary),
+                              ],
+                            ),
+                            Text('${_instrument.name} • ${_instrument.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
@@ -150,90 +197,137 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
 
               const SizedBox(height: 16),
 
-              // Trigger Type: Single vs OCO
-              Text('TRIGGER TYPE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+              // GTT Type: Single vs OCO
+              Text('TYPE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
               const SizedBox(height: 6),
               Row(
                 children: [
-                  ChoiceChip(
-                    label: const Text('Single (Stoploss or Target)'),
-                    selected: _type == GttType.SINGLE,
-                    onSelected: (_) => setState(() => _type = GttType.SINGLE),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => _type = GttType.SINGLE),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _type == GttType.SINGLE ? colors.primary : colors.divider),
+                        backgroundColor: _type == GttType.SINGLE ? colors.primary.withValues(alpha: 0.1) : Colors.transparent,
+                        foregroundColor: colors.textPrimary,
+                      ),
+                      child: const Text('Single Trigger'),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('OCO (Both)'),
-                    selected: _type == GttType.OCO,
-                    onSelected: (_) => setState(() => _type = GttType.OCO),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => _type = GttType.OCO),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _type == GttType.OCO ? colors.primary : colors.divider),
+                        backgroundColor: _type == GttType.OCO ? colors.primary.withValues(alpha: 0.1) : Colors.transparent,
+                        foregroundColor: colors.textPrimary,
+                      ),
+                      child: const Text('OCO (Stop-loss & Target)'),
+                    ),
                   ),
                 ],
               ),
 
               const SizedBox(height: 16),
 
-              // Trigger & Order Price
+              // Primary Trigger & Order Price
+              Text(
+                _type == GttType.OCO ? 'STOP-LOSS LEG' : 'TRIGGER PARAMETERS',
+                style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('TRIGGER PRICE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _triggerPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: AppTypography.body(tabular: true, weight: FontWeight.w600),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: colors.surface,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                        ),
-                      ],
+                    child: TextField(
+                      controller: _triggerPriceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: colors.textPrimary),
+                      decoration: InputDecoration(
+                        labelText: 'Trigger Price',
+                        labelStyle: TextStyle(color: colors.textSecondary),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('LIMIT PRICE', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
-                        const SizedBox(height: 6),
-                        TextField(
-                          controller: _orderPriceController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: AppTypography.body(tabular: true, weight: FontWeight.w600),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: colors.surface,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                          ),
-                        ),
-                      ],
+                    child: TextField(
+                      controller: _orderPriceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: colors.textPrimary),
+                      decoration: InputDecoration(
+                        labelText: 'Limit Price',
+                        labelStyle: TextStyle(color: colors.textSecondary),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
                     ),
                   ),
                 ],
               ),
 
+              // OCO Secondary Target Leg
+              if (_type == GttType.OCO) ...[
+                const SizedBox(height: 16),
+                Text('TARGET LEG', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _targetTriggerController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: TextStyle(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'Target Trigger',
+                          labelStyle: TextStyle(color: colors.textSecondary),
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _targetOrderController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: TextStyle(color: colors.textPrimary),
+                        decoration: InputDecoration(
+                          labelText: 'Target Limit',
+                          labelStyle: TextStyle(color: colors.textSecondary),
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+
               const SizedBox(height: 24),
 
+              // Submit Button
               ElevatedButton(
-                onPressed: _isSubmitting ? null : () async {
-                  if (_isSubmitting) return;
+                onPressed: _isSubmitting
+                    ? null
+                    : () async {
+                  final triggerPrice = double.tryParse(_triggerPriceController.text) ?? 0.0;
+                  final orderPrice = double.tryParse(_orderPriceController.text) ?? 0.0;
+
+                  if (triggerPrice <= 0 || orderPrice <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter valid positive prices')),
+                    );
+                    return;
+                  }
+
                   setState(() => _isSubmitting = true);
 
                   try {
-                    final repo = ref.read(gttRepositoryProvider);
-                    final triggerPrice = double.tryParse(_triggerPriceController.text) ?? 0.0;
-                    final orderPrice = double.tryParse(_orderPriceController.text) ?? 0.0;
-
-                    // Contract Section 8.1: POST /api/gtt
-                    await repo.createGtt(
+                    await ref.read(gttRepositoryProvider).createGtt(
                       symbol: _instrument.symbol,
-                      market: 'INDIAN',
                       condition: _side == TransactionType.BUY ? 'LTE' : 'GTE',
                       triggerPrice: triggerPrice,
                       orderSide: _side.name,
@@ -285,6 +379,30 @@ class _GttCreateSheetState extends ConsumerState<GttCreateSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showInstrumentPicker(BuildContext context) {
+    final cached = ref.read(cachedInstrumentsProvider).valueOrNull ?? [];
+    if (cached.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => ListView.builder(
+        itemCount: cached.length,
+        itemBuilder: (_, idx) {
+          final inst = cached[idx];
+          return ListTile(
+            title: Text(inst.symbol, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(inst.name),
+            onTap: () {
+              Navigator.pop(ctx);
+              _onSelectInstrument(inst);
+            },
+          );
+        },
       ),
     );
   }

@@ -18,6 +18,7 @@ import '../features/heatmap/presentation/sector_heatmap_screen.dart';
 import '../features/history/presentation/history_screen.dart';
 import '../features/ipo/presentation/ipo_list_screen.dart';
 import '../features/net_deals/presentation/net_deals_screen.dart';
+import '../features/news/presentation/learning_screen.dart';
 import '../features/news/presentation/news_screen.dart';
 import '../features/news/presentation/news_feed_screen.dart';
 import '../features/notifications/presentation/mails_screen.dart';
@@ -29,6 +30,7 @@ import '../features/orders/presentation/orders_screen.dart';
 import '../features/portfolio/presentation/portfolio_screen.dart';
 import '../features/profile_settings/presentation/about_screen.dart';
 import '../features/profile_settings/presentation/help_support_screen.dart';
+import '../features/profile_settings/presentation/kyc_screen.dart';
 import '../features/profile_settings/presentation/live_chat_sheet.dart';
 import '../features/profile_settings/presentation/maintenance_screen.dart';
 import '../features/profile_settings/presentation/profile_screen.dart';
@@ -164,7 +166,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/news', builder: (context, state) => const NewsScreen()),
       GoRoute(
           path: '/learning',
-          builder: (context, state) => const NewsScreen()),
+          builder: (context, state) => const LearningScreen()),
       GoRoute(
           path: '/news-feed',
           builder: (context, state) => const NewsFeedScreen()),
@@ -201,6 +203,32 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: (context, state) => const HelpSupportScreen()),
       GoRoute(
         path: '/help/tickets/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return TicketDetailScreen(ticketId: id);
+        },
+      ),
+      GoRoute(
+        path: '/orders/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return OrderDetailScreen(orderId: id);
+        },
+      ),
+      GoRoute(
+        path: '/wallet',
+        redirect: (context, state) => '/funds',
+      ),
+      GoRoute(
+        path: '/gtt',
+        redirect: (context, state) => '/orders',
+      ),
+      GoRoute(
+        path: '/kyc',
+        builder: (context, state) => const KycScreen(),
+      ),
+      GoRoute(
+        path: '/support/tickets/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
           return TicketDetailScreen(ticketId: id);

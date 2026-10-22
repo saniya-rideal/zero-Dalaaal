@@ -29,6 +29,7 @@ class TransactionReceiptDialog extends ConsumerWidget {
       case WalletTransactionStatus.INITIATED:
         return colors.warning;
       case WalletTransactionStatus.PROCESSING:
+      case WalletTransactionStatus.APPROVED:
         return colors.primary;
       case WalletTransactionStatus.FAILED:
       case WalletTransactionStatus.REJECTED:
@@ -47,6 +48,7 @@ class TransactionReceiptDialog extends ConsumerWidget {
       case WalletTransactionStatus.INITIATED:
         return LucideIcons.clock;
       case WalletTransactionStatus.PROCESSING:
+      case WalletTransactionStatus.APPROVED:
         return LucideIcons.refreshCw;
       case WalletTransactionStatus.FAILED:
       case WalletTransactionStatus.REJECTED:

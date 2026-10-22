@@ -26,10 +26,13 @@ class RegisterResult {
 
 abstract class AuthRepository {
   Future<LoginResult> login(String identifier, String password);
+  Future<LoginResult> loginWithGoogle(String idToken);
   Future<Session> verifyPin({required String tempToken, required String pin});
   Future<Session> setPin({required String tempToken, required String pin});
   Future<bool> verifyAppPin(String pin);
   Future<bool> changePin({required String currentPin, required String newPin});
+  Future<void> sendOtp({required String identifier, String type = 'REGISTER'});
+  Future<bool> verifyOtp({required String identifier, required String otp, String type = 'REGISTER'});
   Future<RegisterResult> register({
     required String name,
     required String email,

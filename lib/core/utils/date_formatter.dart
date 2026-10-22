@@ -13,6 +13,7 @@ class DateFormatter {
   static String formatOrderTime(DateTime dt) => _orderTimeFormat.format(dt);
   static String formatOrderDate(DateTime dt) => _orderDateFormat.format(dt);
   static String formatOrderDateTime(DateTime dt) => _orderFullDateTimeFormat.format(dt);
+  static String formatDateTime(DateTime dt) => _orderFullDateTimeFormat.format(dt);
   static String formatExpiry(DateTime dt) => _expiryFormat.format(dt);
   static String formatChartTime(DateTime dt) => _chartTimeFormat.format(dt);
   static String formatChartDate(DateTime dt) => _chartDateFormat.format(dt);

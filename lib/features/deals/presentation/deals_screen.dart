@@ -49,14 +49,14 @@ class _DealsScreenState extends ConsumerState<DealsScreen> {
     final ordersAsync = ref.watch(ordersListProvider);
     final positionsAsync = ref.watch(positionsListProvider);
 
-    final allOrders = ordersAsync.value ?? const <Order>[];
+    final allOrders = ordersAsync.valueOrNull ?? const <Order>[];
     var openOrders = allOrders
         .where((o) =>
             o.status == OrderStatus.OPEN ||
             o.status == OrderStatus.SUBMITTED ||
             o.status == OrderStatus.TRIGGER_PENDING)
         .toList();
-    var activePositions = List<Position>.from(positionsAsync.value ?? const <Position>[]);
+    var activePositions = List<Position>.from(positionsAsync.valueOrNull ?? const <Position>[]);
 
     // Apply Search Filter
     final query = _searchController.text.trim().toLowerCase();

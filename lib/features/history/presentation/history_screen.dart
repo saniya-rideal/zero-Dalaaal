@@ -150,9 +150,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     final positionsAsync = ref.watch(positionsListProvider);
     final fundsAsync = ref.watch(fundsSummaryProvider);
 
-    final allOrders = ordersAsync.value ?? [];
-    final allPositions = positionsAsync.value ?? [];
-    final funds = fundsAsync.value ?? const FundsSummary(
+    final allOrders = ordersAsync.valueOrNull ?? [];
+    final allPositions = positionsAsync.valueOrNull ?? [];
+    final funds = fundsAsync.valueOrNull ?? const FundsSummary(
       availableMargin: 0,
       usedMargin: 0,
       openingBalance: 0,

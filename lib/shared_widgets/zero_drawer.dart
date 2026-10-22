@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../core/services/web_redirect_service.dart';
 import '../core/theme/trading_colors.dart';
 import '../core/theme/typography.dart';
 import '../features/auth/presentation/auth_controller.dart';
+import '../features/funds/presentation/add_funds_sheet.dart';
+import '../features/funds/presentation/withdraw_funds_sheet.dart';
+import '../features/market/data/real_market_repository.dart';
 import 'zero_nav_icons.dart';
 
 class ZeroDrawer extends ConsumerStatefulWidget {
@@ -123,9 +125,29 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                   ),
                   _buildCustomDrawerItem(
                     context: context,
+                    title: 'Watchlist',
+                    iconBuilder: (color) => Icon(LucideIcons.bookmark, color: color, size: 20),
+                    route: '/watchlist',
+                    colors: colors,
+                  ),
+                  _buildCustomDrawerItem(
+                    context: context,
                     title: 'Chart',
                     iconBuilder: (color) => Icon(LucideIcons.lineChart, color: color, size: 20),
-                    route: '/chart-fullscreen/copper_mcx',
+                    route: '/chart-fullscreen',
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (widget.activeRoute.startsWith('/chart-fullscreen')) {
+                        return;
+                      }
+                      final repo = ref.read(marketRepositoryProvider);
+                      final cached = repo.cachedInstruments;
+                      if (cached.isNotEmpty) {
+                        context.go('/chart-fullscreen/${cached.first.token}');
+                      } else {
+                        context.go('/quotes');
+                      }
+                    },
                     colors: colors,
                   ),
                   _buildCustomDrawerItem(
@@ -176,7 +198,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                     iconBuilder: (color) => Icon(LucideIcons.dollarSign, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
-                      WebRedirectService.openDepositWebsite(context: context);
+                      AddFundsSheet.show(context);
                     },
                     colors: colors,
                   ),
@@ -186,7 +208,7 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
                     iconBuilder: (color) => Icon(LucideIcons.arrowDownLeft, color: color, size: 20),
                     onTap: () {
                       Navigator.pop(context);
-                      WebRedirectService.openWithdrawWebsite(context: context);
+                      WithdrawFundsSheet.show(context);
                     },
                     colors: colors,
                   ),
@@ -280,7 +302,11 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
     bool isLogout = false,
     required TradingColors colors,
   }) {
-    final isSelected = route != null && widget.activeRoute == route;
+    final isSelected = isLogout
+        ? false
+        : (route != null &&
+            (widget.activeRoute == route ||
+             (route == '/chart-fullscreen' && widget.activeRoute.startsWith('/chart-fullscreen'))));
     final itemColor = isLogout
         ? colors.primary
         : isSelected
@@ -299,13 +325,21 @@ class _ZeroDrawerState extends ConsumerState<ZeroDrawer> {
           onTap: () {
             if (_isNavigating) return;
             _isNavigating = true;
-            if (onTap != null) {
-              onTap();
-            } else {
-              Navigator.pop(context);
-              if (route != null && widget.activeRoute != route) {
-                context.go(route);
+            try {
+              if (onTap != null) {
+                onTap();
+              } else {
+                Navigator.pop(context);
+                if (route != null && widget.activeRoute != route) {
+                  context.go(route);
+                }
               }
+            } finally {
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (mounted) {
+                  _isNavigating = false;
+                }
+              });
             }
           },
           child: Padding(

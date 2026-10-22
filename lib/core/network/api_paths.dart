@@ -11,12 +11,16 @@ class ApiPaths {
   // 2. Authentication & Session
   static const String authRegister = '/api/auth/register';
   static const String authLogin = '/api/auth/login';
+  static const String authGoogle = '/api/auth/google';
   static const String authVerifyPin = '/api/auth/verify-pin';
   static const String authSetupPin = '/api/auth/setup-pin';
+  static const String authSetPin = '/api/auth/setup-pin';
   static const String authRefreshToken = '/api/auth/refresh-token';
+  static const String authSendOtp = '/api/auth/send-otp';
   static const String authForgotPassword = '/api/auth/forgot-password';
   static const String authVerifyOtp = '/api/auth/verify-otp';
   static const String authResetPassword = '/api/auth/reset-password';
+  static const String authLogout = '/api/auth/logout';
 
   // 3. User Profile, KYC & Compliance
   static const String profile = '/api/account/profile';
@@ -34,8 +38,15 @@ class ApiPaths {
   static const String walletDepositCreate = '/api/wallet/deposit/create';
   static const String walletDepositVerify = '/api/wallet/deposit/verify';
   static const String walletWithdraw = '/api/wallet/withdraw';
+  static const String walletWithdrawals = '/api/wallet/withdrawals';
+  static const String walletDeposits = '/api/wallet/deposits';
   static const String walletLedger = '/api/wallet/ledger';
   static String walletTransactionReceipt(String id) => '/api/wallet/transactions/$id/receipt';
+
+  // 4.1 Real UPI Payment Orders
+  static const String paymentOrders = '/api/payments/orders';
+  static String paymentOrderDetail(String id) => '/api/payments/orders/$id';
+  static String paymentOrderCancel(String id) => '/api/payments/orders/$id/cancel';
 
   // 5. Market Data, Intelligence & Analysis
   static const String marketStatus = '/api/market/status';
@@ -53,6 +64,7 @@ class ApiPaths {
 
   // 6. Trading: Orders, Positions & Portfolio Holdings
   static const String orders = '/api/orders';
+  static const String ordersPreview = '/api/orders/preview';
   static String orderDetail(String id) => '/api/orders/$id';
   static String orderCancel(String id) => '/api/orders/$id/cancel';
   static const String positions = '/api/positions';

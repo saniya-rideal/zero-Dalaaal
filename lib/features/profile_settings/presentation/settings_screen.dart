@@ -9,6 +9,7 @@ import '../data/settings_repository.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/news_ticker_strip.dart';
 import '../../../shared_widgets/script_selector_bar.dart';
+import '../../../shared_widgets/zero_drawer.dart';
 import '../../auth/data/real_auth_repository.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -27,6 +28,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: colors.background,
+      drawer: const ZeroDrawer(activeRoute: '/settings'),
       appBar: AppBar(
         backgroundColor: colors.background,
         elevation: 0,
@@ -41,7 +43,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 behavior: SnackBarBehavior.floating,
               ),
             );
-            context.pop();
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/quotes');
+            }
           },
         ),
         title: Text(
@@ -52,6 +60,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
+        actions: [
+          Builder(
+            builder: (ctx) => IconButton(
+              icon: Icon(LucideIcons.menu, color: colors.textPrimary, size: 22),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+              tooltip: 'Menu',
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [

@@ -48,6 +48,7 @@ class TradingColors extends ThemeExtension<TradingColors> {
   Color get loss => bearish;
   Color get up => bullish;
   Color get down => bearish;
+  Color get accent => secondary;
 
   static const light = TradingColors(
     primary: Color(0xFFE82B57), // Zero signature Rose Pink

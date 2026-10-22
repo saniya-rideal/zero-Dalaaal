@@ -15,6 +15,7 @@ abstract class TradingRepository {
   });
 
   Future<Order> placeOrder(OrderRequest request);
+  Future<OrderPreview> previewOrder(OrderPreviewRequest request);
 
   Future<List<Order>> getOrders();
   Future<Order> getOrder(String id);

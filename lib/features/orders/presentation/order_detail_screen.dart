@@ -19,7 +19,7 @@ class OrderDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
     final ordersAsync = ref.watch(ordersListProvider);
-    final Order? order = ordersAsync.value?.where((o) => o.orderId == orderId || o.id == orderId).firstOrNull;
+    final Order? order = ordersAsync.valueOrNull?.where((o) => o.orderId == orderId || o.id == orderId).firstOrNull;
 
     if (order == null) {
       return Scaffold(

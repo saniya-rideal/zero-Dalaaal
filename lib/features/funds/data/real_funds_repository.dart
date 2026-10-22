@@ -108,6 +108,54 @@ class RealFundsRepository implements FundsRepository {
     final obj = ResponseReader.object(data, 'withdrawal');
     return WalletTransaction.fromJson(obj.isNotEmpty ? obj : ResponseReader.object(data));
   }
+
+  @override
+  Future<PaymentOrder> createPaymentOrder({
+    required double amount,
+    String currency = 'INR',
+    String? idempotencyKey,
+  }) async {
+    final data = await _apiClient.post(
+      ApiPaths.paymentOrders,
+      data: {
+        'amount': amount,
+        'currency': currency,
+      },
+      options: idempotencyKey != null
+          ? Options(headers: {'Idempotency-Key': idempotencyKey})
+          : null,
+    );
+    final obj = ResponseReader.object(data, 'order');
+    return PaymentOrder.fromJson(obj.isNotEmpty ? obj : ResponseReader.object(data));
+  }
+
+  @override
+  Future<PaymentOrder> getPaymentOrder(String id) async {
+    final data = await _apiClient.get(ApiPaths.paymentOrderDetail(id));
+    final obj = ResponseReader.object(data, 'order');
+    return PaymentOrder.fromJson(obj.isNotEmpty ? obj : ResponseReader.object(data));
+  }
+
+  @override
+  Future<PaymentOrder> cancelPaymentOrder(String id) async {
+    final data = await _apiClient.post(ApiPaths.paymentOrderCancel(id));
+    final obj = ResponseReader.object(data, 'order');
+    return PaymentOrder.fromJson(obj.isNotEmpty ? obj : ResponseReader.object(data));
+  }
+
+  @override
+  Future<List<WalletTransaction>> getWithdrawals({int page = 1, int limit = 20}) async {
+    final data = await _apiClient.get(
+      ApiPaths.walletWithdrawals,
+      queryParameters: {'page': page, 'limit': limit},
+    );
+    final items = ResponseReader.list(data, 'items');
+    final rawList = items.isNotEmpty ? items : ResponseReader.list(data, 'withdrawals');
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map((item) => WalletTransaction.fromJson(item))
+        .toList();
+  }
 }
 
 final fundsRepositoryProvider = Provider<FundsRepository>((ref) {
@@ -123,6 +171,11 @@ final fundsSummaryProvider = FutureProvider<FundsSummary>((ref) async {
 final walletLedgerProvider = FutureProvider<List<LedgerEntry>>((ref) async {
   final repo = ref.watch(fundsRepositoryProvider);
   return repo.getLedger();
+});
+
+final withdrawalsListProvider = FutureProvider<List<WalletTransaction>>((ref) async {
+  final repo = ref.watch(fundsRepositoryProvider);
+  return repo.getWithdrawals();
 });
 
 final walletTransactionsListProvider = FutureProvider<List<WalletTransaction>>((ref) async {

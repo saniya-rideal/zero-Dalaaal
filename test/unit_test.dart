@@ -316,26 +316,45 @@ void main() {
       expect(mcx.label, contains('MCX:'));
     });
 
-    test('WatchlistController creates, renames, and deletes watchlists', () async {
+    test('WatchlistController manages single default watchlist (add to top, remove, 50 limit)', () async {
+      final fakeRepo = FakeWatchlistRepository([
+        const WatchlistGroup(
+          id: 'wl_default',
+          name: 'Watchlist',
+          instrumentTokens: ['TCS'],
+          isDefault: true,
+        ),
+      ]);
       final container = ProviderContainer(
         overrides: [
-          watchlistRepositoryProvider.overrideWithValue(FakeWatchlistRepository()),
+          watchlistRepositoryProvider.overrideWithValue(fakeRepo),
         ],
       );
       final controller = container.read(watchlistControllerProvider.notifier);
+      await Future.delayed(const Duration(milliseconds: 50));
 
-      await controller.createWatchlist('Special Options');
       var state = container.read(watchlistControllerProvider);
-      expect(state.watchlists.any((w) => w.name == 'Special Options'), isTrue);
+      expect(state.watchlist, isNotNull);
+      expect(state.watchlist!.name, 'Watchlist');
+      expect(state.watchlist!.instrumentTokens, ['TCS']);
 
-      final newWl = state.watchlists.firstWhere((w) => w.name == 'Special Options');
-      await controller.renameWatchlist(newWl.id, 'Renamed Options');
+      // Add script to top
+      final added = await controller.addInstrument('RELIANCE');
+      expect(added, isTrue);
       state = container.read(watchlistControllerProvider);
-      expect(state.watchlists.any((w) => w.name == 'Renamed Options'), isTrue);
+      expect(state.watchlist!.instrumentTokens.first, 'RELIANCE');
+      expect(state.watchlist!.instrumentTokens, ['RELIANCE', 'TCS']);
 
-      await controller.deleteWatchlist(newWl.id);
+      // Remove script
+      final removed = await controller.removeInstrument('TCS');
+      expect(removed, isTrue);
       state = container.read(watchlistControllerProvider);
-      expect(state.watchlists.any((w) => w.name == 'Renamed Options'), isFalse);
+      expect(state.watchlist!.instrumentTokens, ['RELIANCE']);
+
+      // Undo
+      await controller.addInstrument('TCS');
+      state = container.read(watchlistControllerProvider);
+      expect(state.watchlist!.instrumentTokens.contains('TCS'), isTrue);
     });
 
     // 15. Multi-Market Asset Classes & Instruments Test
@@ -1861,7 +1880,7 @@ void main() {
       const settings = UserSettings();
 
       // Appearance defaults
-      expect(settings.themeMode, ThemeMode.system);
+      expect(settings.themeMode, ThemeMode.light);
       expect(settings.language, AppLanguage.english);
       expect(settings.numberFormat, NumberFormattingMode.indian);
       expect(settings.currency, CurrencyDisplayPreference.inr);
@@ -1869,7 +1888,7 @@ void main() {
       // Security defaults
       expect(settings.pinLockEnabled, isTrue);
       expect(settings.appPin, '1234');
-      expect(settings.twoFactorEnabled, isTrue);
+      expect(settings.twoFactorEnabled, isFalse);
       expect(settings.securityAlertsEnabled, isTrue);
       expect(settings.activeSessions.length, 3);
       expect(settings.activeSessions.any((s) => s.isCurrentDevice), isTrue);

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../../../core/services/connectivity_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import 'auth_controller.dart';
@@ -22,33 +25,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
   int _failedAttempts = 0;
-  bool _isLocked = false;
   int _lockoutSeconds = 0;
   Timer? _lockoutTimer;
+  bool get _isLocked => _lockoutSeconds > 0;
 
   @override
   void dispose() {
-    _lockoutTimer?.cancel();
     _identifierController.dispose();
     _passwordController.dispose();
+    _lockoutTimer?.cancel();
     super.dispose();
   }
 
   void _startLockoutTimer(int seconds) {
     setState(() {
-      _isLocked = true;
       _lockoutSeconds = seconds;
     });
     _lockoutTimer?.cancel();
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_lockoutSeconds > 0) {
-        setState(() => _lockoutSeconds--);
-      } else {
+      if (_lockoutSeconds <= 1) {
+        timer.cancel();
         setState(() {
-          _isLocked = false;
+          _lockoutSeconds = 0;
           _failedAttempts = 0;
         });
-        timer.cancel();
+      } else {
+        setState(() {
+          _lockoutSeconds--;
+        });
       }
     });
   }
@@ -77,8 +81,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (result != null && mounted) {
       _failedAttempts = 0;
-      // Navigate to Security PIN / TOTP screen
-      context.push('/totp');
+      if (result.requiresPin) {
+        // Navigate to Security PIN / TOTP screen to complete authentication and get accessToken
+        context.push('/totp');
+      } else {
+        context.go('/quotes');
+      }
     } else {
       final authState = ref.read(authControllerProvider);
       if (authState.errorMessage != null && authState.errorMessage!.contains('ACCOUNT_LOCKED')) {
@@ -88,6 +96,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (_failedAttempts >= 5) {
           _startLockoutTimer(900);
         }
+      }
+    }
+  }
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
+  bool _isGoogleSigningIn = false;
+
+  Future<void> _handleGoogleSignIn() async {
+    if (_isLocked || _isGoogleSigningIn) return;
+    if (ref.read(isOfflineProvider)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot sign in while offline. Please check your internet connection.'),
+          backgroundColor: Color(0xFFC62828),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isGoogleSigningIn = true);
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => _isGoogleSigningIn = false);
+        return; // User cancelled
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken ?? googleAuth.accessToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to obtain Google verification token.'),
+              backgroundColor: Color(0xFFC62828),
+            ),
+          );
+        }
+        setState(() => _isGoogleSigningIn = false);
+        return;
+      }
+
+      final result = await ref.read(authControllerProvider.notifier).loginWithGoogle(idToken);
+      if (result != null && mounted) {
+        if (result.requiresPin) {
+          context.push('/totp');
+        } else {
+          context.go('/quotes');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In failed: $e'),
+            backgroundColor: const Color(0xFFC62828),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGoogleSigningIn = false);
       }
     }
   }
@@ -283,6 +356,79 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           _isLocked ? 'LOCKED (${_lockoutSeconds}s)' : 'CONTINUE',
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Divider OR
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: colors.divider)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: AppTypography.caption(
+                          color: colors.textSecondary,
+                          weight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: colors.divider)),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Google Sign In Button
+                OutlinedButton(
+                  onPressed: (_isGoogleSigningIn || authState.isLoading || _isLocked)
+                      ? null
+                      : _handleGoogleSignIn,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colors.textPrimary,
+                    side: BorderSide(color: colors.divider),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: _isGoogleSigningIn
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                'G',
+                                style: GoogleFonts.roboto(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: const Color(0xFF4285F4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Continue with Google',
+                              style: AppTypography.body(
+                                color: colors.textPrimary,
+                                weight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                 ),
 

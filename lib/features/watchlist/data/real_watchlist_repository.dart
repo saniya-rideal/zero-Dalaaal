@@ -13,46 +13,78 @@ class RealWatchlistRepository implements WatchlistRepository {
 
   @override
   Future<List<WatchlistGroup>> getAllWatchlists() async {
-    final data = await _apiClient.get(ApiPaths.watchlists);
-    final items = ResponseReader.list(data, 'watchlists');
-    final list = items
-        .whereType<Map<String, dynamic>>()
-        .map((e) => WatchlistGroup.fromJson(e))
-        .toList();
-    _cache = list;
-    return list;
+    try {
+      final data = await _apiClient.get(ApiPaths.watchlists);
+      final items = ResponseReader.list(data, 'watchlists');
+      final rawList = items.isNotEmpty ? items : ResponseReader.list(data, 'items');
+      final list = rawList
+          .whereType<Map<String, dynamic>>()
+          .map((e) => WatchlistGroup.fromJson(e))
+          .toList();
+      if (list.isNotEmpty) {
+        _cache = list;
+        return list;
+      }
+    } catch (_) {}
+
+    if (_cache.isEmpty) {
+      _cache = [
+        const WatchlistGroup(
+          id: 'wl_default',
+          name: 'Watchlist',
+          instrumentTokens: [],
+          isDefault: true,
+        ),
+      ];
+    }
+    return _cache;
   }
 
   @override
   Future<WatchlistGroup> createWatchlist(String name) async {
-    final data = await _apiClient.post(
-      ApiPaths.watchlists,
-      data: {'name': name.trim()},
+    WatchlistGroup? group;
+    final wlName = name.trim().isEmpty ? 'Watchlist' : name.trim();
+    try {
+      final data = await _apiClient.post(
+        ApiPaths.watchlists,
+        data: {'name': wlName},
+      );
+
+      final obj = ResponseReader.object(data, 'watchlist');
+      if (obj.isNotEmpty) {
+        group = WatchlistGroup.fromJson(obj);
+      }
+    } catch (_) {}
+
+    group ??= WatchlistGroup(
+      id: 'wl_${DateTime.now().millisecondsSinceEpoch}',
+      name: wlName,
+      instrumentTokens: [],
+      isDefault: true,
     );
 
-    final obj = ResponseReader.object(data, 'watchlist');
-    final group = WatchlistGroup.fromJson(obj.isNotEmpty ? obj : {'name': name});
+    _cache.removeWhere((w) => w.id == 'wl_default');
     _cache.add(group);
     return group;
   }
 
   @override
   Future<void> renameWatchlist(String id, String newName) async {
+    final index = _cache.indexWhere((w) => w.id == id);
+    if (index != -1) {
+      _cache[index] = _cache[index].copyWith(name: newName.trim());
+    }
+
     await _apiClient.put(
       ApiPaths.watchlistDetail(id),
       data: {'name': newName.trim()},
     );
-
-    final index = _cache.indexWhere((w) => w.id == id);
-    if (index != -1) {
-      _cache[index] = _cache[index].copyWith(name: newName);
-    }
   }
 
   @override
   Future<void> deleteWatchlist(String id) async {
-    await _apiClient.delete(ApiPaths.watchlistDetail(id));
     _cache.removeWhere((w) => w.id == id);
+    await _apiClient.delete(ApiPaths.watchlistDetail(id));
   }
 
   @override
@@ -61,23 +93,33 @@ class RealWatchlistRepository implements WatchlistRepository {
       await getAllWatchlists();
     }
 
+    final tokenClean = token.trim();
     final index = _cache.indexWhere((w) => w.id == watchlistId);
-    List<String> currentTokens = index != -1 ? List.from(_cache[index].instrumentTokens) : [];
+    final List<String> currentTokens = index != -1
+        ? List<String>.from(_cache[index].instrumentTokens)
+        : [];
 
-    if (!currentTokens.contains(token)) {
-      currentTokens.add(token);
-      if (currentTokens.length > 50) {
-        currentTokens = currentTokens.take(50).toList();
+    final exists = currentTokens.any((t) => t.trim().toUpperCase() == tokenClean.toUpperCase());
+    if (!exists) {
+      if (currentTokens.length >= 50) {
+        throw Exception('MAX_SYMBOLS_EXCEEDED');
       }
+      currentTokens.insert(0, tokenClean);
+      if (index != -1) {
+        _cache[index] = _cache[index].copyWith(instrumentTokens: currentTokens);
+      }
+    }
 
+    try {
       await _apiClient.put(
         ApiPaths.watchlistDetail(watchlistId),
         data: {'symbols': currentTokens},
       );
-
-      if (index != -1) {
-        _cache[index] = _cache[index].copyWith(instrumentTokens: currentTokens);
+    } catch (e) {
+      if (e.toString().contains('MAX_SYMBOLS_EXCEEDED')) {
+        throw Exception('MAX_SYMBOLS_EXCEEDED');
       }
+      rethrow;
     }
   }
 
@@ -87,17 +129,21 @@ class RealWatchlistRepository implements WatchlistRepository {
       await getAllWatchlists();
     }
 
+    final tokenClean = token.trim().toUpperCase();
     final index = _cache.indexWhere((w) => w.id == watchlistId);
+    final List<String> currentTokens = index != -1
+        ? List<String>.from(_cache[index].instrumentTokens)
+        : [];
+    currentTokens.removeWhere((t) => t.trim().toUpperCase() == tokenClean);
+
     if (index != -1) {
-      final currentTokens = List<String>.from(_cache[index].instrumentTokens)..remove(token);
-
-      await _apiClient.put(
-        ApiPaths.watchlistDetail(watchlistId),
-        data: {'symbols': currentTokens},
-      );
-
       _cache[index] = _cache[index].copyWith(instrumentTokens: currentTokens);
     }
+
+    await _apiClient.put(
+      ApiPaths.watchlistDetail(watchlistId),
+      data: {'symbols': currentTokens},
+    );
   }
 
   @override
@@ -113,13 +159,12 @@ class RealWatchlistRepository implements WatchlistRepository {
       if (oldIndex < list.length && newIndex <= list.length) {
         final item = list.removeAt(oldIndex);
         list.insert(newIndex, item);
+        _cache[index] = _cache[index].copyWith(instrumentTokens: list);
 
         await _apiClient.put(
           ApiPaths.watchlistDetail(watchlistId),
           data: {'symbols': list},
         );
-
-        _cache[index] = _cache[index].copyWith(instrumentTokens: list);
       }
     }
   }

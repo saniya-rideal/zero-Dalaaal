@@ -1,25 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../../../core/constants/charges_config.dart';
-import '../../../core/error/app_exception.dart';
 import '../../../core/services/connectivity_service.dart';
-import '../../../core/services/edge_case_service.dart';
 import '../../../core/services/maintenance_service.dart';
 import '../../../core/services/realtime_quote_service.dart';
-import '../../../core/theme/trading_colors.dart';
-import '../../../core/utils/currency_formatter.dart';
-import '../../../data/models/models.dart';
-import '../../auth/presentation/auth_controller.dart';
+import '../../../data/models/enums.dart';
+import '../../../data/models/instrument.dart';
+import '../../../data/models/quote.dart';
 import '../../funds/data/real_funds_repository.dart';
-import '../../funds/presentation/add_funds_sheet.dart';
-import '../../market/data/real_market_repository.dart';
-import '../../orders/data/real_trading_repository.dart';
-import '../../profile_settings/data/settings_repository.dart';
-import 'leverage_education_dialog.dart';
+import 'controllers/order_entry_controller.dart';
+import 'widgets/order_header.dart';
+import 'widgets/order_review_sheet.dart';
 
 class OrderEntrySheet extends ConsumerStatefulWidget {
   final Instrument instrument;
@@ -51,1847 +44,1180 @@ class OrderEntrySheet extends ConsumerStatefulWidget {
 }
 
 class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
-  late Instrument _currentInstrument;
-  bool _isSubmitting = false;
-  // 'Market' | 'Pending' (Limit) | 'Stop' (SL-Market) | 'Stop-Limit' (SL)
-  String _orderExecutionType = 'Market';
-  String _amountUnit = 'In Lot'; // 'In Lot' or 'In Quantity'
-  String _sltpMode = 'At Price'; // 'At Price' or 'At Value'
-  // Time-in-force: DAY (default) or IOC (Immediate-or-Cancel)
-  Validity _validity = Validity.DAY;
-
-  double _lots = 0.10;
-  double _limitPrice = 0.0;
-  double _triggerPrice = 0.0; // Used for Stop & Stop-Limit orders
-  double _slPrice = 0.0;
-  double _tpPrice = 0.0;
-  final TextEditingController _commentController = TextEditingController();
-
-  String? _lastOrderSignature;
-  String? _currentIdempotencyKey;
-
-  String _getIdempotencyKey(TransactionType side, double totalQty, double execPrice) {
-    final rawSym = _currentInstrument.symbol.isNotEmpty ? _currentInstrument.symbol : _currentInstrument.token;
-    final sym = rawSym.contains(':') ? rawSym.split(':').last : rawSym;
-    final cleanSym = sym.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-    final signature = '${cleanSym}_${side.name}_${totalQty.toStringAsFixed(2)}_${execPrice.toStringAsFixed(2)}_${_slPrice.toStringAsFixed(2)}_${_tpPrice.toStringAsFixed(2)}_${_orderExecutionType}_${_validity.name}';
-    if (_lastOrderSignature != signature || _currentIdempotencyKey == null) {
-      _lastOrderSignature = signature;
-      _currentIdempotencyKey = 'ord_${DateTime.now().millisecondsSinceEpoch}_$cleanSym';
-    }
-    return _currentIdempotencyKey!;
-  }
+  late ({Instrument instrument, TransactionType initialSide}) _familyKey;
+  late final TextEditingController _lotCtrl;
+  late final TextEditingController _qtyCtrl;
+  late final TextEditingController _slCtrl;
+  late final TextEditingController _tpCtrl;
+  late final TextEditingController _atPriceCtrl;
+  late final TextEditingController _commentCtrl;
 
   @override
   void initState() {
     super.initState();
-    _currentInstrument = widget.instrument;
-    final defaultLots = ref.read(appSettingsProvider).defaultLots;
-    if (defaultLots > 0) {
-      _lots = defaultLots;
-    }
+    _familyKey = (instrument: widget.instrument, initialSide: widget.initialSide);
+
+    _lotCtrl = TextEditingController(text: '1.00');
+    _qtyCtrl = TextEditingController(text: '1');
+    _slCtrl = TextEditingController();
+    _tpCtrl = TextEditingController();
+    _atPriceCtrl = TextEditingController();
+    _commentCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
-    _commentController.dispose();
+    _lotCtrl.dispose();
+    _qtyCtrl.dispose();
+    _slCtrl.dispose();
+    _tpCtrl.dispose();
+    _atPriceCtrl.dispose();
+    _commentCtrl.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final tickerService = ref.watch(tickerServiceProvider);
-    final quote = tickerService.getQuote(_currentInstrument.token);
-
-    if (_limitPrice == 0.0) {
-      _limitPrice = quote.ltp;
+  void _syncControllers(OrderEntryState state) {
+    if (double.tryParse(_lotCtrl.text) != state.lots) {
+      _lotCtrl.text = state.lots.toStringAsFixed(2);
     }
-
-    final bid = (quote.ltp - 0.15);
-    final ask = (quote.ltp + 0.15);
-
-    final isCommodity = _currentInstrument.exchange == Exchange.MCX ||
-        _currentInstrument.token.contains('mcx_');
-    final lotMultiplier = isCommodity ? 2500.0 : (_currentInstrument.lotSize > 0 ? _currentInstrument.lotSize.toDouble() : 1.0);
-
-    final totalQuantity = _amountUnit == 'In Lot' ? (_lots * lotMultiplier) : _lots;
-    final estQuantity = totalQuantity.toStringAsFixed(2);
-
-    // Dynamic Exposure & Margin
-    final bool isPending = _orderExecutionType == 'Pending';
-    final bool isStop = _orderExecutionType == 'Stop';
-    final bool isStopLimit = _orderExecutionType == 'Stop-Limit';
-    final effectivePrice = (isPending || isStopLimit) ? _limitPrice : quote.ltp;
-    final totalExposure = (effectivePrice * totalQuantity);
-
-    final leverage = _currentInstrument.leverageMultiplier > 0
-        ? _currentInstrument.leverageMultiplier
-        : (isCommodity ? 500.0 : 5.0);
-    final marginRate = 1.0 / leverage;
-    final estBuyMargin = totalExposure * marginRate;
-    final estSellMargin = totalExposure * marginRate;
-
-    // Charges calculation (Zero Brokerage model)
-    final calculatedCharges = ChargesConfig.calculateCharges(
-      price: effectivePrice,
-      quantity: totalQuantity.toInt().clamp(1, 100000),
-      side: widget.initialSide,
-      product: isCommodity ? ProductType.NRML : ProductType.MIS,
-      instrumentType: _currentInstrument.type,
-    );
-
-    // Target P&L & Max Risk Preview
-    double? targetProfit;
-    double? maxRisk;
-    if (_tpPrice > 0) {
-      targetProfit = (_tpPrice - effectivePrice).abs() * totalQuantity;
+    if (int.tryParse(_qtyCtrl.text) != state.quantity) {
+      _qtyCtrl.text = state.quantity.toString();
     }
-    if (_slPrice > 0) {
-      maxRisk = (effectivePrice - _slPrice).abs() * totalQuantity;
+    if (state.slPrice > 0 && double.tryParse(_slCtrl.text) != state.slPrice) {
+      _slCtrl.text = state.slPrice.toStringAsFixed(2);
+    } else if (state.slPrice == 0 && _slCtrl.text.isNotEmpty) {
+      _slCtrl.clear();
     }
-
-    final fundsAsync = ref.watch(fundsSummaryProvider);
-    final availableMargin = fundsAsync.valueOrNull?.availableMargin ?? 0.0;
-
-    final isMarginInsufficientBuy = estBuyMargin > availableMargin;
-    final isMarginInsufficientSell = estSellMargin > availableMargin;
-    final postTradeUtilization =
-        availableMargin > 0 ? (estBuyMargin / availableMargin) * 100 : 999.0;
-    final isHighMarginUtilization =
-        postTradeUtilization >= 80.0 && !isMarginInsufficientBuy;
-
-    final colors = context.tradingColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      backgroundColor: colors.background,
-      appBar: AppBar(
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
-        ),
-        backgroundColor: colors.cardBackground,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-        leading: IconButton(
-          icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        titleSpacing: 0,
-        title: InkWell(
-          onTap: () => _showInstrumentPicker(context),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _currentInstrument.symbol,
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(LucideIcons.chevronDown, size: 18, color: colors.textSecondary),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.graduationCap, color: Color(0xFF1E88E5), size: 20),
-            tooltip: 'Risk & Leverage Guide',
-            onPressed: () => LeverageEducationDialog.show(context),
-          ),
-          const SizedBox(width: 6),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: colors.divider,
-            height: 1.0,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Risk & Info Badges Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (_currentInstrument.isSuspended)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFC62828),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(LucideIcons.ban, size: 10, color: Colors.white),
-                          const SizedBox(width: 3),
-                          Text(
-                            'SUSPENDED',
-                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (_currentInstrument.surveillanceTag != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF57C00),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(LucideIcons.alertTriangle, size: 10, color: Colors.white),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${_currentInstrument.surveillanceTag}',
-                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: colors.divider),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(LucideIcons.zap, size: 10, color: Color(0xFF1E88E5)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${leverage.toStringAsFixed(0)}x Leverage',
-                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: colors.divider),
-                    ),
-                    child: Text(
-                      'Max: ${_currentInstrument.freezeQty} Qty',
-                      style: GoogleFonts.inter(fontSize: 10, color: colors.textSecondary),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: colors.surface,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: colors.divider),
-                    ),
-                    child: Text(
-                      'Circuit: ₹${(quote.lowerCircuit > 0 ? quote.lowerCircuit : quote.ltp * 0.9).toStringAsFixed(1)} - ₹${(quote.upperCircuit > 0 ? quote.upperCircuit : quote.ltp * 1.1).toStringAsFixed(1)}',
-                      style: GoogleFonts.inter(fontSize: 10, color: colors.textSecondary),
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => LeverageEducationDialog.show(context),
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E88E5).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFF1E88E5).withValues(alpha: 0.3)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(LucideIcons.graduationCap, size: 12, color: Color(0xFF1E88E5)),
-                          const SizedBox(width: 3),
-                          Text(
-                            'Risk Guide',
-                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w600, color: const Color(0xFF1E88E5)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 1, thickness: 0.8, color: colors.divider),
-
-              const SizedBox(height: 14),
-
-              // 2. Order Mode: Market | Pending (Limit)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Wrap(
-                  spacing: 20,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _buildRadioOption('Market', _orderExecutionType, (val) {
-                      setState(() => _orderExecutionType = val);
-                    }),
-                    _buildRadioOption('Pending', _orderExecutionType, (val) {
-                      setState(() => _orderExecutionType = val);
-                    }),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 10),
-              // 2b. Time-in-Force: DAY | IOC
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  children: [
-                    Text(
-                      'Validity:',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: colors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    _buildRadioOption('DAY', _validity == Validity.DAY ? 'DAY' : 'IOC', (val) {
-                      setState(() => _validity = Validity.DAY);
-                    }),
-                    const SizedBox(width: 20),
-                    _buildRadioOption('IOC', _validity == Validity.IOC ? 'IOC' : 'DAY', (val) {
-                      setState(() => _validity = Validity.IOC);
-                    }),
-                    const SizedBox(width: 8),
-                    Tooltip(
-                      message: 'DAY: Order stays open till end of trading day.\nIOC: Order must fill immediately or is cancelled.',
-                      child: Icon(LucideIcons.info, size: 14, color: colors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // 3. Bid / Ask Dual Box
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: colors.divider, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      // Bid Box
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Bid  ',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF2D88C8),
-                                  ),
-                                ),
-                                Text(
-                                  bid.toStringAsFixed(2),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF2D88C8),
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures()
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      Container(width: 1, height: 52, color: colors.divider),
-
-                      // Ask Box
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Ask  ',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF2D88C8),
-                                  ),
-                                ),
-                                Text(
-                                  ask.toStringAsFixed(2),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF2D88C8),
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures()
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 4. Pending / Limit Price Input (If Pending Selected)
-              // 3a. Trigger Price (shown for Stop & Stop-Limit)
-              if (isStop || isStopLimit) ...[
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(LucideIcons.bellRing,
-                              size: 15, color: colors.warning),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Trigger Price:',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: colors.warning,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isStop ? '(Stop-Market: executes at market when triggered)' : '(Stop-Limit: executes at limit price when triggered)',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: colors.warning.withValues(alpha: 0.6)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                if (_triggerPrice > 0.5) {
-                                  setState(() => _triggerPrice -= 0.5);
-                                }
-                              },
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFE82B57),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(LucideIcons.minus, size: 14, color: Colors.white),
-                              ),
-                            ),
-                            Text(
-                              _triggerPrice.toStringAsFixed(2),
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: colors.warning,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () {
-                                setState(() => _triggerPrice += 0.5);
-                              },
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF1E88E5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(LucideIcons.plus, size: 14, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // 3b. Limit Price (shown for Pending & Stop-Limit)
-              if (isPending || isStopLimit) ...[
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isPending ? 'Pending / Limit Price:' : 'Limit Price (Stop-Limit execution price):',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: colors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: colors.divider),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                if (_limitPrice > 0.5) {
-                                  setState(() => _limitPrice -= 0.5);
-                                }
-                              },
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFE82B57),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(LucideIcons.minus, size: 14, color: Colors.white),
-                              ),
-                            ),
-                            Text(
-                              _limitPrice.toStringAsFixed(2),
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: colors.textPrimary,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            InkWell(
-                              onTap: () {
-                                setState(() => _limitPrice += 0.5);
-                              },
-                              child: Container(
-                                width: 26,
-                                height: 26,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF1E88E5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(LucideIcons.plus, size: 14, color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 16),
-
-              // 5. Amount Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Amount (Lot)',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: colors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(LucideIcons.info,
-                                size: 16, color: Color(0xFF2D88C8)),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildRadioOption('In Lot', _amountUnit, (val) {
-                              setState(() => _amountUnit = val);
-                            }),
-                            const SizedBox(width: 16),
-                            _buildRadioOption('In Quantity', _amountUnit, (val) {
-                              setState(() => _amountUnit = val);
-                            }),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // Amount Stepper Box
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: colors.surface,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: colors.divider, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          InkWell(
-                            onTap: () {
-                              if (_lots > 0.05) {
-                                setState(() =>
-                                    _lots = (_lots - 0.05).clamp(0.01, 100.0));
-                              }
-                            },
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFE82B57),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(LucideIcons.minus,
-                                  size: 14, color: Colors.white),
-                            ),
-                          ),
-
-                          Text(
-                            _lots.toStringAsFixed(2),
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: colors.textPrimary,
-                              fontFeatures: const [FontFeature.tabularFigures()],
-                            ),
-                          ),
-
-                          InkWell(
-                            onTap: () {
-                              setState(() =>
-                                  _lots = (_lots + 0.05).clamp(0.01, 100.0));
-                            },
-                            child: Container(
-                              width: 24,
-                              height: 24,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF1E88E5),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(LucideIcons.plus,
-                                  size: 14, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-                    Text(
-                      'Estimated Quantity: ≈ $estQuantity units',
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: colors.textSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // 6. SL / TP Orders Section
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'SL/TP orders:',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: colors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(LucideIcons.info,
-                                size: 16, color: Color(0xFF2D88C8)),
-                          ],
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildRadioOption('At Price', _sltpMode, (val) {
-                              setState(() => _sltpMode = val);
-                            }),
-                            const SizedBox(width: 16),
-                            _buildRadioOption('At Value', _sltpMode, (val) {
-                              setState(() => _sltpMode = val);
-                            }),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    // S/L and T/P Dual Stepper Inputs
-                    Row(
-                      children: [
-                        // S/L Input Box
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'S/L',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                height: 44,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                decoration: BoxDecoration(
-                                  color: colors.surface,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: colors.divider, width: 1),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    InkWell(
-                                      onTap: () {
-                                        if (_slPrice > 0.5) {
-                                          setState(() => _slPrice -= 0.5);
-                                        }
-                                      },
-                                      child: Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE82B57),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(LucideIcons.minus,
-                                            size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                    Text(
-                                      _slPrice > 0
-                                          ? _slPrice.toStringAsFixed(2)
-                                          : '0.00',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: colors.textPrimary,
-                                      ),
-                                    ),
-                                    InkWell(
-                                      onTap: () {
-                                        setState(() => _slPrice += 0.5);
-                                      },
-                                      child: Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF1E88E5),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(LucideIcons.plus,
-                                            size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(width: 14),
-
-                        // T/P Input Box
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'T/P',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Container(
-                                height: 44,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                decoration: BoxDecoration(
-                                  color: colors.surface,
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: colors.divider, width: 1),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    InkWell(
-                                      onTap: () {
-                                        if (_tpPrice > 0.5) {
-                                          setState(() => _tpPrice -= 0.5);
-                                        }
-                                      },
-                                      child: Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE82B57),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(LucideIcons.minus,
-                                            size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                    Text(
-                                      _tpPrice > 0
-                                          ? _tpPrice.toStringAsFixed(2)
-                                          : '0.00',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: colors.textPrimary,
-                                      ),
-                                    ),
-                                    InkWell(
-                                      onTap: () {
-                                        setState(() => _tpPrice += 0.5);
-                                      },
-                                      child: Container(
-                                        width: 24,
-                                        height: 24,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFF1E88E5),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(LucideIcons.plus,
-                                            size: 14, color: Colors.white),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Target P&L Preview Banner (if SL or TP set)
-                    if (targetProfit != null || maxRisk != null) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colors.surface,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: colors.divider),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (targetProfit != null)
-                              Row(
-                                children: [
-                                  const Icon(LucideIcons.trendingUp, size: 14, color: Color(0xFF00A854)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Est. Profit: +${CurrencyFormatter.format(targetProfit)}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF00A854),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            if (maxRisk != null)
-                              Row(
-                                children: [
-                                  const Icon(LucideIcons.trendingDown, size: 14, color: Color(0xFFE82B57)),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Max Risk: -${CurrencyFormatter.format(maxRisk)}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFFE82B57),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // 7. Financial & Margin Breakdown Summary (Estimates)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: colors.divider),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildMarginRow('Total Exposure Value:',
-                          CurrencyFormatter.format(totalExposure), colors.textPrimary),
-                      const SizedBox(height: 6),
-                      _buildMarginRow('Instrument Leverage:',
-                          '${leverage.toStringAsFixed(0)}x (${(marginRate * 100).toStringAsFixed(1)}% margin)', const Color(0xFF1E88E5)),
-                      const SizedBox(height: 6),
-                      _buildMarginRow('Est. Buy Margin:',
-                          CurrencyFormatter.format(estBuyMargin), const Color(0xFF00A854)),
-                      const SizedBox(height: 6),
-                      _buildMarginRow('Est. Sell Margin:',
-                          CurrencyFormatter.format(estSellMargin), const Color(0xFFE82B57)),
-                      const SizedBox(height: 6),
-                      _buildMarginRow('Est. Brokerage & Taxes:',
-                          '₹0.00 Brokerage + ₹${calculatedCharges.total.toStringAsFixed(2)} Taxes', colors.textSecondary),
-                      const SizedBox(height: 6),
-                      _buildMarginRow('Available Margin:',
-                          CurrencyFormatter.format(availableMargin), colors.textPrimary),
-                      const SizedBox(height: 6),
-                      _buildMarginRow('Margin Utilization:',
-                          '${postTradeUtilization.toStringAsFixed(1)}%',
-                          postTradeUtilization > 80 ? const Color(0xFFE82B57) : (postTradeUtilization > 50 ? const Color(0xFFF57C00) : colors.textSecondary)),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 8. Margin / Risk Alerts
-              if (isMarginInsufficientBuy || isMarginInsufficientSell) ...[
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE82B57).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFE82B57).withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(LucideIcons.alertTriangle, color: Color(0xFFE82B57), size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Insufficient Margin Rejection Alert',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFE82B57),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Required: ${CurrencyFormatter.format(estBuyMargin)} • Available: ${CurrencyFormatter.format(availableMargin)} • Shortfall: ${CurrencyFormatter.format(estBuyMargin - availableMargin)}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10.5,
-                                  color: const Color(0xFFE82B57),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () => AddFundsSheet.show(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE82B57),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Add Funds', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ] else if (isHighMarginUtilization) ...[
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF57C00).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFF57C00).withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(LucideIcons.info, color: Color(0xFFF57C00), size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'High Margin Utilization (${postTradeUtilization.toStringAsFixed(1)}%): This order utilizes over 80% of your available funds. Maintain a cash buffer against adverse price swings.',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFF57C00),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 14),
-
-              // 9. Comment Section (Swapped to last)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Comment',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: _commentController,
-                      maxLines: 2,
-                      style: TextStyle(color: colors.textPrimary),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: 'Optional order tag/comment...',
-                        contentPadding: const EdgeInsets.all(10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: colors.divider, width: 1),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: BorderSide(color: colors.divider, width: 1),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(color: Color(0xFF1E88E5), width: 1.5),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 14),
-
-              // Notice text — dynamic per order type
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Text(
-                  _orderExecutionType == 'Market'
-                      ? 'Attention! The trade will be executed at market conditions, difference with requested price may be significant!'
-                      : _orderExecutionType == 'Pending'
-                          ? 'Your order will remain pending until the market reaches your specified limit price.'
-                          : _orderExecutionType == 'Stop'
-                              ? 'Stop-Market: When the trigger price is hit, the order will execute at the best available market price.'
-                              : 'Stop-Limit: When the trigger price is hit, a limit order will be placed at your specified limit price.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 10.5,
-                    color: colors.textSecondary,
-                    height: 1.3,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          decoration: BoxDecoration(
-            color: colors.cardBackground,
-            border: Border(
-              top: BorderSide(color: colors.divider, width: 1),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Row(
-            children: [
-              // SELL Button (Rose Crimson #E82B57)
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: Semantics(
-                    button: true,
-                    label: 'Place Sell Order',
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting
-                          ? null
-                          : () => _promptOrderReview(
-                                context,
-                                side: TransactionType.SELL,
-                                price: (isPending || isStopLimit) ? _limitPrice : bid,
-                                totalQty: totalQuantity,
-                                marginReq: estSellMargin,
-                                availableMargin: availableMargin,
-                                charges: calculatedCharges,
-                              ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE82B57),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              'SELL',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // BUY Button (Vibrant Emerald Green #00A854)
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: Semantics(
-                    button: true,
-                    label: 'Place Buy Order',
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting
-                          ? null
-                          : () => _promptOrderReview(
-                                context,
-                                side: TransactionType.BUY,
-                                price: (isPending || isStopLimit) ? _limitPrice : ask,
-                                totalQty: totalQuantity,
-                                marginReq: estBuyMargin,
-                                availableMargin: availableMargin,
-                                charges: calculatedCharges,
-                              ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00A854),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              'BUY',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    if (state.tpPrice > 0 && double.tryParse(_tpCtrl.text) != state.tpPrice) {
+      _tpCtrl.text = state.tpPrice.toStringAsFixed(2);
+    } else if (state.tpPrice == 0 && _tpCtrl.text.isNotEmpty) {
+      _tpCtrl.clear();
+    }
+    final activePrice = state.limitPrice > 0 ? state.limitPrice : state.triggerPrice;
+    if (activePrice > 0 && double.tryParse(_atPriceCtrl.text) != activePrice) {
+      _atPriceCtrl.text = activePrice.toStringAsFixed(2);
+    } else if (activePrice == 0 && _atPriceCtrl.text.isNotEmpty) {
+      _atPriceCtrl.clear();
+    }
   }
 
-  Widget _buildRadioOption(
-      String label, String groupValue, ValueChanged<String> onChanged) {
-    final isSelected = label == groupValue;
-    final colors = context.tradingColors;
-    return InkWell(
-      onTap: () => onChanged(label),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 16,
-            height: 16,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFF2D88C8)
-                    : colors.divider,
-                width: isSelected ? 4.5 : 1.5,
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: colors.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  void _onConfirmPlacement(BuildContext context, TransactionType side) {
+    final notifier = ref.read(orderEntryControllerProvider(_familyKey).notifier);
+    final state = ref.read(orderEntryControllerProvider(_familyKey));
+    final quote = ref.read(quoteDetailStreamProvider(state.instrument.symbol)).value;
 
-
-  Widget _buildMarginRow(String label, String value, Color color) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _promptOrderReview(
-    BuildContext context, {
-    required TransactionType side,
-    required double price,
-    required double totalQty,
-    required double marginReq,
-    required double availableMargin,
-    required ChargesBreakdown charges,
-  }) {
-    final colors = context.tradingColors;
-    final authState = ref.read(authControllerProvider);
-    final profile = authState.session?.profile;
-    final clientDisplay = profile != null
-        ? '${profile.userId} (${profile.phone})'
-        : 'Not available';
+    final execPrice = state.isMarketOrder
+        ? (side == TransactionType.BUY ? (quote?.ask ?? quote?.ltp ?? 0.0) : (quote?.bid ?? quote?.ltp ?? 0.0))
+        : (state.limitPrice > 0 ? state.limitPrice : state.triggerPrice);
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: colors.cardBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Consumer(
+          builder: (ctx, sheetRef, _) {
+            final latestState = sheetRef.watch(orderEntryControllerProvider(_familyKey));
+            return OrderReviewSheet(
+              state: latestState,
+              side: side,
+              executionPrice: execPrice,
+              onConfirm: () async {
+                await notifier.submitOrder(
+                  context: context,
+                  overrideSide: side,
+                );
+              },
+              onCancel: () => Navigator.of(bottomSheetContext).pop(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showInstrumentPicker(BuildContext context) {
+    final notifier = ref.read(orderEntryControllerProvider(_familyKey).notifier);
+    final state = ref.read(orderEntryControllerProvider(_familyKey));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => InstrumentPickerSheet(
+        currentInstrument: state.instrument,
+        onSelected: (selected) {
+          notifier.setInstrument(selected);
+        },
       ),
-      builder: (reviewContext) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 20.0,
-            right: 20.0,
-            top: 16.0,
-            bottom: 20.0 + MediaQuery.viewInsetsOf(reviewContext).bottom,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(reviewContext).height * 0.85,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final isOnline = ref.watch(connectivityServiceProvider) == NetworkStatus.online;
+    final isMaint = ref.watch(maintenanceServiceProvider).isMaintenanceActive;
+
+    final state = ref.watch(orderEntryControllerProvider(_familyKey));
+    final notifier = ref.read(orderEntryControllerProvider(_familyKey).notifier);
+    _syncControllers(state);
+
+    final quoteAsync = ref.watch(quoteDetailStreamProvider(state.instrument.symbol));
+    final quote = quoteAsync.valueOrNull;
+
+    final fundsSummaryAsync = ref.watch(fundsSummaryProvider);
+    final availMargin = fundsSummaryAsync.valueOrNull?.availableCash ?? 100000.0;
+
+    final isMarket = state.orderCategory == 'Market';
+    final isLotMode = state.unitMode == 'In Lot';
+    final isAtPrice = state.sltpMode == 'At Price';
+
+    // Margins calculation
+    final ltp = quote?.ltp ?? 100.0;
+    final bid = quote?.bid ?? ltp;
+    final ask = quote?.ask ?? ltp;
+    final leverage = state.instrument.defaultLeverage > 0 ? state.instrument.defaultLeverage : 1.0;
+    final qty = state.quantity > 0 ? state.quantity : 1;
+    final estBuyMargin = (qty * ask) / leverage;
+    final estSellMargin = (qty * bid) / leverage;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F1218) : Colors.white,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            // Connectivity / Maintenance Warning
+            if (!isOnline)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                color: Colors.red.shade700,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const Icon(LucideIcons.wifiOff, size: 13, color: Colors.white),
+                    const SizedBox(width: 8),
                     Text(
-                      'Order Confirmation',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: (side == TransactionType.BUY ? const Color(0xFF00A854) : const Color(0xFFE82B57)),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        side.name,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
+                      'No Internet Connection — Real-time quotes paused',
+                      style: GoogleFonts.inter(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+              )
+            else if (isMaint)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                color: Colors.amber.shade800,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(LucideIcons.alertTriangle, size: 13, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Exchange Maintenance Window in Progress',
+                      style: GoogleFonts.inter(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
 
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            // Top Header: Centered Instrument Name with Down Dropdown Arrow
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      LucideIcons.arrowLeft,
+                      color: isDark ? Colors.white : Colors.black87,
+                      size: 18,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => _showInstrumentPicker(context),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                state.instrument.name.isNotEmpty
+                                    ? state.instrument.name
+                                    : state.instrument.symbol,
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              size: 20,
+                              color: isDark ? Colors.white70 : Colors.black87,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                ],
+              ),
+            ),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: isDark ? const Color(0xFF2C3240) : const Color(0xFFE5E7EB),
+            ),
+
+            // Scrollable Form Area
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Order Type Radio Selection: Market vs Pending (Centered)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildReviewRow('Instrument:', _currentInstrument.symbol, colors),
-                        _buildReviewRow(
-                          'Order Type:',
-                          _orderExecutionType == 'Market'
-                              ? 'MARKET (fills at best price)'
-                              : _orderExecutionType == 'Stop'
-                                  ? 'STOP-MARKET (SL-M — triggers at ₹${_triggerPrice.toStringAsFixed(2)}, fills at market)'
-                                  : _orderExecutionType == 'Stop-Limit'
-                                      ? 'STOP-LIMIT (SL — trigger ₹${_triggerPrice.toStringAsFixed(2)}, limit ₹${_limitPrice.toStringAsFixed(2)})'
-                                      : 'LIMIT / PENDING',
-                          colors,
+                        _buildRadioItem(
+                          label: 'Market',
+                          selected: isMarket,
+                          onTap: () => notifier.setOrderCategory('Market'),
+                          isDark: isDark,
                         ),
-                        _buildReviewRow('Side:', side.name, colors),
-                        _buildReviewRow('Order Price:', CurrencyFormatter.format(price), colors),
-                        _buildReviewRow('Quantity / Lots:', '${_lots.toStringAsFixed(2)} Lots (≈ ${totalQty.toStringAsFixed(0)} Qty)', colors),
-                        _buildReviewRow(
-                          'Time-in-Force:',
-                          _validity == Validity.DAY
-                              ? 'DAY (valid till end of trading day)'
-                              : 'IOC (Immediate or Cancel)',
-                          colors,
+                        const SizedBox(width: 20),
+                        _buildRadioItem(
+                          label: 'Pending',
+                          selected: !isMarket,
+                          onTap: () => notifier.setOrderCategory('Pending'),
+                          isDark: isDark,
                         ),
-                        _buildReviewRow('Stop Loss (S/L):', _slPrice > 0 ? CurrencyFormatter.format(_slPrice) : 'None', colors),
-                        _buildReviewRow('Take Profit (T/P):', _tpPrice > 0 ? CurrencyFormatter.format(_tpPrice) : 'None', colors),
-                        _buildReviewRow('Estimated Margin:', CurrencyFormatter.format(marginReq), colors),
-                        _buildReviewRow(
-                          'Est. Charges:',
-                          '₹0.00 Brokerage + STT ₹${charges.stt.toStringAsFixed(2)} + GST ₹${charges.gst.toStringAsFixed(2)} + Other ₹${(charges.exchangeTxnCharge + charges.sebiCharges + charges.stampDuty).toStringAsFixed(2)}',
-                          colors,
-                        ),
-                        _buildReviewRow('Total Taxes:', '₹${charges.total.toStringAsFixed(2)}', colors),
-                        _buildReviewRow('Client / Account ID:', clientDisplay, colors),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
 
-                        if (_currentInstrument.isSuspended) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFC62828).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFC62828)),
+                    // Dual Bid / Ask Box with Live Tick Color (Blue on profit/up, Red on loss/down)
+                    _LiveBidAskBox(
+                      quote: quote,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Amount Section: Header with info & In Lot / In Quantity radio buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  isLotMode ? 'Amount (Lot)' : 'Amount (Quantity)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : const Color(0xFF111827),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              _buildInfoIcon(),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildRadioItem(
+                              label: 'In Lot',
+                              selected: isLotMode,
+                              onTap: () => notifier.setUnitMode('In Lot'),
+                              isDark: isDark,
+                              fontSize: 11.5,
                             ),
-                            child: Row(
+                            const SizedBox(width: 4),
+                            _buildRadioItem(
+                              label: 'In Quantity',
+                              selected: !isLotMode,
+                              onTap: () => notifier.setUnitMode('In Quantity'),
+                              isDark: isDark,
+                              fontSize: 11.5,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Amount Stepper Box: Red minus circle, centered amount, Blue plus circle
+                    _buildStepperInputBox(
+                      controller: isLotMode ? _lotCtrl : _qtyCtrl,
+                      onMinus: isLotMode ? () => notifier.stepLots(false) : () => notifier.stepQuantity(false),
+                      onPlus: isLotMode ? () => notifier.stepLots(true) : () => notifier.stepQuantity(true),
+                      onChanged: (val) {
+                        if (isLotMode) {
+                          final parsed = double.tryParse(val) ?? 1.0;
+                          notifier.setLots(parsed);
+                        } else {
+                          final parsed = int.tryParse(val) ?? 1;
+                          notifier.setQuantity(parsed);
+                        }
+                      },
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 3),
+
+                    // Subtitle Estimated Quantity
+                    Text(
+                      'Estimated Quantity: \u2248 ${isLotMode ? (state.lots * (state.instrument.lotSize > 0 ? state.instrument.lotSize : 1.0)).toStringAsFixed(2) : state.quantity.toString()}',
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        color: isDark ? Colors.white54 : const Color(0xFF78909C),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Pending Orders Controls (When Pending is selected)
+                    if (!isMarket) ...[
+                      // Pending type radio options: Buy Limit, Sell Limit, Buy Stop, Sell Stop
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildRadioItem(
+                              label: 'Buy Limit',
+                              selected: state.pendingType == 'Buy Limit',
+                              onTap: () => notifier.setPendingType('Buy Limit'),
+                              isDark: isDark,
+                              fontSize: 11.5,
+                            ),
+                            const SizedBox(width: 6),
+                            _buildRadioItem(
+                              label: 'Sell Limit',
+                              selected: state.pendingType == 'Sell Limit',
+                              onTap: () => notifier.setPendingType('Sell Limit'),
+                              isDark: isDark,
+                              fontSize: 11.5,
+                            ),
+                            const SizedBox(width: 6),
+                            _buildRadioItem(
+                              label: 'Buy Stop',
+                              selected: state.pendingType == 'Buy Stop',
+                              onTap: () => notifier.setPendingType('Buy Stop'),
+                              isDark: isDark,
+                              fontSize: 11.5,
+                            ),
+                            const SizedBox(width: 6),
+                            _buildRadioItem(
+                              label: 'Sell Stop',
+                              selected: state.pendingType == 'Sell Stop',
+                              onTap: () => notifier.setPendingType('Sell Stop'),
+                              isDark: isDark,
+                              fontSize: 11.5,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // At Price Stepper Section
+                      Row(
+                        children: [
+                          Text(
+                            'At Price',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF111827),
+                            ),
+                          ),
+                          _buildInfoIcon(),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _buildStepperInputBox(
+                        controller: _atPriceCtrl,
+                        hintText: (quote?.ltp ?? 0.0).toStringAsFixed(2),
+                        onMinus: () {
+                          if (state.pendingType.contains('Limit')) {
+                            notifier.stepLimitPrice(false);
+                          } else {
+                            notifier.stepTriggerPrice(false);
+                          }
+                        },
+                        onPlus: () {
+                          if (state.pendingType.contains('Limit')) {
+                            notifier.stepLimitPrice(true);
+                          } else {
+                            notifier.stepTriggerPrice(true);
+                          }
+                        },
+                        onChanged: (val) {
+                          final parsed = double.tryParse(val) ?? 0.0;
+                          if (state.pendingType.contains('Limit')) {
+                            notifier.setLimitPrice(parsed);
+                          } else {
+                            notifier.setTriggerPrice(parsed);
+                          }
+                        },
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Expiry Date Box
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1A1F2C) : Colors.white,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF2C3240) : const Color(0xFFCFD8DC),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(LucideIcons.ban, size: 14, color: Color(0xFFC62828)),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'SUSPENDED: Trading in ${_currentInstrument.symbol} is suspended (${_currentInstrument.suspensionReason ?? "Regulatory action"}). Order will be rejected.',
-                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFC62828)),
+                                Text(
+                                  'Expiry Date',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : const Color(0xFF263238),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  state.gtcExpiry != null
+                                      ? '${state.gtcExpiry!.day}/${state.gtcExpiry!.month}/${state.gtcExpiry!.year}'
+                                      : 'Good till cancel',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.5,
+                                    color: isDark ? Colors.white70 : const Color(0xFF546E7A),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ] else if (_currentInstrument.surveillanceTag != null) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF57C00).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFF57C00)),
+                            Row(
+                              children: [
+                                if (state.gtcExpiry != null)
+                                  IconButton(
+                                    icon: const Icon(LucideIcons.trash2, size: 16, color: Color(0xFF03A9F4)),
+                                    onPressed: () => notifier.setGtcExpiry(null),
+                                    constraints: const BoxConstraints(),
+                                    padding: const EdgeInsets.only(right: 6),
+                                  ),
+                                IconButton(
+                                  icon: const Icon(LucideIcons.calendar, size: 16, color: Color(0xFF03A9F4)),
+                                  onPressed: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now().add(const Duration(days: 30)),
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                                    );
+                                    if (picked != null) {
+                                      notifier.setGtcExpiry(picked);
+                                    }
+                                  },
+                                  constraints: const BoxConstraints(),
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ],
                             ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Market Mode SL/TP Controls
+                    if (isMarket) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    'SL/TP orders:',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? Colors.white : const Color(0xFF111827),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                _buildInfoIcon(),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildRadioItem(
+                                label: 'At Price',
+                                selected: isAtPrice,
+                                onTap: () => notifier.setSltpMode('At Price'),
+                                isDark: isDark,
+                                fontSize: 11.5,
+                              ),
+                              const SizedBox(width: 4),
+                              _buildRadioItem(
+                                label: 'At Value',
+                                selected: !isAtPrice,
+                                onTap: () => notifier.setSltpMode('At Value'),
+                                isDark: isDark,
+                                fontSize: 11.5,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      // S/L and T/P Stepper Input Columns
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(LucideIcons.alertTriangle, size: 14, color: Color(0xFFF57C00)),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'SURVEILLANCE MEASURE: ${_currentInstrument.symbol} is under ${_currentInstrument.surveillanceTag}. 100% margin required; intraday leverage restricted.',
-                                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFF57C00)),
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      'S/L',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : const Color(0xFF111827),
+                                      ),
+                                    ),
+                                    _buildInfoIcon(),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                _buildStepperInputBox(
+                                  controller: _slCtrl,
+                                  hintText: isAtPrice ? 'Price' : 'Points',
+                                  onMinus: () {
+                                    final current = double.tryParse(_slCtrl.text) ?? 0.0;
+                                    final updated = (current - 1.0) > 0 ? (current - 1.0) : 0.0;
+                                    notifier.setSlPrice(updated);
+                                  },
+                                  onPlus: () {
+                                    final current = double.tryParse(_slCtrl.text) ?? 0.0;
+                                    notifier.setSlPrice(current + 1.0);
+                                  },
+                                  onChanged: (val) {
+                                    final parsed = double.tryParse(val) ?? 0.0;
+                                    notifier.setSlPrice(parsed);
+                                  },
+                                  isDark: isDark,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'T/P',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? Colors.white : const Color(0xFF111827),
+                                      ),
+                                    ),
+                                    _buildInfoIcon(),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                _buildStepperInputBox(
+                                  controller: _tpCtrl,
+                                  hintText: isAtPrice ? 'Price' : 'Points',
+                                  onMinus: () {
+                                    final current = double.tryParse(_tpCtrl.text) ?? 0.0;
+                                    final updated = (current - 1.0) > 0 ? (current - 1.0) : 0.0;
+                                    notifier.setTpPrice(updated);
+                                  },
+                                  onPlus: () {
+                                    final current = double.tryParse(_tpCtrl.text) ?? 0.0;
+                                    notifier.setTpPrice(current + 1.0);
+                                  },
+                                  onChanged: (val) {
+                                    final parsed = double.tryParse(val) ?? 0.0;
+                                    notifier.setTpPrice(parsed);
+                                  },
+                                  isDark: isDark,
                                 ),
                               ],
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
 
-                        if (marginReq > availableMargin * 0.8 && !_currentInstrument.isSuspended) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE82B57).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE82B57).withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(LucideIcons.alertTriangle, size: 16, color: Color(0xFFE82B57)),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    'High-Risk Order: Consumes >80% margin. Amplified volatility may lead to liquidation.',
-                                    style: GoogleFonts.inter(fontSize: 10.5, color: const Color(0xFFE82B57), fontWeight: FontWeight.w600),
-                                  ),
+                    // Comment Section
+                    Text(
+                      'Comment',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF263238),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A1F2C) : Colors.white,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF2C3240) : const Color(0xFFCFD8DC),
+                          width: 1,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: TextField(
+                        controller: _commentCtrl,
+                        maxLines: 2,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: notifier.setComment,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Direction Validation Banner if present
+                    if (state.directionValidationError != null && state.directionValidationError!.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.red.shade400),
+                        ),
+                        child: Text(
+                          state.directionValidationError!,
+                          style: GoogleFonts.inter(fontSize: 11, color: Colors.red.shade700, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bottom Section: Margins Summary & Edge-to-Edge Action Buttons
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF12151C) : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0xFF2C3240) : const Color(0xFFECEFF1),
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Three-Row Margin Summary
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Est. Buy Margin:',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF0288D1),
                                 ),
-                                InkWell(
-                                  onTap: () => LeverageEducationDialog.show(context),
-                                  child: const Text(' Guide', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF1E88E5), decoration: TextDecoration.underline)),
-                                ),
-                              ],
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        ],
+                            Text(
+                              estBuyMargin.toStringAsFixed(2),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0288D1),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Est. Sell Margin:',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFE91E63),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              estSellMargin.toStringAsFixed(2),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFE91E63),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Available Margin:',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : const Color(0xFF263238),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              availMargin.toStringAsFixed(2),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : const Color(0xFF263238),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
-                ),
 
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(reviewContext),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text('Edit Order'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting
-                            ? null
-                            : () {
-                                Navigator.pop(reviewContext);
-                                _executeOrder(side, price, totalQty);
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: side == TransactionType.BUY ? const Color(0xFF00A854) : const Color(0xFFE82B57),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: _isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                  // Action Buttons: SELL (Red) & BUY (Navy Blue) or PLACE
+                  if (isMarket)
+                    Row(
+                      children: [
+                        // SELL (Red)
+                        Expanded(
+                          child: SizedBox(
+                            height: 44,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFEB2A53),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                              ),
+                              onPressed: () => _onConfirmPlacement(context, TransactionType.SELL),
+                              child: Text(
+                                'SELL',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
                                   color: Colors.white,
                                 ),
-                              )
-                            : const Text('Confirm & Place', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // BUY (Navy Blue)
+                        Expanded(
+                          child: SizedBox(
+                            height: 44,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1B357F),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                              ),
+                              onPressed: () => _onConfirmPlacement(context, TransactionType.BUY),
+                              child: Text(
+                                'BUY',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEB2A53),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                        ),
+                        onPressed: () {
+                          final side = state.pendingType.startsWith('Buy')
+                              ? TransactionType.BUY
+                              : TransactionType.SELL;
+                          _onConfirmPlacement(context, side);
+                        },
+                        child: Text(
+                          'PLACE',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  SizedBox(height: MediaQuery.of(context).padding.bottom),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildReviewRow(String label, String value, TradingColors colors) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Text(
+  Widget _buildInfoIcon() {
+    return const Padding(
+      padding: EdgeInsets.only(left: 4),
+      child: Icon(
+        Icons.info_outline,
+        size: 14,
+        color: Color(0xFF03A9F4),
+      ),
+    );
+  }
+
+  Widget _buildRadioItem({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required bool isDark,
+    double fontSize = 12.5,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 15,
+              height: 15,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected ? const Color(0xFF1E88E5) : (isDark ? Colors.white54 : const Color(0xFF90A4AE)),
+                  width: 1.5,
+                ),
+              ),
+              child: selected
+                  ? Center(
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFF1E88E5),
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 6),
+            Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(fontSize: 13, color: colors.textSecondary),
+              style: GoogleFonts.inter(
+                fontSize: fontSize,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: isDark ? Colors.white : const Color(0xFF1F2937),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepperInputBox({
+    required TextEditingController controller,
+    required VoidCallback onMinus,
+    required VoidCallback onPlus,
+    required ValueChanged<String> onChanged,
+    String? hintText,
+    required bool isDark,
+  }) {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1F2C) : Colors.white,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C3240) : const Color(0xFFCFD8DC),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: Row(
+        children: [
+          // Red Minus Circle Button
+          InkWell(
+            onTap: onMinus,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFFEB2A53),
+              ),
+              child: const Center(
+                child: Icon(Icons.remove, color: Colors.white, size: 15),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: colors.textPrimary),
+          // Centered Text Input
+          Expanded(
+            child: TextField(
+              controller: controller,
+              textAlign: TextAlign.center,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
+              ],
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF111827),
+              ),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                hintText: hintText ?? '',
+                hintStyle: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: isDark ? Colors.white38 : Colors.black26,
+                ),
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: onChanged,
+            ),
+          ),
+          // Blue Plus Circle Button
+          InkWell(
+            onTap: onPlus,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: 26,
+              height: 26,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF2979FF),
+              ),
+              child: const Center(
+                child: Icon(Icons.add, color: Colors.white, size: 15),
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  void _executeOrder(TransactionType side, double execPrice, double totalQty) async {
-    // 1. Double-tap and spam protection
-    if (_isSubmitting) return;
-    setState(() => _isSubmitting = true);
+/// Dual Bid / Ask Box with Live Tick Color (Blue on tick up / profit, Red on tick down / loss)
+class _LiveBidAskBox extends StatefulWidget {
+  final Quote? quote;
+  final bool isDark;
 
-    try {
-      final isMaintenance = ref.read(isMaintenanceActiveProvider);
-      if (isMaintenance) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Cannot place orders: Exchange servers are under scheduled maintenance.',
-            ),
-            backgroundColor: Color(0xFFE65100),
-          ),
-        );
-        return;
+  const _LiveBidAskBox({
+    required this.quote,
+    required this.isDark,
+  });
+
+  @override
+  State<_LiveBidAskBox> createState() => _LiveBidAskBoxState();
+}
+
+class _LiveBidAskBoxState extends State<_LiveBidAskBox> {
+  double? _prevBid;
+  double? _prevAsk;
+  Color _bidColor = const Color(0xFF1976D2); // Blue default
+  Color _askColor = const Color(0xFF1976D2); // Blue default
+
+  @override
+  void didUpdateWidget(_LiveBidAskBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final curBid = widget.quote?.bid ?? widget.quote?.ltp ?? 0.0;
+    final curAsk = widget.quote?.ask ?? widget.quote?.ltp ?? 0.0;
+
+    if (_prevBid != null && curBid != _prevBid) {
+      if (curBid > _prevBid!) {
+        _bidColor = const Color(0xFF1976D2); // Blue (tick up / profit)
+      } else if (curBid < _prevBid!) {
+        _bidColor = const Color(0xFFE53935); // Red (tick down / loss)
       }
-
-      final isOffline = ref.read(isOfflineProvider);
-      if (isOffline) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Cannot place orders while offline. Please check your internet connection.',
-            ),
-            backgroundColor: Color(0xFFC62828),
-          ),
-        );
-        return;
-      }
-
-      final tradingRepo = ref.read(tradingRepositoryProvider);
-      final edgeService = ref.read(edgeCaseServiceProvider);
-
-      final isCommodity = _currentInstrument.exchange == Exchange.MCX ||
-          _currentInstrument.token.contains('mcx_');
-
-      // 2. Client-generated session idempotency key (reused on retry of identical request, refreshed on param changes)
-      final idempotencyKey = _getIdempotencyKey(side, totalQty, execPrice);
-      final rawSymbol = _currentInstrument.symbol.isNotEmpty
-          ? _currentInstrument.symbol
-          : _currentInstrument.token;
-      final targetSymbol = rawSymbol.contains(':') ? rawSymbol.split(':').last : rawSymbol;
-
-      final request = OrderRequest(
-        idempotencyKey: idempotencyKey,
-        instrumentToken: targetSymbol,
-        side: side,
-        product: isCommodity ? ProductType.NRML : ProductType.MIS,
-        leverage: _currentInstrument.defaultLeverage > 0 ? _currentInstrument.defaultLeverage : 5.0,
-        market: _currentInstrument.market,
-        kind: _orderExecutionType == 'Market'
-            ? OrderKind.MARKET
-            : _orderExecutionType == 'Stop'
-                ? OrderKind.SL_M
-                : _orderExecutionType == 'Stop-Limit'
-                    ? OrderKind.SL
-                    : OrderKind.LIMIT,
-        quantity: totalQty.toInt().clamp(1, 100000),
-        price: (_orderExecutionType == 'Pending' || _orderExecutionType == 'Stop-Limit')
-            ? _limitPrice
-            : null,
-        triggerPrice: (_orderExecutionType == 'Stop' || _orderExecutionType == 'Stop-Limit')
-            ? _triggerPrice
-            : null,
-        bracket: (_slPrice > 0 || _tpPrice > 0)
-            ? BracketParams(
-                stopLoss: _slPrice,
-                target: _tpPrice,
-              )
-            : null,
-        validity: _validity,
-      );
-
-      // 3. Record in journal before dispatch to recover if app is killed
-      edgeService.recordInFlightOrder(request, idempotencyKey);
-
-      final placedOrder = await tradingRepo.placeOrder(request);
-
-      ref.invalidate(ordersListProvider);
-      ref.invalidate(positionsListProvider);
-      ref.invalidate(fundsSummaryProvider);
-
-      // 4. Mark persisted in journal
-      edgeService.markOrderPersisted(idempotencyKey, placedOrder.effectiveServerOrderId);
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      if (placedOrder.status == OrderStatus.REJECTED) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(LucideIcons.xCircle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    placedOrder.rejectionReason ?? 'Order rejected by Risk Management System.',
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFFC62828),
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${side.name} order placed! Ref: ${placedOrder.orderId} • ${_lots.toStringAsFixed(2)} lots @ ${execPrice.toStringAsFixed(2)}',
-          ),
-          backgroundColor: side == TransactionType.BUY
-              ? const Color(0xFF00A854)
-              : const Color(0xFFE82B57),
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'VIEW DEALS',
-            textColor: Colors.white,
-            onPressed: () => context.go('/deals'),
-          ),
-        ),
-      );
-    } catch (e, stack) {
-      debugPrint('[OrderEntry] Order execution failed: $e\n$stack');
-      if (mounted) {
-        final message = e is AppException ? e.message : e.toString();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(LucideIcons.alertCircle, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFFC62828),
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
+    } else if (_prevBid == null && widget.quote != null) {
+      _bidColor = (widget.quote!.change >= 0) ? const Color(0xFF1976D2) : const Color(0xFFE53935);
     }
+    _prevBid = curBid;
+
+    if (_prevAsk != null && curAsk != _prevAsk) {
+      if (curAsk > _prevAsk!) {
+        _askColor = const Color(0xFF1976D2); // Blue (tick up / profit)
+      } else if (curAsk < _prevAsk!) {
+        _askColor = const Color(0xFFE53935); // Red (tick down / loss)
+      }
+    } else if (_prevAsk == null && widget.quote != null) {
+      _askColor = (widget.quote!.change >= 0) ? const Color(0xFF1976D2) : const Color(0xFFE53935);
+    }
+    _prevAsk = curAsk;
   }
 
-  void _showInstrumentPicker(BuildContext context) {
-    final colors = context.tradingColors;
-    final repo = ref.read(marketRepositoryProvider);
-    final allInstruments = repo.cachedInstruments;
+  @override
+  Widget build(BuildContext context) {
+    final ltp = widget.quote?.ltp ?? 0.0;
+    final bid = widget.quote?.bid ?? ltp;
+    final ask = widget.quote?.ask ?? ltp;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: colors.cardBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.isDark ? const Color(0xFF1A1F2C) : Colors.white,
+        border: Border.all(
+          color: widget.isDark ? const Color(0xFF2C3240) : const Color(0xFFB0BEC5),
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(4),
       ),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: IntrinsicHeight(
+        child: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Select Instrument',
-                style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: colors.textPrimary),
-              ),
-            ),
-            Divider(height: 1, color: colors.divider),
+            // Left Half: Bid
             Expanded(
-              child: ListView.separated(
-                itemCount: allInstruments.length,
-                separatorBuilder: (_, __) => Divider(height: 1, color: colors.divider.withValues(alpha: 0.5)),
-                itemBuilder: (context, index) {
-                  final inst = allInstruments[index];
-                  final isSelected = inst.token == _currentInstrument.token;
-
-                  return Material(
-                    color: Colors.transparent,
-                    child: ListTile(
-                      title: Text(
-                        inst.symbol,
-                        style: GoogleFonts.inter(
-                          fontWeight:
-                              isSelected ? FontWeight.w800 : FontWeight.w600,
-                          color: isSelected
-                              ? const Color(0xFFE82B57)
-                              : colors.textPrimary,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Bid',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _bidColor,
+                      ),
+                    ),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          bid.toStringAsFixed(2),
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: _bidColor,
+                          ),
                         ),
                       ),
-                      subtitle: Text(
-                        '${inst.exchange.name} • ${inst.type.name}',
-                        style: TextStyle(color: colors.textSecondary),
-                      ),
-                      trailing: isSelected
-                          ? const Icon(LucideIcons.check, color: Color(0xFFE82B57), size: 20)
-                          : null,
-                      onTap: () {
-                        Navigator.pop(context);
-                        setState(() => _currentInstrument = inst);
-                      },
                     ),
-                  );
-                },
+                  ],
+                ),
+              ),
+            ),
+            // Vertical Divider
+            VerticalDivider(
+              width: 1,
+              thickness: 1,
+              color: widget.isDark ? const Color(0xFF2C3240) : const Color(0xFFB0BEC5),
+            ),
+            // Right Half: Ask
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Ask',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _askColor,
+                      ),
+                    ),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          ask.toStringAsFixed(2),
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: _askColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],

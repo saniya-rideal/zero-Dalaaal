@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/services/market_status_service.dart';
 import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
@@ -12,63 +14,16 @@ import '../../../shared_widgets/zero_drawer.dart';
 import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'watchlist_controller.dart';
 import 'watchlist_row_actions.dart';
-import 'watchlist_tab_strip.dart';
 import '../../../core/services/notification_service.dart';
 
-class WatchlistScreen extends ConsumerStatefulWidget {
+class WatchlistScreen extends ConsumerWidget {
   const WatchlistScreen({super.key});
 
   @override
-  ConsumerState<WatchlistScreen> createState() => _WatchlistScreenState();
-}
-
-class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
-  final TextEditingController _newWatchlistController = TextEditingController();
-
-  @override
-  void dispose() {
-    _newWatchlistController.dispose();
-    super.dispose();
-  }
-
-  void _showCreateWatchlistDialog() {
-    _newWatchlistController.clear();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create New Watchlist'),
-        content: TextField(
-          controller: _newWatchlistController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. Pharma, Dividend Stocks',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = _newWatchlistController.text.trim();
-              if (name.isNotEmpty) {
-                ref.read(watchlistControllerProvider.notifier).createWatchlist(name);
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.tradingColors;
     final state = ref.watch(watchlistControllerProvider);
-    final activeGroup = state.activeWatchlist;
+    final activeGroup = state.watchlist;
     final tickerService = ref.watch(tickerServiceProvider);
     final repo = ref.watch(marketRepositoryProvider);
 
@@ -79,16 +34,33 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
 
     // Watch stream of quotes for real-time ticking
     final quotesAsync = ref.watch(quotesStreamProvider);
-    final quotesMap = quotesAsync.value ?? tickerService.getAllQuotes();
+    final quotesMap = quotesAsync.valueOrNull ?? tickerService.getAllQuotes();
+
+    final nseStatus = MarketStatusService.getStatusForExchange('NSE');
+    final isMarketClosed = nseStatus.state == MarketSessionState.closed;
 
     return Scaffold(
       drawer: const ZeroDrawer(activeRoute: '/watchlist'),
       appBar: AppBar(
         leading: const AdaptiveLeadingButton(),
-        title: Text(
-          'Marketwatch',
-          style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Watchlist',
+              style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w700),
+            ),
+            Text(
+              '${activeGroup?.instrumentTokens.length ?? 0} / 50 symbols',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: colors.textSecondary,
+              ),
+            ),
+          ],
         ),
+        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.search, size: 20),
@@ -136,14 +108,8 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
       ),
       body: Column(
         children: [
-          // Watchlist Tabs Header
-          if (state.watchlists.isNotEmpty)
-            WatchlistTabStrip(
-              watchlists: state.watchlists,
-              activeIndex: state.activeIndex,
-              onSelectTab: (idx) => ref.read(watchlistControllerProvider.notifier).setActiveIndex(idx),
-              onAddWatchlist: _showCreateWatchlistDialog,
-            ),
+          if (isMarketClosed)
+            const MarketClosedBanner(),
 
           // Main List View
           Expanded(
@@ -152,10 +118,10 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                 : activeGroup == null || activeGroup.instrumentTokens.isEmpty
                     ? EmptyStateView(
                         icon: LucideIcons.bookmark,
-                        title: 'Your Watchlist is Empty',
-                        subtitle: 'Explore 150+ equities, indices, and derivatives to add them to this list.',
-                        buttonText: 'Add Instruments',
-                        onButtonPressed: () => context.push('/search'),
+                        title: 'Your watchlist is empty',
+                        subtitle: 'Add equities, commodities, forex, or crypto scripts to track live prices.',
+                        buttonText: 'Add script',
+                        onButtonPressed: () => context.push('/add-script'),
                       )
                     : ReorderableListView.builder(
                         itemCount: activeGroup.instrumentTokens.length,
@@ -176,46 +142,88 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                           return Column(
                             key: ValueKey('row_$token'),
                             children: [
-                              InstrumentRow(
-                                instrument: instrument,
-                                quote: quote,
-                                onTap: () => context.push('/quote/${instrument.token}'),
-                                onBuy: () => OrderEntrySheet.show(
-                                  context,
-                                  instrument: instrument,
-                                  side: TransactionType.BUY,
+                              Dismissible(
+                                key: ValueKey('dismiss_wl_$token'),
+                                direction: DismissDirection.endToStart,
+                                background: Container(
+                                  color: colors.bearish,
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  child: const Icon(LucideIcons.trash2, color: Colors.white, size: 20),
                                 ),
-                                onSell: () => OrderEntrySheet.show(
-                                  context,
-                                  instrument: instrument,
-                                  side: TransactionType.SELL,
-                                ),
-                                onLongPress: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                                    ),
-                                    builder: (_) => WatchlistRowActions(
-                                      instrument: instrument,
-                                      quote: quote,
-                                      onBuy: () => OrderEntrySheet.show(
-                                        context,
-                                        instrument: instrument,
-                                        side: TransactionType.BUY,
+                                confirmDismiss: (direction) async {
+                                  final notifier = ref.read(watchlistControllerProvider.notifier);
+                                  final success = await notifier.removeInstrument(token);
+                                  if (context.mounted && success) {
+                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Removed ${instrument.symbol} from Watchlist'),
+                                        action: SnackBarAction(
+                                          label: 'UNDO',
+                                          textColor: Colors.white,
+                                          onPressed: () => notifier.addInstrument(token),
+                                        ),
                                       ),
-                                      onSell: () => OrderEntrySheet.show(
-                                        context,
-                                        instrument: instrument,
-                                        side: TransactionType.SELL,
-                                      ),
-                                      onRemove: () => ref
-                                          .read(watchlistControllerProvider.notifier)
-                                          .removeInstrument(instrument.token),
-                                    ),
-                                  );
+                                    );
+                                  }
+                                  return success;
                                 },
+                                child: InstrumentRow(
+                                  instrument: instrument,
+                                  quote: quote,
+                                  onTap: () => context.push('/quote/${instrument.token}'),
+                                  onBuy: () => OrderEntrySheet.show(
+                                    context,
+                                    instrument: instrument,
+                                    side: TransactionType.BUY,
+                                  ),
+                                  onSell: () => OrderEntrySheet.show(
+                                    context,
+                                    instrument: instrument,
+                                    side: TransactionType.SELL,
+                                  ),
+                                  onLongPress: () {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                                      ),
+                                      builder: (_) => WatchlistRowActions(
+                                        instrument: instrument,
+                                        quote: quote,
+                                        onBuy: () => OrderEntrySheet.show(
+                                          context,
+                                          instrument: instrument,
+                                          side: TransactionType.BUY,
+                                        ),
+                                        onSell: () => OrderEntrySheet.show(
+                                          context,
+                                          instrument: instrument,
+                                          side: TransactionType.SELL,
+                                        ),
+                                        onRemove: () async {
+                                          final notifier = ref.read(watchlistControllerProvider.notifier);
+                                          final success = await notifier.removeInstrument(instrument.token);
+                                          if (context.mounted && success) {
+                                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Removed ${instrument.symbol} from Watchlist'),
+                                                action: SnackBarAction(
+                                                  label: 'UNDO',
+                                                  textColor: Colors.white,
+                                                  onPressed: () => notifier.addInstrument(instrument.token),
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                               const Divider(height: 1),
                             ],
@@ -226,11 +234,11 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/search'),
+        onPressed: () => context.push('/add-script'),
         backgroundColor: colors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(LucideIcons.plus, size: 20),
-        label: const Text('Add Stock'),
+        label: const Text('Add script'),
       ),
     );
   }

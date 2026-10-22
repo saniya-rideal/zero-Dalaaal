@@ -118,8 +118,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         itemBuilder: (context, index) {
                           final instrument = state.results[index];
                           final quote = tickerService.getQuote(instrument.token);
-                          final isInWatchlist = watchlistState.activeWatchlist?.instrumentTokens
-                                  .contains(instrument.token) ??
+                          final tokenUpper = instrument.token.toUpperCase();
+                          final symUpper = instrument.symbol.toUpperCase();
+                          final isInWatchlist = watchlistState.watchlist?.instrumentTokens
+                                  .any((t) => t.toUpperCase() == tokenUpper || t.toUpperCase() == symUpper) ??
                               false;
 
                           return ListTile(
@@ -157,26 +159,55 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 const SizedBox(width: 12),
                                 IconButton(
                                   icon: Icon(
-                                    isInWatchlist ? LucideIcons.checkCircle2 : LucideIcons.plusCircle,
+                                    isInWatchlist ? LucideIcons.check : LucideIcons.plus,
                                     color: isInWatchlist ? colors.bullish : colors.primary,
                                     size: 22,
                                   ),
-                                  onPressed: () {
+                                  tooltip: isInWatchlist ? 'In Watchlist' : 'Add to Watchlist',
+                                  onPressed: () async {
+                                    final notifier = ref.read(watchlistControllerProvider.notifier);
                                     if (isInWatchlist) {
-                                      ref
-                                          .read(watchlistControllerProvider.notifier)
-                                          .removeInstrument(instrument.token);
+                                      final success = await notifier.removeInstrument(instrument.symbol);
+                                      if (context.mounted && success) {
+                                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Removed ${instrument.symbol} from Watchlist'),
+                                            action: SnackBarAction(
+                                              label: 'UNDO',
+                                              textColor: Colors.white,
+                                              onPressed: () => notifier.addInstrument(instrument.symbol),
+                                            ),
+                                          ),
+                                        );
+                                      }
                                     } else {
-                                      ref
-                                          .read(watchlistControllerProvider.notifier)
-                                          .addInstrumentToActive(instrument.token);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Added ${instrument.symbol} to ${watchlistState.activeWatchlist?.name}'),
-                                          duration: const Duration(seconds: 1),
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
+                                      final success = await notifier.addInstrument(instrument.symbol);
+                                      if (context.mounted) {
+                                        if (success) {
+                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Added ${instrument.symbol} to Watchlist'),
+                                              action: SnackBarAction(
+                                                label: 'UNDO',
+                                                textColor: Colors.white,
+                                                onPressed: () => notifier.removeInstrument(instrument.symbol),
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          final err = ref.read(watchlistControllerProvider).errorMessage;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(err == 'MAX_SYMBOLS_EXCEEDED'
+                                                  ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
+                                                  : (err ?? 'Failed to add ${instrument.symbol}')),
+                                              backgroundColor: const Color(0xFFC62828),
+                                            ),
+                                          );
+                                        }
+                                      }
                                     }
                                   },
                                 ),

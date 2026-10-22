@@ -8,6 +8,7 @@ import '../../../data/models/enums.dart';
 import '../../../data/models/sip.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../../market/data/real_market_repository.dart';
 import '../data/sip_repository.dart';
 
 final sipListProvider = FutureProvider.autoDispose<List<Sip>>((ref) async {
@@ -271,7 +272,8 @@ class _SipScreenState extends ConsumerState<SipScreen> {
 
   void _showCreateSipDialog() {
     final colors = context.tradingColors;
-    final symbolController = TextEditingController(text: 'RELIANCE');
+    final defaultSym = ref.read(cachedInstrumentsProvider).value?.firstOrNull?.symbol ?? '';
+    final symbolController = TextEditingController(text: defaultSym);
     final amountController = TextEditingController(text: '5000');
     String frequency = 'MONTHLY';
     bool isSubmitting = false;

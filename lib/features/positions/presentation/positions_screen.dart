@@ -34,7 +34,7 @@ class _PositionsScreenState extends ConsumerState<PositionsScreen> {
     final quoteService = ref.watch(realtimeQuoteServiceProvider);
     
     final positionsAsync = ref.watch(positionsListProvider);
-    final allPositions = positionsAsync.value ?? const <Position>[];
+    final allPositions = positionsAsync.valueOrNull ?? const <Position>[];
 
     final basePositions = _isDayView
         ? allPositions.where((p) => p.isDayPosition).toList()

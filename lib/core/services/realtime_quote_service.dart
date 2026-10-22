@@ -45,9 +45,13 @@ class RealtimeQuoteService {
 
   Stream<Map<String, Quote>> get stream => _controller.stream;
 
-  Stream<Quote> streamForToken(String symbol) {
+  Stream<Quote> streamForToken(String symbol) async* {
     subscribe(symbol);
-    return _controller.stream
+    final cached = getQuote(symbol);
+    if (cached.lastPrice > 0 || cached.token.isNotEmpty) {
+      yield cached;
+    }
+    yield* _controller.stream
         .where((map) => map.containsKey(symbol))
         .map((map) => map[symbol]!);
   }
@@ -153,3 +157,9 @@ final quotesStreamProvider = StreamProvider<Map<String, Quote>>((ref) {
   final service = ref.watch(realtimeQuoteServiceProvider);
   return service.stream;
 });
+
+final quoteDetailStreamProvider = StreamProvider.family<Quote, String>((ref, symbol) {
+  final service = ref.watch(realtimeQuoteServiceProvider);
+  return service.streamForToken(symbol);
+});
+

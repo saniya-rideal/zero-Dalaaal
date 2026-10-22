@@ -50,6 +50,9 @@ class FundsSummary {
   /// Free margin available for placing new orders
   double get freeMargin => availableMargin;
 
+  /// Available cash for trading
+  double get availableCash => cash;
+
   /// Current cash balance (Available Cash + Margin Blocked for Orders/Positions)
   double get balance => cash;
 
@@ -222,6 +225,7 @@ enum WalletTransactionStatus {
   PROCESSING,
   SUCCESS,
   COMPLETED,
+  APPROVED,
   FAILED,
   CANCELLED,
   REJECTED,
@@ -275,6 +279,8 @@ class WalletTransaction {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? failureReason;
+  final String? payoutUtr;
+  final String? adminNote;
 
   const WalletTransaction({
     required this.id,
@@ -288,13 +294,22 @@ class WalletTransaction {
     required this.createdAt,
     required this.updatedAt,
     this.failureReason,
+    this.payoutUtr,
+    this.adminNote,
   });
 
   bool get isDeposit => type == WalletTransactionType.DEPOSIT;
   bool get isWithdrawal => type == WalletTransactionType.WITHDRAWAL;
-  bool get isPending => status == WalletTransactionStatus.PENDING || status == WalletTransactionStatus.INITIATED;
-  bool get isSuccess => status == WalletTransactionStatus.SUCCESS || status == WalletTransactionStatus.COMPLETED;
-  bool get isFailed => status == WalletTransactionStatus.FAILED || status == WalletTransactionStatus.REJECTED;
+  bool get isPending =>
+      status == WalletTransactionStatus.PENDING ||
+      status == WalletTransactionStatus.INITIATED;
+  bool get isApproved => status == WalletTransactionStatus.APPROVED;
+  bool get isSuccess =>
+      status == WalletTransactionStatus.SUCCESS ||
+      status == WalletTransactionStatus.COMPLETED;
+  bool get isFailed =>
+      status == WalletTransactionStatus.FAILED ||
+      status == WalletTransactionStatus.REJECTED;
   bool get isCancelled => status == WalletTransactionStatus.CANCELLED;
 
   WalletTransaction copyWith({
@@ -309,6 +324,8 @@ class WalletTransaction {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? failureReason,
+    String? payoutUtr,
+    String? adminNote,
   }) {
     return WalletTransaction(
       id: id ?? this.id,
@@ -322,6 +339,8 @@ class WalletTransaction {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       failureReason: failureReason ?? this.failureReason,
+      payoutUtr: payoutUtr ?? this.payoutUtr,
+      adminNote: adminNote ?? this.adminNote,
     );
   }
 
@@ -337,6 +356,8 @@ class WalletTransaction {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'failureReason': failureReason,
+    'payoutUtr': payoutUtr,
+    'adminNote': adminNote,
   };
 
   factory WalletTransaction.fromJson(Map<String, dynamic> json) {
@@ -392,6 +413,104 @@ class WalletTransaction {
       upiId: json['upiId']?.toString(),
       createdAt: cr,
       updatedAt: up,
+      failureReason: json['failureReason']?.toString(),
+      payoutUtr: (json['payoutUtr'] ?? json['utr'])?.toString(),
+      adminNote: json['adminNote']?.toString(),
+    );
+  }
+}
+
+enum PaymentOrderStatus {
+  CREATED,
+  PENDING,
+  PAID,
+  EXPIRED,
+  CANCELLED,
+  FAILED,
+}
+
+class PaymentOrder {
+  final String id;
+  final String? providerOrderId;
+  final double amount;
+  final String currency;
+  final PaymentOrderStatus status;
+  final String? upiIntentUrl;
+  final String? qrPayload;
+  final DateTime? expiresAt;
+  final DateTime createdAt;
+  final String? utr;
+  final String? failureReason;
+
+  const PaymentOrder({
+    required this.id,
+    this.providerOrderId,
+    required this.amount,
+    this.currency = 'INR',
+    required this.status,
+    this.upiIntentUrl,
+    this.qrPayload,
+    this.expiresAt,
+    required this.createdAt,
+    this.utr,
+    this.failureReason,
+  });
+
+  bool get isPaid => status == PaymentOrderStatus.PAID;
+  bool get isExpired => status == PaymentOrderStatus.EXPIRED;
+  bool get isCancelled => status == PaymentOrderStatus.CANCELLED;
+  bool get isFailed => status == PaymentOrderStatus.FAILED;
+  bool get isPending =>
+      status == PaymentOrderStatus.PENDING ||
+      status == PaymentOrderStatus.CREATED;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'providerOrderId': providerOrderId,
+    'amount': amount,
+    'currency': currency,
+    'status': status.name,
+    'upiIntentUrl': upiIntentUrl,
+    'qrPayload': qrPayload,
+    'expiresAt': expiresAt?.toIso8601String(),
+    'createdAt': createdAt.toIso8601String(),
+    'utr': utr,
+    'failureReason': failureReason,
+  };
+
+  factory PaymentOrder.fromJson(Map<String, dynamic> json) {
+    PaymentOrderStatus s = PaymentOrderStatus.CREATED;
+    final sRaw = (json['status'] ?? '').toString().toUpperCase();
+    for (final val in PaymentOrderStatus.values) {
+      if (val.name == sRaw) {
+        s = val;
+        break;
+      }
+    }
+
+    DateTime cr;
+    if (json['createdAt'] != null) {
+      cr = DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now();
+    } else {
+      cr = DateTime.now();
+    }
+
+    DateTime? exp;
+    if (json['expiresAt'] != null) {
+      exp = DateTime.tryParse(json['expiresAt'].toString());
+    }
+
+    return PaymentOrder(
+      id: (json['_id'] ?? json['id'] ?? '').toString(),
+      providerOrderId: json['providerOrderId']?.toString(),
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      currency: (json['currency'] ?? 'INR').toString(),
+      status: s,
+      upiIntentUrl: json['upiIntentUrl']?.toString(),
+      qrPayload: json['qrPayload']?.toString(),
+      expiresAt: exp,
+      createdAt: cr,
+      utr: (json['utr'] ?? json['payoutUtr'])?.toString(),
       failureReason: json['failureReason']?.toString(),
     );
   }

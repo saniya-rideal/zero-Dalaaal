@@ -24,7 +24,7 @@ class RealTradingRepository implements TradingRepository {
     double? takeProfit,
     String? idempotencyKey,
   }) async {
-    final orderTypeStr = orderType == OrderKind.LIMIT ? 'LIMIT' : 'MARKET';
+    final orderTypeStr = orderType.toBackendString();
     final payload = <String, dynamic>{
       'symbol': symbol,
       'market': market,
@@ -32,8 +32,10 @@ class RealTradingRepository implements TradingRepository {
       'orderType': orderTypeStr,
       'type': orderTypeStr,
       'quantity': quantity,
-      'leverage': (leverage != null && leverage > 0) ? leverage : 5.0,
     };
+    if (leverage != null && leverage > 0) {
+      payload['leverage'] = leverage;
+    }
 
     if (limitPrice != null && limitPrice > 0) {
       payload['limitPrice'] = limitPrice;
@@ -59,9 +61,7 @@ class RealTradingRepository implements TradingRepository {
 
   @override
   Future<Order> placeOrder(OrderRequest request) async {
-    final orderTypeStr = (request.kind == OrderKind.LIMIT || (request.price != null && request.price! > 0))
-        ? 'LIMIT'
-        : 'MARKET';
+    final orderTypeStr = request.kind.toBackendString();
     final payload = <String, dynamic>{
       'symbol': request.instrumentToken,
       'instrumentToken': request.instrumentToken,
@@ -72,8 +72,11 @@ class RealTradingRepository implements TradingRepository {
       'quantity': request.quantity,
       'product': request.product.name,
       'validity': request.validity.name,
-      'leverage': (request.leverage != null && request.leverage! > 0) ? request.leverage! : 5.0,
     };
+
+    if (request.leverage != null && request.leverage! > 0) {
+      payload['leverage'] = request.leverage!;
+    }
 
     if (request.price != null && request.price! > 0) {
       payload['limitPrice'] = request.price;
@@ -82,14 +85,18 @@ class RealTradingRepository implements TradingRepository {
     if (request.triggerPrice != null && request.triggerPrice! > 0) {
       payload['triggerPrice'] = request.triggerPrice;
     }
-    final sl = (request.bracket?.stopLoss != null && request.bracket!.stopLoss > 0)
-        ? request.bracket!.stopLoss
-        : (request.triggerPrice != null && request.triggerPrice! > 0 ? request.triggerPrice : null);
-    if (sl != null && sl > 0) {
-      payload['stopLoss'] = sl;
+    // Never copy triggerPrice into stopLoss! Stop-loss is only from bracket
+    if (request.bracket?.stopLoss != null && request.bracket!.stopLoss > 0) {
+      payload['stopLoss'] = request.bracket!.stopLoss;
     }
     if (request.bracket?.target != null && request.bracket!.target > 0) {
       payload['takeProfit'] = request.bracket!.target;
+    }
+    if (request.expiresAt != null) {
+      payload['expiresAt'] = request.expiresAt!.toIso8601String();
+    }
+    if (request.comment != null && request.comment!.trim().isNotEmpty) {
+      payload['comment'] = request.comment!.trim();
     }
 
     final data = await _apiClient.post(
@@ -105,6 +112,21 @@ class RealTradingRepository implements TradingRepository {
       return Order.fromJson(obj);
     }
     return Order.fromJson(ResponseReader.object(data));
+  }
+
+  @override
+  Future<OrderPreview> previewOrder(OrderPreviewRequest request) async {
+    final payload = request.toJson();
+    final data = await _apiClient.post(
+      ApiPaths.ordersPreview,
+      data: payload,
+    );
+
+    final obj = ResponseReader.object(data, 'preview');
+    if (obj.isNotEmpty) {
+      return OrderPreview.fromJson(obj);
+    }
+    return OrderPreview.fromJson(ResponseReader.object(data));
   }
 
   @override
@@ -211,10 +233,14 @@ final ordersListProvider = FutureProvider<List<Order>>((ref) async {
   return repo.getOrders();
 });
 
+final ordersProvider = ordersListProvider;
+
 final positionsListProvider = FutureProvider<List<Position>>((ref) async {
   final repo = ref.watch(tradingRepositoryProvider);
   return repo.getPositions(status: 'OPEN');
 });
+
+final positionsProvider = positionsListProvider;
 
 final holdingsListProvider = FutureProvider<List<Holding>>((ref) async {
   final repo = ref.watch(tradingRepositoryProvider);

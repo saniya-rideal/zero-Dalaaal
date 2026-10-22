@@ -24,6 +24,9 @@ class Instrument {
   final String? surveillanceTag;
   final bool isSuspended;
   final String? suspensionReason;
+  final List<ProductType>? allowedProducts;
+  final List<String>? allowedOrderTypes;
+  final bool tradingEnabled;
 
   const Instrument({
     String? token,
@@ -49,6 +52,9 @@ class Instrument {
     this.surveillanceTag,
     this.isSuspended = false,
     this.suspensionReason,
+    this.allowedProducts,
+    this.allowedOrderTypes,
+    this.tradingEnabled = true,
   })  : token = token ?? symbol,
         leverageMultiplier = leverageMultiplier ?? maxLeverage;
 
@@ -56,6 +62,25 @@ class Instrument {
   double get contractMultiplier => lotSize > 0 ? lotSize : 1.0;
 
   String get category => segment;
+
+  bool get isCryptoOrForex {
+    final m = market.toUpperCase();
+    final s = segment.toUpperCase();
+    return m == 'CRYPTO' || m == 'FOREX' || s == 'CRYPTO' || s == 'FOREX';
+  }
+
+  /// Safe resolution of allowed products (MIS, CNC, NRML)
+  List<ProductType> get effectiveAllowedProducts {
+    if (isCryptoOrForex) return const [];
+    if (allowedProducts != null && allowedProducts!.isNotEmpty) {
+      return allowedProducts!;
+    }
+    final s = segment.toUpperCase();
+    if (s == 'COMMODITY' || type == InstrumentType.FUT || type == InstrumentType.CE || type == InstrumentType.PE) {
+      return const [ProductType.MIS, ProductType.NRML];
+    }
+    return const [ProductType.MIS, ProductType.CNC];
+  }
 
   Instrument copyWith({
     String? token,
@@ -133,11 +158,15 @@ class Instrument {
     'surveillanceTag': surveillanceTag,
     'isSuspended': isSuspended,
     'suspensionReason': suspensionReason,
+    'allowedProducts': allowedProducts?.map((p) => p.name).toList(),
+    'allowedOrderTypes': allowedOrderTypes,
+    'tradingEnabled': tradingEnabled,
   };
 
   factory Instrument.fromJson(Map<String, dynamic> json) {
-    final sym = (json['symbol'] ?? json['token'] ?? '').toString();
-    final tok = (json['token'] ?? sym).toString();
+    final sym = (json['symbol'] ?? json['token'] ?? '').toString().trim();
+    final rawTok = (json['token'] ?? '').toString().trim();
+    final tok = rawTok.isNotEmpty ? rawTok : sym;
 
     // Tolerant exchange parsing
     Exchange ex = Exchange.NSE;
@@ -161,6 +190,30 @@ class Instrument {
 
     final maxLev = (json['maxLeverage'] ?? json['leverageMultiplier'] as num?)?.toDouble() ?? 5.0;
     final defLev = (json['defaultLeverage'] as num?)?.toDouble() ?? maxLev;
+
+    List<ProductType>? allowedProds;
+    if (json['allowedProducts'] is List) {
+      allowedProds = (json['allowedProducts'] as List)
+          .map((e) => e.toString().toUpperCase())
+          .map((name) {
+            switch (name) {
+              case 'CNC':
+                return ProductType.CNC;
+              case 'NRML':
+                return ProductType.NRML;
+              case 'MIS':
+              default:
+                return ProductType.MIS;
+            }
+          })
+          .toSet()
+          .toList();
+    }
+
+    List<String>? allowedOrders;
+    if (json['allowedOrderTypes'] is List) {
+      allowedOrders = (json['allowedOrderTypes'] as List).map((e) => e.toString().toUpperCase()).toList();
+    }
 
     return Instrument(
       token: tok,
@@ -186,6 +239,9 @@ class Instrument {
       surveillanceTag: json['surveillanceTag'] as String?,
       isSuspended: json['isSuspended'] as bool? ?? false,
       suspensionReason: json['suspensionReason'] as String?,
+      allowedProducts: allowedProds,
+      allowedOrderTypes: allowedOrders,
+      tradingEnabled: json['tradingEnabled'] as bool? ?? true,
     );
   }
 

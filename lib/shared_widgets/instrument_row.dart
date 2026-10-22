@@ -7,6 +7,7 @@ import '../data/models/instrument.dart';
 import '../data/models/quote.dart';
 import 'exchange_chip.dart';
 import 'price_text.dart';
+import 'quote_status_badge.dart';
 
 class InstrumentRow extends StatelessWidget {
   final Instrument instrument;
@@ -89,13 +90,23 @@ class InstrumentRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                PriceText(
-                  value: quote.ltp,
-                  change: quote.change,
-                  style: AppTypography.body(
-                    weight: FontWeight.w600,
-                    tabular: true,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    QuoteStatusBadge(status: quote.status),
+                    const SizedBox(width: 5),
+                    Opacity(
+                      opacity: (quote.status == QuoteStatus.stale || quote.status == QuoteStatus.closed) ? 0.5 : 1.0,
+                      child: PriceText(
+                        value: quote.ltp,
+                        change: quote.change,
+                        style: AppTypography.body(
+                          weight: FontWeight.w600,
+                          tabular: true,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Row(

@@ -15,7 +15,29 @@ enum ProductType { CNC, MIS, NRML }
 
 enum OrderVariety { REGULAR, BO, CO, AMO, GTT }
 
-enum OrderKind { MARKET, LIMIT, SL, SL_M }
+enum OrderKind {
+  MARKET,
+  LIMIT,
+  SL,
+  SL_M,
+  STOP,
+  STOP_LIMIT;
+
+  String toBackendString() {
+    switch (this) {
+      case OrderKind.MARKET:
+        return 'MARKET';
+      case OrderKind.LIMIT:
+        return 'LIMIT';
+      case OrderKind.STOP:
+      case OrderKind.SL_M:
+        return 'STOP';
+      case OrderKind.STOP_LIMIT:
+      case OrderKind.SL:
+        return 'STOP_LIMIT';
+    }
+  }
+}
 
 enum OrderStatus {
   DRAFT,           // Order being composed / not yet submitted
@@ -30,7 +52,7 @@ enum OrderStatus {
   FAILED,          // Failed due to network timeout or system error
 }
 
-enum Validity { DAY, IOC }
+enum Validity { DAY, IOC, GTC }
 
 enum Segment { EQUITY, COMMODITY }
 

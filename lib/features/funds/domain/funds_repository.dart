@@ -21,4 +21,12 @@ abstract class FundsRepository {
     String currency = 'INR',
     String? idempotencyKey,
   });
+  Future<PaymentOrder> createPaymentOrder({
+    required double amount,
+    String currency = 'INR',
+    String? idempotencyKey,
+  });
+  Future<PaymentOrder> getPaymentOrder(String id);
+  Future<PaymentOrder> cancelPaymentOrder(String id);
+  Future<List<WalletTransaction>> getWithdrawals({int page = 1, int limit = 20});
 }

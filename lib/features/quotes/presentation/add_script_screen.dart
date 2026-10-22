@@ -1,231 +1,167 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/instrument.dart';
+import '../../market/data/real_market_repository.dart';
+import '../../watchlist/presentation/watchlist_controller.dart';
 
 class AddScriptCategory {
   final String name;
-  final int selectedCount;
-  final int totalCount;
   final List<Instrument> scripts;
 
   const AddScriptCategory({
     required this.name,
-    required this.selectedCount,
-    required this.totalCount,
     required this.scripts,
   });
+
+  int get totalCount => scripts.length;
+
+  int getSelectedCount(Set<String> selectedTokens) {
+    return scripts.where((s) {
+      final tokUpper = s.token.toUpperCase();
+      final symUpper = s.symbol.toUpperCase();
+      return selectedTokens.any((t) => t.toUpperCase() == tokUpper || t.toUpperCase() == symUpper);
+    }).length;
+  }
 }
 
 class AddScriptFolder {
   final String name;
-  final int selectedCount;
-  final int totalCount;
   final List<AddScriptCategory> categories;
 
   const AddScriptFolder({
     required this.name,
-    required this.selectedCount,
-    required this.totalCount,
     required this.categories,
   });
+
+  int get totalCount => categories.fold(0, (sum, cat) => sum + cat.totalCount);
+
+  int getSelectedCount(Set<String> selectedTokens) {
+    return categories.fold(0, (sum, cat) => sum + cat.getSelectedCount(selectedTokens));
+  }
 }
 
-class AddScriptScreen extends StatefulWidget {
+class AddScriptScreen extends ConsumerStatefulWidget {
   const AddScriptScreen({super.key});
 
   @override
-  State<AddScriptScreen> createState() => _AddScriptScreenState();
+  ConsumerState<AddScriptScreen> createState() => _AddScriptScreenState();
 }
 
-class _AddScriptScreenState extends State<AddScriptScreen> {
+class _AddScriptScreenState extends ConsumerState<AddScriptScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   AddScriptFolder? _openedFolder;
   AddScriptCategory? _openedCategory;
 
-  final Set<String> _selectedTokens = {
-    'copper_mcx',
-    'ltc_spot',
-    'mankind_sep',
-    'gold_mcx',
-    'mazdock_sep',
-    'natgas_mcx',
-    'crude_mcx',
-    'nifty_50',
-    'bnty_55000c',
-    'bnty_55200c',
-    'bnty_55300c',
-    'bnty_55100p',
-    'bnty_55500c',
-    'bnty_55500p',
-  };
-
-  late List<AddScriptFolder> _folders;
+  final Set<String> _selectedTokens = {};
+  List<AddScriptFolder> _folders = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _initFolders();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final wl = ref.read(watchlistControllerProvider).watchlist;
+      if (wl != null && mounted) {
+        setState(() {
+          _selectedTokens.clear();
+          _selectedTokens.addAll(wl.instrumentTokens);
+        });
+      }
+      _loadInstruments();
+    });
   }
 
-  void _initFolders() {
-    // ────────────── GLOBAL SUB-CATEGORIES ──────────────
-    final commoditiesScripts = [
-      const Instrument(token: 'brent_crude', symbol: 'BRENT Crude Spot', name: 'Brent Crude Oil Spot', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'wti_crude', symbol: 'WTI Crude Spot', name: 'WTI Crude Oil Spot', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'natgas_spot', symbol: 'Natural Gas Spot', name: 'US Natural Gas Spot', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'wheat_spot', symbol: 'Wheat Spot', name: 'US Wheat Futures', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'corn_spot', symbol: 'Corn Spot', name: 'US Corn Futures', exchange: Exchange.CDS, type: InstrumentType.FUT),
-    ];
+  Future<void> _loadInstruments() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-    final cryptoScripts = [
-      const Instrument(token: 'crypto_btcusd', symbol: 'BTCUSD Spot', name: 'Bitcoin / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'crypto_ethusd', symbol: 'ETHUSD Spot', name: 'Ethereum / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'ltc_spot', symbol: 'LTCUSD Spot', name: 'Litecoin Spot', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'crypto_xrpusd', symbol: 'XRPUSD Spot', name: 'Ripple / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'crypto_solusd', symbol: 'SOLUSD Spot', name: 'Solana / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'crypto_adausd', symbol: 'ADAUSD Spot', name: 'Cardano / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'crypto_dogeusd', symbol: 'DOGEUSD Spot', name: 'Dogecoin / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'crypto_dotusd', symbol: 'DOTUSD Spot', name: 'Polkadot / US Dollar', exchange: Exchange.CDS, type: InstrumentType.EQ),
-    ];
+    try {
+      final instruments = await ref.read(marketRepositoryProvider).getInstruments();
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _initFolders(instruments);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
 
-    final currencyPairsScripts = List.generate(
-      95,
-      (i) => Instrument(
-        token: 'curr_$i',
-        symbol: 'CURR_PAIR_${i + 1}',
-        name: 'Currency Pair ${i + 1} Spot',
-        exchange: Exchange.CDS,
-        type: InstrumentType.FUT,
-      ),
-    );
+  void _initFolders(List<Instrument> instruments) {
+    if (instruments.isEmpty) {
+      _folders = [];
+      return;
+    }
 
-    final forexScripts = [
-      const Instrument(token: 'fx_eurusd', symbol: 'EURUSD Spot', name: 'Euro / US Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'fx_gbpusd', symbol: 'GBPUSD Spot', name: 'British Pound / US Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'fx_usdjpy', symbol: 'USDJPY Spot', name: 'US Dollar / Japanese Yen', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'fx_audusd', symbol: 'AUDUSD Spot', name: 'Australian Dollar / US Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'fx_usdcad', symbol: 'USDCAD Spot', name: 'US Dollar / Canadian Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'fx_usdchf', symbol: 'USDCHF Spot', name: 'US Dollar / Swiss Franc', exchange: Exchange.CDS, type: InstrumentType.FUT),
-    ];
+    final Map<String, Map<String, List<Instrument>>> folderMap = {};
 
-    final globalIndicesScripts = [
-      const Instrument(token: 'us30_spot', symbol: 'US30 Cash', name: 'Dow Jones Industrial Average', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-      const Instrument(token: 'nas100_spot', symbol: 'NAS100 Cash', name: 'Nasdaq 100 Tech Index', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-      const Instrument(token: 'spx500_spot', symbol: 'SPX500 Cash', name: 'S&P 500 Index', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-      const Instrument(token: 'uk100_spot', symbol: 'UK100 Cash', name: 'FTSE 100 Index', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-      const Instrument(token: 'ger40_spot', symbol: 'GER40 Cash', name: 'DAX 40 Index', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-      const Instrument(token: 'jpn225_spot', symbol: 'JPN225 Cash', name: 'Nikkei 225 Index', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-      const Instrument(token: 'hk50_spot', symbol: 'HK50 Cash', name: 'Hang Seng Index', exchange: Exchange.CDS, type: InstrumentType.INDEX),
-    ];
+    for (final inst in instruments) {
+      final mkt = inst.market.isNotEmpty ? inst.market.toUpperCase() : 'OTHER';
+      final seg = inst.segment.isNotEmpty ? inst.segment.toUpperCase() : 'GENERAL';
 
-    final metalsSpotScripts = [
-      const Instrument(token: 'xau_usd', symbol: 'XAUUSD Spot', name: 'Gold Spot / US Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT),
-      const Instrument(token: 'xag_usd', symbol: 'XAGUSD Spot', name: 'Silver Spot / US Dollar', exchange: Exchange.CDS, type: InstrumentType.FUT),
-    ];
+      String folderName;
+      String categoryName;
 
-    final usStocksScripts = [
-      const Instrument(token: 'us_aapl', symbol: 'AAPL Spot', name: 'Apple Inc.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_tsla', symbol: 'TSLA Spot', name: 'Tesla Inc.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_nvda', symbol: 'NVDA Spot', name: 'NVIDIA Corp.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_msft', symbol: 'MSFT Spot', name: 'Microsoft Corp.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_amzn', symbol: 'AMZN Spot', name: 'Amazon.com Inc.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_googl', symbol: 'GOOGL Spot', name: 'Alphabet Inc.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_meta', symbol: 'META Spot', name: 'Meta Platforms Inc.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_nflx', symbol: 'NFLX Spot', name: 'Netflix Inc.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_amd', symbol: 'AMD Spot', name: 'Advanced Micro Devices', exchange: Exchange.CDS, type: InstrumentType.EQ),
-      const Instrument(token: 'us_intc', symbol: 'INTC Spot', name: 'Intel Corp.', exchange: Exchange.CDS, type: InstrumentType.EQ),
-    ];
+      if (mkt == 'CRYPTO') {
+        folderName = 'Crypto';
+        categoryName = 'Crypto (Spot)';
+      } else if (mkt == 'FOREX' || seg == 'FOREX' || seg == 'CURRENCY') {
+        folderName = 'Forex';
+        categoryName = 'Currency Pairs';
+      } else if (mkt == 'COMMODITY' || seg == 'COMMODITY' || seg == 'COMMODITIES') {
+        folderName = 'Commodities';
+        categoryName = 'MCX & Commodities';
+      } else if (mkt == 'INDIAN') {
+        folderName = 'Indian Markets';
+        if (inst.type == InstrumentType.INDEX || seg == 'INDEX') {
+          categoryName = 'Indian Indices';
+        } else if (inst.type == InstrumentType.FUT || inst.type == InstrumentType.CE || inst.type == InstrumentType.PE) {
+          categoryName = 'F&O Derivatives';
+        } else {
+          categoryName = 'Equities';
+        }
+      } else {
+        folderName = mkt;
+        categoryName = seg;
+      }
 
-    // ────────────── INDIAN SUB-CATEGORIES ──────────────
-    final giftNiftyScripts = [
-      const Instrument(token: 'gift_nifty_fut', symbol: 'GIFT NIFTY Sep FUT', name: 'NSE IX Gift Nifty Futures', exchange: Exchange.CDS, type: InstrumentType.FUT),
-    ];
+      folderMap.putIfAbsent(folderName, () => {});
+      folderMap[folderName]!.putIfAbsent(categoryName, () => []);
+      folderMap[folderName]![categoryName]!.add(inst);
+    }
 
-    final indianIndexOptionsScripts = [
-      const Instrument(token: 'bnty_55000c', symbol: 'BNTY29SEPN55000C', name: 'BANKNIFTY 29SEP 55000 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-      const Instrument(token: 'bnty_55200c', symbol: 'BNTY29SEPN55200C', name: 'BANKNIFTY 29SEP 55200 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-      const Instrument(token: 'bnty_55300c', symbol: 'BNTY29SEPN55300C', name: 'BANKNIFTY 29SEP 55300 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-      const Instrument(token: 'bnty_55100p', symbol: 'BNTY29SEPN55100P', name: 'BANKNIFTY 29SEP 55100 PE', exchange: Exchange.NFO, type: InstrumentType.PE),
-      const Instrument(token: 'bnty_55500c', symbol: 'BNTY29SEPN55500C', name: 'BANKNIFTY 29SEP 55500 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-      const Instrument(token: 'bnty_55500p', symbol: 'BNTY29SEPN55500P', name: 'BANKNIFTY 29SEP 55500 PE', exchange: Exchange.NFO, type: InstrumentType.PE),
-      const Instrument(token: 'nifty_25200c', symbol: 'NIFTY26SEPN25200C', name: 'NIFTY 26SEP 25200 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-      const Instrument(token: 'nifty_25000p', symbol: 'NIFTY26SEPN25000P', name: 'NIFTY 26SEP 25000 PE', exchange: Exchange.NFO, type: InstrumentType.PE),
-    ];
+    _folders = folderMap.entries.map((fEntry) {
+      final categories = fEntry.value.entries.map((cEntry) {
+        return AddScriptCategory(name: cEntry.key, scripts: cEntry.value);
+      }).toList();
+      return AddScriptFolder(name: fEntry.key, categories: categories);
+    }).toList();
 
-    final indianIndicesScripts = [
-      const Instrument(token: 'nifty_50', symbol: 'NIFTY 50', name: 'NSE Nifty 50 Index', exchange: Exchange.NSE, type: InstrumentType.INDEX),
-      const Instrument(token: 'nifty_bank', symbol: 'NIFTY BANK', name: 'NSE Bank Nifty Index', exchange: Exchange.NSE, type: InstrumentType.INDEX),
-      const Instrument(token: 'nifty_fin', symbol: 'FINNIFTY', name: 'Nifty Financial Services', exchange: Exchange.NSE, type: InstrumentType.INDEX),
-      const Instrument(token: 'nifty_mid', symbol: 'MIDCPNIFTY', name: 'Nifty Midcap Select', exchange: Exchange.NSE, type: InstrumentType.INDEX),
-      const Instrument(token: 'sensex_idx', symbol: 'SENSEX', name: 'BSE Sensex Index', exchange: Exchange.BSE, type: InstrumentType.INDEX),
-    ];
-
-    final mcxFuturesScripts = [
-      const Instrument(token: 'copper_mcx', symbol: 'COPPER MCX Sep', name: 'Copper Futures 2500kg', exchange: Exchange.MCX, type: InstrumentType.FUT),
-      const Instrument(token: 'gold_mcx', symbol: 'GOLD MCX Oct', name: 'Gold Futures 1kg', exchange: Exchange.MCX, type: InstrumentType.FUT),
-      const Instrument(token: 'natgas_mcx', symbol: 'NATURALGAS MCX Sep', name: 'Natural Gas Futures 1250 MMBtu', exchange: Exchange.MCX, type: InstrumentType.FUT),
-      const Instrument(token: 'crude_mcx', symbol: 'CRUDEOIL MCX Oct', name: 'Crude Oil Futures 100 BBL', exchange: Exchange.MCX, type: InstrumentType.FUT),
-      const Instrument(token: 'silver_mcx', symbol: 'SILVER MCX Dec', name: 'Silver Futures 30kg', exchange: Exchange.MCX, type: InstrumentType.FUT),
-    ];
-
-    final mcxFuturesMiniScripts = [
-      const Instrument(token: 'goldm_mcx', symbol: 'GOLDM MCX Oct', name: 'Gold Mini Futures 100g', exchange: Exchange.MCX, type: InstrumentType.FUT),
-      const Instrument(token: 'silverm_mcx', symbol: 'SILVERM MCX Nov', name: 'Silver Mini Futures 5kg', exchange: Exchange.MCX, type: InstrumentType.FUT),
-    ];
-
-    final mcxOptionsScripts = [
-      const Instrument(token: 'crude_6200c', symbol: 'CRUDEOIL19OCT6200CE', name: 'Crude Oil 19OCT 6200 CE', exchange: Exchange.MCX, type: InstrumentType.CE),
-      const Instrument(token: 'crude_6000p', symbol: 'CRUDEOIL19OCT6000PE', name: 'Crude Oil 19OCT 6000 PE', exchange: Exchange.MCX, type: InstrumentType.PE),
-    ];
-
-    final nseStockFuturesScripts = [
-      const Instrument(token: 'mankind_sep', symbol: 'MANKIND Sep', name: 'Mankind Pharma Futures', exchange: Exchange.NFO, type: InstrumentType.FUT),
-      const Instrument(token: 'mazdock_sep', symbol: 'MAZDOCK Sep', name: 'Mazagon Dock Futures', exchange: Exchange.NFO, type: InstrumentType.FUT),
-      const Instrument(token: 'reliance_sep', symbol: 'RELIANCE Sep FUT', name: 'Reliance Industries Futures', exchange: Exchange.NFO, type: InstrumentType.FUT),
-      const Instrument(token: 'tcs_sep', symbol: 'TCS Sep FUT', name: 'Tata Consultancy Services FUT', exchange: Exchange.NFO, type: InstrumentType.FUT),
-      const Instrument(token: 'hdfc_sep', symbol: 'HDFCBANK Sep FUT', name: 'HDFC Bank Futures', exchange: Exchange.NFO, type: InstrumentType.FUT),
-    ];
-
-    final nseStockOptionsScripts = [
-      const Instrument(token: 'mankind_2400c', symbol: 'MANKIND26SEP2400CE', name: 'Mankind Pharma 26SEP 2400 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-      const Instrument(token: 'mazdock_4400c', symbol: 'MAZDOCK26SEP4400CE', name: 'Mazagon Dock 26SEP 4400 CE', exchange: Exchange.NFO, type: InstrumentType.CE),
-    ];
-
-    _folders = [
-      AddScriptFolder(
-        name: 'Global',
-        selectedCount: 1,
-        totalCount: 47,
-        categories: [
-          AddScriptCategory(name: 'Commodities', selectedCount: 0, totalCount: 5, scripts: commoditiesScripts),
-          AddScriptCategory(name: 'Crypto (Spot)', selectedCount: 0, totalCount: 8, scripts: cryptoScripts),
-          AddScriptCategory(name: 'Currency pairs', selectedCount: 0, totalCount: 95, scripts: currencyPairsScripts),
-          AddScriptCategory(name: 'Forex', selectedCount: 0, totalCount: 6, scripts: forexScripts),
-          AddScriptCategory(name: 'Global Indices', selectedCount: 0, totalCount: 7, scripts: globalIndicesScripts),
-          AddScriptCategory(name: 'Metals Spot', selectedCount: 0, totalCount: 2, scripts: metalsSpotScripts),
-          AddScriptCategory(name: 'US Stocks', selectedCount: 0, totalCount: 19, scripts: usStocksScripts),
-        ],
-      ),
-      AddScriptFolder(
-        name: 'Indian',
-        selectedCount: 19,
-        totalCount: 816,
-        categories: [
-          AddScriptCategory(name: 'Gift Nifty', selectedCount: 0, totalCount: 1, scripts: giftNiftyScripts),
-          AddScriptCategory(name: 'Indian Index Options', selectedCount: 14, totalCount: 374, scripts: indianIndexOptionsScripts),
-          AddScriptCategory(name: 'Indian Indices', selectedCount: 0, totalCount: 5, scripts: indianIndicesScripts),
-          AddScriptCategory(name: 'MCX Futures', selectedCount: 2, totalCount: 5, scripts: mcxFuturesScripts),
-          AddScriptCategory(name: 'MCX Futures Mini', selectedCount: 0, totalCount: 2, scripts: mcxFuturesMiniScripts),
-          AddScriptCategory(name: 'MCX Options', selectedCount: 0, totalCount: 64, scripts: mcxOptionsScripts),
-          AddScriptCategory(name: 'NSE Stock Futures', selectedCount: 0, totalCount: 172, scripts: nseStockFuturesScripts),
-          AddScriptCategory(name: 'NSE Stock Options', selectedCount: 0, totalCount: 222, scripts: nseStockOptionsScripts),
-        ],
-      ),
-    ];
+    // Maintain current navigation if opened
+    if (_openedFolder != null) {
+      final match = _folders.where((f) => f.name == _openedFolder!.name).firstOrNull;
+      if (match != null) {
+        _openedFolder = match;
+        if (_openedCategory != null) {
+          _openedCategory = match.categories.where((c) => c.name == _openedCategory!.name).firstOrNull;
+        }
+      } else {
+        _openedFolder = null;
+        _openedCategory = null;
+      }
+    }
   }
 
   @override
@@ -234,19 +170,100 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
     super.dispose();
   }
 
-  void _toggleScript(String token) {
-    setState(() {
-      if (_selectedTokens.contains(token)) {
-        _selectedTokens.remove(token);
-      } else {
-        _selectedTokens.add(token);
+  bool _isScriptSelected(Instrument script) {
+    final tokUpper = script.token.toUpperCase();
+    final symUpper = script.symbol.toUpperCase();
+    return _selectedTokens.any(
+      (t) => t.toUpperCase() == tokUpper || t.toUpperCase() == symUpper,
+    );
+  }
+
+  void _toggleScript(Instrument script) async {
+    final sym = script.symbol;
+    final isSelected = _isScriptSelected(script);
+    final notifier = ref.read(watchlistControllerProvider.notifier);
+
+    if (isSelected) {
+      setState(() {
+        _selectedTokens.removeWhere(
+          (t) => t.toUpperCase() == script.token.toUpperCase() || t.toUpperCase() == sym.toUpperCase(),
+        );
+      });
+      final success = await notifier.removeInstrument(sym);
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Removed ${script.symbol} from Watchlist'),
+              action: SnackBarAction(
+                label: 'UNDO',
+                textColor: Colors.white,
+                onPressed: () => notifier.addInstrument(sym),
+              ),
+            ),
+          );
+        }
       }
-    });
+    } else {
+      if (_selectedTokens.length >= 50) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Watchlist limit reached: Maximum 50 symbols allowed.'),
+            backgroundColor: Color(0xFFC62828),
+          ),
+        );
+        return;
+      }
+      setState(() {
+        _selectedTokens.add(sym);
+      });
+      final success = await notifier.addInstrument(sym);
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added ${script.symbol} to Watchlist'),
+              action: SnackBarAction(
+                label: 'UNDO',
+                textColor: Colors.white,
+                onPressed: () => notifier.removeInstrument(sym),
+              ),
+            ),
+          );
+        } else {
+          setState(() {
+            _selectedTokens.removeWhere(
+              (t) => t.toUpperCase() == script.token.toUpperCase() || t.toUpperCase() == sym.toUpperCase(),
+            );
+          });
+          final err = ref.read(watchlistControllerProvider).errorMessage;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(err == 'MAX_SYMBOLS_EXCEEDED'
+                  ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
+                  : (err ?? 'Failed to add ${script.symbol}')),
+              backgroundColor: const Color(0xFFC62828),
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+
+    ref.listen<WatchlistState>(watchlistControllerProvider, (prev, next) {
+      if (next.watchlist != null) {
+        setState(() {
+          _selectedTokens.clear();
+          _selectedTokens.addAll(next.watchlist!.instrumentTokens);
+        });
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -266,9 +283,18 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
           },
         ),
         centerTitle: true,
-        title: Text(
-          _openedCategory?.name ?? 'Add Script',
-          style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w600),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _openedCategory?.name ?? (_openedFolder?.name ?? 'Add Script'),
+              style: AppTypography.h1(color: colors.textPrimary, weight: FontWeight.w600),
+            ),
+            Text(
+              '${_selectedTokens.length} / 50 symbols',
+              style: AppTypography.caption(color: colors.textSecondary),
+            ),
+          ],
         ),
       ),
       body: Column(
@@ -310,22 +336,59 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
 
           const SizedBox(height: 8),
 
-          // Content: Search Results, Category Scripts List, Sub-Folder List, or Root Folder List
+          // Content States: Loading, Error, Empty, or Hierarchical Lists
           Expanded(
-            child: _query.isNotEmpty
-                ? _buildGlobalSearchResults(colors)
-                : _openedCategory != null
-                    ? _buildCategoryScriptsList(_openedCategory!, colors)
-                    : _openedFolder != null
-                        ? _buildSubFolderList(_openedFolder!, colors)
-                        : _buildRootFolderList(colors),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(LucideIcons.alertCircle, size: 40, color: colors.bearish),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Failed to load instruments',
+                                style: AppTypography.h2(color: colors.textPrimary),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.caption(color: colors.textSecondary),
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadInstruments,
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _folders.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No instruments available from market exchange',
+                              style: AppTypography.body(color: colors.textSecondary),
+                            ),
+                          )
+                        : _query.isNotEmpty
+                            ? _buildGlobalSearchResults(colors)
+                            : _openedCategory != null
+                                ? _buildCategoryScriptsList(_openedCategory!, colors)
+                                : _openedFolder != null
+                                    ? _buildSubFolderList(_openedFolder!, colors)
+                                    : _buildRootFolderList(colors),
           ),
         ],
       ),
     );
   }
 
-  // 1. Root Folder List (Global 1/47, Indian 19/816) - Matching Screenshot 1
+  // 1. Root Folder List
   Widget _buildRootFolderList(TradingColors colors) {
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -333,6 +396,8 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
       itemCount: _folders.length,
       itemBuilder: (context, index) {
         final folder = _folders[index];
+        final selectedCount = folder.getSelectedCount(_selectedTokens);
+        final totalCount = folder.totalCount;
 
         return InkWell(
           onTap: () => setState(() {
@@ -343,7 +408,6 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
             padding: const EdgeInsets.symmetric(vertical: 14.0),
             child: Row(
               children: [
-                // Yellow / Golden Folder Icon
                 const Icon(
                   LucideIcons.folder,
                   color: Color(0xFFF5A623),
@@ -359,7 +423,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  '${folder.selectedCount}/${folder.totalCount}',
+                  '$selectedCount/$totalCount',
                   style: AppTypography.body(
                     color: colors.textPrimary,
                     weight: FontWeight.w500,
@@ -374,7 +438,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
     );
   }
 
-  // 2. Sub-Folder List (Inside Global or Indian) - Matching Screenshots 2 & 3
+  // 2. Sub-Folder List
   Widget _buildSubFolderList(AddScriptFolder folder, TradingColors colors) {
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -382,6 +446,8 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
       itemCount: folder.categories.length,
       itemBuilder: (context, index) {
         final cat = folder.categories[index];
+        final selectedCount = cat.getSelectedCount(_selectedTokens);
+        final totalCount = cat.totalCount;
 
         return InkWell(
           onTap: () => setState(() => _openedCategory = cat),
@@ -389,7 +455,6 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
             padding: const EdgeInsets.symmetric(vertical: 14.0),
             child: Row(
               children: [
-                // Golden Yellow Folder Icon
                 const Icon(
                   LucideIcons.folder,
                   color: Color(0xFFF5A623),
@@ -405,7 +470,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
                 ),
                 const Spacer(),
                 Text(
-                  '${cat.selectedCount}/${cat.totalCount}',
+                  '$selectedCount/$totalCount',
                   style: AppTypography.body(
                     color: colors.textPrimary,
                     weight: FontWeight.w500,
@@ -420,7 +485,7 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
     );
   }
 
-  // 3. Category Scripts List (Inside a Category sub-folder)
+  // 3. Category Scripts List
   Widget _buildCategoryScriptsList(AddScriptCategory cat, TradingColors colors) {
     if (cat.scripts.isEmpty) {
       return Center(
@@ -435,18 +500,19 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final script = cat.scripts[index];
-        final isSelected = _selectedTokens.contains(script.token);
+        final isSelected = _isScriptSelected(script);
 
         return ListTile(
           title: Text(script.symbol, style: AppTypography.body(weight: FontWeight.w700)),
           subtitle: Text('${script.name} • ${script.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
           trailing: IconButton(
             icon: Icon(
-              isSelected ? LucideIcons.checkCircle2 : LucideIcons.plusCircle,
-              color: isSelected ? colors.primary : colors.secondary,
+              isSelected ? LucideIcons.check : LucideIcons.plus,
+              color: isSelected ? colors.bullish : colors.primary,
               size: 22,
             ),
-            onPressed: () => _toggleScript(script.token),
+            tooltip: isSelected ? 'In Watchlist' : 'Add to Watchlist',
+            onPressed: () => _toggleScript(script),
           ),
         );
       },
@@ -482,18 +548,19 @@ class _AddScriptScreenState extends State<AddScriptScreen> {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final script = matches[index];
-        final isSelected = _selectedTokens.contains(script.token);
+        final isSelected = _isScriptSelected(script);
 
         return ListTile(
           title: Text(script.symbol, style: AppTypography.body(weight: FontWeight.w700)),
           subtitle: Text('${script.name} • ${script.exchange.name}', style: AppTypography.caption(color: colors.textSecondary)),
           trailing: IconButton(
             icon: Icon(
-              isSelected ? LucideIcons.checkCircle2 : LucideIcons.plusCircle,
-              color: isSelected ? colors.primary : colors.secondary,
+              isSelected ? LucideIcons.check : LucideIcons.plus,
+              color: isSelected ? colors.bullish : colors.primary,
               size: 22,
             ),
-            onPressed: () => _toggleScript(script.token),
+            tooltip: isSelected ? 'In Watchlist' : 'Add to Watchlist',
+            onPressed: () => _toggleScript(script),
           ),
         );
       },

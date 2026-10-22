@@ -1,16 +1,22 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/network/socket_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/date_formatter.dart';
 import '../../../data/models/enums.dart';
+import '../../../data/models/funds.dart';
+import '../../../shared_widgets/shared_widgets.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/real_funds_repository.dart';
 import 'balance_breakdown_dialog.dart';
 import 'transaction_receipt_dialog.dart';
-import '../../../shared_widgets/shared_widgets.dart';
 
 class WithdrawFundsSheet extends ConsumerStatefulWidget {
   const WithdrawFundsSheet({super.key});
@@ -29,26 +35,36 @@ class WithdrawFundsSheet extends ConsumerStatefulWidget {
 }
 
 class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
-  final _amountController = TextEditingController(text: '10000');
+  final _amountController = TextEditingController(text: '5000');
   late final TextEditingController _accountNumberController;
   late final TextEditingController _ifscController;
   bool _isSubmitting = false;
   String? _errorText;
+  StreamSubscription? _withdrawalSocketSub;
+  final Uuid _uuid = const Uuid();
 
   @override
   void initState() {
     super.initState();
     final profile = ref.read(authControllerProvider).session?.profile;
     _accountNumberController = TextEditingController(
-      text: profile?.bankAccountNumber.isNotEmpty == true
-          ? profile!.bankAccountNumber.replaceAll(' ', '')
-          : '987654321012',
+      text: (profile != null && profile.bankAccountNumber.isNotEmpty)
+          ? profile.bankAccountNumber.replaceAll(' ', '')
+          : '',
     );
-    _ifscController = TextEditingController(text: 'HDFC0001234');
+    _ifscController = TextEditingController();
+
+    // Listen to real-time withdrawal updates from backend socket
+    final socketService = ref.read(socketServiceProvider);
+    _withdrawalSocketSub = socketService.withdrawalUpdatesStream.listen((_) {
+      ref.invalidate(withdrawalsListProvider);
+      ref.invalidate(fundsSummaryProvider);
+    });
   }
 
   @override
   void dispose() {
+    _withdrawalSocketSub?.cancel();
     _amountController.dispose();
     _accountNumberController.dispose();
     _ifscController.dispose();
@@ -89,7 +105,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
       return;
     }
     if (_ifscController.text.trim().isEmpty) {
-      setState(() => _errorText = 'Please enter IFSC code');
+      setState(() => _errorText = 'Please enter bank IFSC code');
       return;
     }
 
@@ -97,13 +113,12 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
 
     try {
       final repo = ref.read(fundsRepositoryProvider);
-      final idempotencyKey = 'wth_${DateTime.now().millisecondsSinceEpoch}';
+      final idempotencyKey = 'wth_${_uuid.v4()}';
 
-      // Contract Section 4.4: POST /api/wallet/withdraw
       final txn = await repo.withdraw(
         amount: amt,
         accountNumber: _accountNumberController.text.trim(),
-        ifsc: _ifscController.text.trim(),
+        ifsc: _ifscController.text.trim().toUpperCase(),
         method: 'BANK_TRANSFER',
         currency: 'INR',
         idempotencyKey: idempotencyKey,
@@ -112,6 +127,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
       ref.invalidate(fundsSummaryProvider);
       ref.invalidate(walletLedgerProvider);
       ref.invalidate(walletTransactionsListProvider);
+      ref.invalidate(withdrawalsListProvider);
 
       if (!mounted) return;
       Navigator.pop(context); // Close sheet
@@ -137,6 +153,7 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
     final fundsAsync = ref.watch(fundsSummaryProvider);
     final available = fundsAsync.valueOrNull?.withdrawable ?? 0.0;
     final profile = ref.watch(authControllerProvider).session?.profile;
+    final hasVerifiedBank = profile != null && profile.bankAccountNumber.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -160,13 +177,13 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
               Text('Withdraw Funds', style: AppTypography.h1(color: colors.textPrimary)),
               const SizedBox(height: 4),
               Text(
-                'Transfer settled cash directly to your verified bank account.',
+                'Withdrawal requests transfer settled cash balance directly to your verified bank account.',
                 style: AppTypography.caption(color: colors.textSecondary),
               ),
 
               const SizedBox(height: 16),
 
-              // Available to withdraw banner with explainer button
+              // Available to withdraw banner
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -241,66 +258,84 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
               const SizedBox(height: 20),
 
               // Destination Bank Details
-              Text('BANK ACCOUNT DETAILS', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
+              Text('DESTINATION BANK ACCOUNT', style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600)),
               const SizedBox(height: 8),
 
-              TextField(
-                controller: _accountNumberController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Account Number',
-                  hintText: 'Enter bank account number',
-                  filled: true,
-                  fillColor: colors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              if (hasVerifiedBank) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.divider),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.landmark, size: 22, color: colors.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  profile.bankName.isNotEmpty ? profile.bankName : 'Primary Bank Account',
+                                  style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w600),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: colors.bullish.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: colors.bullish.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Text(
+                                    'Verified',
+                                    style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: colors.bullish),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'A/C No: ${profile.bankAccountNumber}',
+                              style: GoogleFonts.robotoMono(fontSize: 12, color: colors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _ifscController,
-                textCapitalization: TextCapitalization.characters,
-                decoration: InputDecoration(
-                  labelText: 'IFSC Code',
-                  hintText: 'e.g. HDFC0001234',
-                  filled: true,
-                  fillColor: colors.surface,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ] else ...[
+                TextField(
+                  controller: _accountNumberController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Bank Account Number',
+                    hintText: 'Enter your savings/current account number',
+                    filled: true,
+                    fillColor: colors.surface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
                 ),
-              ),
-              if (profile?.bankName.isNotEmpty == true) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Linked Bank: ${profile!.bankName}',
-                  style: GoogleFonts.inter(fontSize: 11, color: colors.textSecondary),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _ifscController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: 'IFSC Code',
+                    hintText: 'e.g. HDFC0001234',
+                    filled: true,
+                    fillColor: colors.surface,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
                 ),
               ],
-
-              const SizedBox(height: 20),
-
-              // Information Notice
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: colors.divider, width: 0.5),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(LucideIcons.clock, size: 18, color: colors.warning),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Withdrawal requests reserve your cash balance immediately and are reviewed and disbursed via NEFT/RTGS during banking hours.',
-                        style: GoogleFonts.inter(fontSize: 11, color: colors.textSecondary, height: 1.3),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
               const SizedBox(height: 20),
 
@@ -322,20 +357,193 @@ class _WithdrawFundsSheetState extends ConsumerState<WithdrawFundsSheet> {
                       )
                     : Row(
                         mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(LucideIcons.arrowDownLeft, size: 18),
                           const SizedBox(width: 8),
-                          Text(
-                            'Request Withdrawal',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 15),
+                          Flexible(
+                            child: Text(
+                              'Request Payout of ₹${_amountController.text}',
+                              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
               ),
+
+              const SizedBox(height: 24),
+
+              // Recent Withdrawals History Section
+              _buildRecentWithdrawalsSection(colors),
               const SizedBox(height: 12),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecentWithdrawalsSection(TradingColors colors) {
+    final withdrawalsAsync = ref.watch(withdrawalsListProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'RECENT WITHDRAWALS',
+              style: AppTypography.caption(color: colors.textSecondary, weight: FontWeight.w600),
+            ),
+            IconButton(
+              icon: Icon(LucideIcons.refreshCw, size: 14, color: colors.textSecondary),
+              onPressed: () => ref.invalidate(withdrawalsListProvider),
+              tooltip: 'Refresh Status',
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        withdrawalsAsync.when(
+          data: (list) {
+            if (list.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colors.divider, width: 0.5),
+                ),
+                child: Center(
+                  child: Text(
+                    'No past withdrawal requests found.',
+                    style: AppTypography.caption(color: colors.textSecondary),
+                  ),
+                ),
+              );
+            }
+
+            final recentList = list.take(5).toList();
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: recentList.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final w = recentList[index];
+                return _buildWithdrawalItemCard(w, colors);
+              },
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          ),
+          error: (err, _) => Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('Unable to load withdrawals history.', style: AppTypography.caption(color: colors.textSecondary)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWithdrawalItemCard(WalletTransaction w, TradingColors colors) {
+    Color statusBg;
+    Color statusFg;
+    String statusLabel;
+
+    switch (w.status) {
+      case WalletTransactionStatus.PENDING:
+      case WalletTransactionStatus.INITIATED:
+        statusBg = colors.warning.withValues(alpha: 0.12);
+        statusFg = colors.warning;
+        statusLabel = 'Pending Review';
+        break;
+      case WalletTransactionStatus.APPROVED:
+      case WalletTransactionStatus.PROCESSING:
+        statusBg = colors.primary.withValues(alpha: 0.12);
+        statusFg = colors.primary;
+        statusLabel = 'Approved / In Transit';
+        break;
+      case WalletTransactionStatus.SUCCESS:
+      case WalletTransactionStatus.COMPLETED:
+        statusBg = colors.bullish.withValues(alpha: 0.12);
+        statusFg = colors.bullish;
+        statusLabel = 'Completed';
+        break;
+      case WalletTransactionStatus.FAILED:
+      case WalletTransactionStatus.REJECTED:
+        statusBg = colors.bearish.withValues(alpha: 0.12);
+        statusFg = colors.bearish;
+        statusLabel = 'Rejected';
+        break;
+      case WalletTransactionStatus.CANCELLED:
+        statusBg = colors.textSecondary.withValues(alpha: 0.12);
+        statusFg = colors.textSecondary;
+        statusLabel = 'Cancelled';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.divider, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                CurrencyFormatter.format(w.amount),
+                style: AppTypography.body(color: colors.textPrimary, weight: FontWeight.w700),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: statusFg),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                DateFormatter.formatDateTime(w.createdAt),
+                style: GoogleFonts.robotoMono(fontSize: 10, color: colors.textSecondary),
+              ),
+              if (w.payoutUtr != null && w.payoutUtr!.isNotEmpty)
+                Text(
+                  'UTR: ${w.payoutUtr}',
+                  style: GoogleFonts.robotoMono(fontSize: 10, fontWeight: FontWeight.bold, color: colors.bullish),
+                ),
+            ],
+          ),
+          if (w.adminNote != null && w.adminNote!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Note: ${w.adminNote}',
+              style: AppTypography.caption(color: colors.bearish),
+            ),
+          ],
+        ],
       ),
     );
   }

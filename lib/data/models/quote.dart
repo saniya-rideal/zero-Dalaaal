@@ -57,6 +57,48 @@ class MarketDepth {
   }
 }
 
+enum QuoteStatus {
+  live,
+  delayed,
+  stale,
+  closed,
+  simulated;
+
+  String get displayName {
+    switch (this) {
+      case QuoteStatus.live:
+        return 'LIVE';
+      case QuoteStatus.delayed:
+        return 'DELAYED';
+      case QuoteStatus.stale:
+        return 'STALE';
+      case QuoteStatus.closed:
+        return 'CLOSED';
+      case QuoteStatus.simulated:
+        return 'SIMULATED';
+    }
+  }
+
+  static QuoteStatus fromString(String? val) {
+    if (val == null) return QuoteStatus.live;
+    final upper = val.toUpperCase().trim();
+    switch (upper) {
+      case 'LIVE':
+        return QuoteStatus.live;
+      case 'DELAYED':
+        return QuoteStatus.delayed;
+      case 'STALE':
+        return QuoteStatus.stale;
+      case 'CLOSED':
+        return QuoteStatus.closed;
+      case 'SIMULATED':
+        return QuoteStatus.simulated;
+      default:
+        return QuoteStatus.live;
+    }
+  }
+}
+
 class Quote {
   final String token;
   final double ltp;
@@ -74,6 +116,10 @@ class Quote {
   final double low52;
   final MarketDepth depth;
   final DateTime timestamp;
+  final QuoteStatus status;
+
+  final double? rawBid;
+  final double? rawAsk;
 
   const Quote({
     required this.token,
@@ -92,10 +138,18 @@ class Quote {
     this.low52 = 0.0,
     required this.depth,
     required this.timestamp,
+    this.status = QuoteStatus.live,
+    this.rawBid,
+    this.rawAsk,
   });
 
-  double get bestBid => depth.buy.isNotEmpty ? depth.buy.first.price : ltp;
-  double get bestAsk => depth.sell.isNotEmpty ? depth.sell.first.price : ltp;
+  double? get bid => rawBid ?? (depth.buy.isNotEmpty ? depth.buy.first.price : null);
+  double? get ask => rawAsk ?? (depth.sell.isNotEmpty ? depth.sell.first.price : null);
+  bool get hasBidAsk => bid != null && ask != null && bid! > 0 && ask! > 0;
+  double get spread => (hasBidAsk && ask! >= bid!) ? (ask! - bid!) : 0.0;
+
+  double get bestBid => bid ?? ltp;
+  double get bestAsk => ask ?? ltp;
   double get lastPrice => ltp;
   double get openPrice => open;
   double get dayHigh => high;
@@ -121,6 +175,9 @@ class Quote {
     double? low52,
     MarketDepth? depth,
     DateTime? timestamp,
+    QuoteStatus? status,
+    double? rawBid,
+    double? rawAsk,
   }) {
     return Quote(
       token: token ?? this.token,
@@ -139,6 +196,9 @@ class Quote {
       low52: low52 ?? this.low52,
       depth: depth ?? this.depth,
       timestamp: timestamp ?? this.timestamp,
+      status: status ?? this.status,
+      rawBid: rawBid ?? this.rawBid,
+      rawAsk: rawAsk ?? this.rawAsk,
     );
   }
 
@@ -159,6 +219,9 @@ class Quote {
     'low52': low52,
     'depth': depth.toJson(),
     'timestamp': timestamp.toIso8601String(),
+    'status': status.displayName,
+    if (rawBid != null) 'bid': rawBid,
+    if (rawAsk != null) 'ask': rawAsk,
   };
 
   factory Quote.fromJson(Map<String, dynamic> json) {
@@ -174,16 +237,16 @@ class Quote {
         (pc != 0 ? ((chg / pc) * 100) : 0.0);
     final vol = (json['volume'] ?? json['vol'] as num?)?.toInt() ?? 0;
 
-    final bid = (json['bid'] as num?)?.toDouble() ?? lastPrice;
-    final ask = (json['ask'] as num?)?.toDouble() ?? lastPrice;
+    final parsedBid = (json['bid'] as num?)?.toDouble();
+    final parsedAsk = (json['ask'] as num?)?.toDouble();
 
     MarketDepth d;
     if (json['depth'] is Map<String, dynamic>) {
       d = MarketDepth.fromJson(json['depth'] as Map<String, dynamic>);
     } else {
       d = MarketDepth(
-        buy: [DepthLevel(price: bid, qty: 1, orders: 1)],
-        sell: [DepthLevel(price: ask, qty: 1, orders: 1)],
+        buy: parsedBid != null ? [DepthLevel(price: parsedBid, qty: 1, orders: 1)] : const [],
+        sell: parsedAsk != null ? [DepthLevel(price: parsedAsk, qty: 1, orders: 1)] : const [],
       );
     }
 
@@ -193,6 +256,8 @@ class Quote {
     } else {
       ts = DateTime.now();
     }
+
+    final quoteStatus = QuoteStatus.fromString(json['status']?.toString());
 
     return Quote(
       token: sym,
@@ -211,10 +276,13 @@ class Quote {
       low52: (json['low52'] as num?)?.toDouble() ?? (lo * 0.8),
       depth: d,
       timestamp: ts,
+      status: quoteStatus,
+      rawBid: parsedBid,
+      rawAsk: parsedAsk,
     );
   }
 
-  factory Quote.zero(String token) => Quote(
+  factory Quote.zero(String token, {QuoteStatus status = QuoteStatus.live}) => Quote(
     token: token,
     ltp: 0.0,
     open: 0.0,
@@ -227,5 +295,6 @@ class Quote {
     volume: 0,
     depth: const MarketDepth(buy: [], sell: []),
     timestamp: DateTime.now(),
+    status: status,
   );
 }

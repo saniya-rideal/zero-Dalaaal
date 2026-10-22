@@ -24,10 +24,11 @@ class SettingsRepository extends ChangeNotifier {
       final obj = ResponseReader.object(data);
       if (obj.isNotEmpty) {
         _settings = _settings.copyWith(
-          themeMode: (obj['theme']?.toString().toUpperCase() == 'LIGHT')
-              ? ThemeMode.light
-              : ThemeMode.dark,
+          themeMode: (obj['theme']?.toString().toUpperCase() == 'DARK')
+              ? ThemeMode.dark
+              : ThemeMode.light,
           biometricEnabled: obj['biometricEnabled'] as bool? ?? _settings.biometricEnabled,
+          twoFactorEnabled: obj['twoFactorEnabled'] as bool? ?? _settings.twoFactorEnabled,
           orderNotificationSound: obj['orderNotification'] as bool? ?? _settings.orderNotificationSound,
           priceAlertSound: obj['priceAlertNotification'] as bool? ?? _settings.priceAlertSound,
         );
@@ -44,6 +45,7 @@ class SettingsRepository extends ChangeNotifier {
         data: {
           'theme': _settings.themeMode == ThemeMode.light ? 'LIGHT' : 'DARK',
           'biometricEnabled': _settings.biometricEnabled,
+          'twoFactorEnabled': _settings.twoFactorEnabled,
           'orderNotification': _settings.orderNotificationSound,
           'priceAlertNotification': _settings.priceAlertSound,
         },
@@ -101,6 +103,7 @@ class SettingsRepository extends ChangeNotifier {
   void setTwoFactorEnabled(bool enabled) {
     _settings = _settings.copyWith(twoFactorEnabled: enabled);
     notifyListeners();
+    _syncToBackend();
   }
 
   void setAutoLockTimeout(int minutes) {

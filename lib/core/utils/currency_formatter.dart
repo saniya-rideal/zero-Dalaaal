@@ -31,6 +31,10 @@ class CurrencyFormatter {
         : _indianNumberFormat.format(sanitizedValue).trim();
   }
 
+  static String formatInr(double value, {bool showSymbol = true, int decimalDigits = 2}) {
+    return format(value, showSymbol: showSymbol, decimalDigits: decimalDigits);
+  }
+
   static String formatCompact(double value) {
     final abs = value.abs();
     final sign = value < 0 ? '-' : '';

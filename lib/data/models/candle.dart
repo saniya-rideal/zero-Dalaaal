@@ -26,12 +26,31 @@ class Candle {
     'volume': volume,
   };
 
-  factory Candle.fromJson(Map<String, dynamic> json) => Candle(
-    time: DateTime.parse(json['time'] as String),
-    open: (json['open'] as num).toDouble(),
-    high: (json['high'] as num).toDouble(),
-    low: (json['low'] as num).toDouble(),
-    close: (json['close'] as num).toDouble(),
-    volume: (json['volume'] as num).toInt(),
-  );
+  factory Candle.fromJson(Map<String, dynamic> json) {
+    DateTime parsedTime;
+    final rawTime = json['time'] ??
+        json['openTime'] ??
+        json['timestamp'] ??
+        json['t'] ??
+        json['date'] ??
+        json['closeTime'];
+
+    if (rawTime is String) {
+      parsedTime = DateTime.tryParse(rawTime) ?? DateTime.now();
+    } else if (rawTime is num) {
+      final millis = rawTime > 10000000000 ? rawTime.toInt() : (rawTime * 1000).toInt();
+      parsedTime = DateTime.fromMillisecondsSinceEpoch(millis);
+    } else {
+      parsedTime = DateTime.now();
+    }
+
+    return Candle(
+      time: parsedTime,
+      open: (json['open'] as num?)?.toDouble() ?? 0.0,
+      high: (json['high'] as num?)?.toDouble() ?? 0.0,
+      low: (json['low'] as num?)?.toDouble() ?? 0.0,
+      close: (json['close'] as num?)?.toDouble() ?? 0.0,
+      volume: (json['volume'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
