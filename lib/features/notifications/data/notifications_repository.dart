@@ -9,6 +9,17 @@ final notificationsRepositoryProvider = Provider<NotificationsRepository>((ref) 
   return NotificationsRepository(client);
 });
 
+final latestNotificationSummaryProvider = FutureProvider.autoDispose<String?>((ref) async {
+  try {
+    final repo = ref.watch(notificationsRepositoryProvider);
+    final notifs = await repo.getNotifications(limit: 1);
+    if (notifs.isNotEmpty) {
+      return '${notifs.first.title}: ${notifs.first.body}';
+    }
+  } catch (_) {}
+  return null;
+});
+
 class NotificationsRepository {
   final ApiClient _client;
 

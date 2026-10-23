@@ -58,6 +58,12 @@ class Instrument {
   })  : token = token ?? symbol,
         leverageMultiplier = leverageMultiplier ?? maxLeverage;
 
+  /// Clean display name stripping any "(simulated)" or "[simulated]" tags
+  String get displayName {
+    final clean = name.replaceAll(RegExp(r'\s*[\(\[]simulated[\)\]]', caseSensitive: false), '').trim();
+    return clean.isNotEmpty ? clean : symbol;
+  }
+
   /// Contract multiplier for F&O / commodities (defaults to lotSize or 1.0)
   double get contractMultiplier => lotSize > 0 ? lotSize : 1.0;
 
@@ -215,10 +221,13 @@ class Instrument {
       allowedOrders = (json['allowedOrderTypes'] as List).map((e) => e.toString().toUpperCase()).toList();
     }
 
+    final rawName = (json['name'] ?? sym).toString();
+    final cleanName = rawName.replaceAll(RegExp(r'\s*[\(\[]simulated[\)\]]', caseSensitive: false), '').trim();
+
     return Instrument(
       token: tok,
       symbol: sym,
-      name: (json['name'] ?? sym).toString(),
+      name: cleanName.isNotEmpty ? cleanName : sym,
       market: (json['market'] ?? 'INDIAN').toString(),
       segment: (json['segment'] ?? 'EQUITY').toString(),
       exchange: ex,

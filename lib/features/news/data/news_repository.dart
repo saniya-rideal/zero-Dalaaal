@@ -9,6 +9,17 @@ final newsRepositoryProvider = Provider<NewsRepository>((ref) {
   return NewsRepository(client);
 });
 
+final latestNewsHeadlineProvider = FutureProvider.autoDispose<String?>((ref) async {
+  try {
+    final repo = ref.watch(newsRepositoryProvider);
+    final articles = await repo.getArticles(limit: 5);
+    if (articles.isNotEmpty) {
+      return articles.first.title;
+    }
+  } catch (_) {}
+  return null;
+});
+
 class NewsRepository {
   final ApiClient _client;
 

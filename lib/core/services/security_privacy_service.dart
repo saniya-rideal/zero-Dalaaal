@@ -69,11 +69,26 @@ class SecurityPrivacyService extends ChangeNotifier {
   PrivacyConsentRecord _consentRecord = PrivacyConsentRecord.empty();
 
   bool _isScreenProtectionActive = false;
+  bool _isDisposed = false;
 
   SecurityPrivacyService([this._ref]);
 
   PrivacyConsentRecord get consentRecord => _consentRecord;
   bool get isScreenProtectionActive => _isScreenProtectionActive;
+  bool get isDisposed => _isDisposed;
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
 
   // ─── 1. Brute-Force & Rate-Limiting Controls ───────────────────────────────
 
@@ -155,6 +170,7 @@ class SecurityPrivacyService extends ChangeNotifier {
   // ─── 3. Screen Protection / Screenshot Prevention Policy ──────────────────
 
   void setScreenProtection(bool active) {
+    if (_isDisposed) return;
     if (_isScreenProtectionActive != active) {
       _isScreenProtectionActive = active;
       notifyListeners();

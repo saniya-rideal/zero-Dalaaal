@@ -429,9 +429,10 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
   }
 
   /// Live validation of price direction per MT5 / Indian market exchange invariants
-  void validateDirection(Quote? quote) {
+  void validateDirection(Quote? quote, {TransactionType? sideOverride}) {
     String? dirError;
     String? generalError;
+    final effectiveSide = sideOverride ?? state.side;
 
     if (!state.instrument.tradingEnabled || state.instrument.isSuspended) {
       generalError = state.instrument.suspensionReason ?? 'Trading is currently suspended for this symbol';
@@ -487,9 +488,9 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
         case 'Stop-Limit':
           if (state.triggerPrice <= 0 || state.limitPrice <= 0) {
             dirError = 'Specify both trigger price and limit price for Stop-Limit';
-          } else if (state.side == TransactionType.BUY && state.triggerPrice <= ask) {
+          } else if (effectiveSide == TransactionType.BUY && state.triggerPrice <= ask) {
             dirError = 'Buy Stop-Limit trigger must be above current ask (₹${ask.toStringAsFixed(2)})';
-          } else if (state.side == TransactionType.SELL && state.triggerPrice >= bid) {
+          } else if (effectiveSide == TransactionType.SELL && state.triggerPrice >= bid) {
             dirError = 'Sell Stop-Limit trigger must be below current bid (₹${bid.toStringAsFixed(2)})';
           }
           break;
@@ -499,12 +500,12 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
     // Stop Loss direction validation
     if (state.slPrice > 0) {
       final basePrice = state.isMarketOrder
-          ? (state.side == TransactionType.BUY ? ask : bid)
+          ? (effectiveSide == TransactionType.BUY ? ask : bid)
           : (state.limitPrice > 0 ? state.limitPrice : state.triggerPrice);
 
-      if (state.side == TransactionType.BUY && state.slPrice >= basePrice) {
+      if (effectiveSide == TransactionType.BUY && state.slPrice >= basePrice) {
         dirError = 'Stop Loss for BUY must be lower than execution price (₹${basePrice.toStringAsFixed(2)})';
-      } else if (state.side == TransactionType.SELL && state.slPrice <= basePrice) {
+      } else if (effectiveSide == TransactionType.SELL && state.slPrice <= basePrice) {
         dirError = 'Stop Loss for SELL must be higher than execution price (₹${basePrice.toStringAsFixed(2)})';
       }
     }
@@ -512,12 +513,12 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
     // Take Profit direction validation
     if (state.tpPrice > 0) {
       final basePrice = state.isMarketOrder
-          ? (state.side == TransactionType.BUY ? ask : bid)
+          ? (effectiveSide == TransactionType.BUY ? ask : bid)
           : (state.limitPrice > 0 ? state.limitPrice : state.triggerPrice);
 
-      if (state.side == TransactionType.BUY && state.tpPrice <= basePrice) {
+      if (effectiveSide == TransactionType.BUY && state.tpPrice <= basePrice) {
         dirError = 'Take Profit for BUY must be higher than execution price (₹${basePrice.toStringAsFixed(2)})';
-      } else if (state.side == TransactionType.SELL && state.tpPrice >= basePrice) {
+      } else if (effectiveSide == TransactionType.SELL && state.tpPrice >= basePrice) {
         dirError = 'Take Profit for SELL must be lower than execution price (₹${basePrice.toStringAsFixed(2)})';
       }
     }
@@ -629,7 +630,7 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
     }
 
     final quote = _ref.read(quoteDetailStreamProvider(state.instrument.symbol)).value;
-    validateDirection(quote);
+    validateDirection(quote, sideOverride: targetSide);
 
     if (state.directionValidationError != null) {
       state = state.copyWith(submissionError: state.directionValidationError);
@@ -686,12 +687,14 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
       state = state.copyWith(
         isSubmitting: false,
         submissionError: mappedMessage,
+        lastIdempotencyKey: null,
       );
       return null;
     } catch (e) {
       state = state.copyWith(
         isSubmitting: false,
         submissionError: e.toString().replaceAll('Exception: ', ''),
+        lastIdempotencyKey: null,
       );
       return null;
     }
@@ -699,12 +702,24 @@ class OrderEntryController extends StateNotifier<OrderEntryState> {
 
   String _mapBackendErrorCode(AppException e) {
     switch (e.code) {
+      case 'INSUFFICIENT_MARGIN':
+        return 'Insufficient margin in wallet. Required margin exceeds available funds.';
+      case 'QUOTE_STALE':
+        return 'Market quote is updating. Please try placing your order again in a moment.';
+      case 'INVALID_STOP_LOSS':
+        return 'Stop loss must be below entry price for BUY and above entry for SELL.';
+      case 'INVALID_TAKE_PROFIT':
+        return 'Take profit must be above entry price for BUY and below entry for SELL.';
+      case 'LEVERAGE_EXCEEDS_ACCOUNT_LIMIT':
+        return 'Order leverage exceeds the maximum allowed leverage for this account.';
+      case 'LEVERAGE_EXCEEDS_MAXIMUM':
+        return 'Order leverage exceeds instrument maximum allowed leverage.';
+      case 'INVALID_LOT_SIZE':
+        return 'Quantity must be an exact multiple of the contract lot size.';
       case 'INVALID_TRIGGER_DIRECTION':
         return 'Invalid trigger price direction relative to live market spread.';
       case 'MARKET_CLOSED':
         return 'The exchange is currently closed. Order placement is restricted.';
-      case 'INSUFFICIENT_MARGIN':
-        return 'Insufficient available margin in wallet for this order.';
       case 'TRADING_DISABLED':
         return 'Trading is currently suspended or disabled for this security.';
       case 'INVALID_QUANTITY':

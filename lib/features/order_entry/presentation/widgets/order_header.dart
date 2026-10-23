@@ -114,7 +114,7 @@ class OrderHeader extends ConsumerWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                instrument.name,
+                                instrument.displayName,
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   color: isDark ? Colors.white54 : const Color(0xFF6B7280),

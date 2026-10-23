@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum Environment {
-  dev,
-  staging,
-  prod,
-}
-
 class AppConfig {
-  static const String _envString = String.fromEnvironment('ENV', defaultValue: 'dev');
+  /// =========================================================================
+  /// 🔗 BACKEND URL:
+  /// - Currently for local: 'http://localhost:5000' (or Wi-Fi IP: 'http://192.168.1.35:5000')
+  /// - When she sends the live link, JUST PASTE IT HERE (e.g. 'https://api.yourdomain.com')
+  /// =========================================================================
+  static const String serverUrl = 'http://localhost:5000';
+
   static const String _definedBaseUrl = String.fromEnvironment('API_URL', defaultValue: '') != ''
       ? String.fromEnvironment('API_URL')
       : String.fromEnvironment('API_BASE_URL', defaultValue: '');
@@ -16,40 +16,11 @@ class AppConfig {
       ? String.fromEnvironment('SOCKET_URL')
       : String.fromEnvironment('SOCKET_BASE_URL', defaultValue: '');
 
-  static Environment get currentEnvironment {
-    switch (_envString.toLowerCase()) {
-      case 'prod':
-      case 'production':
-        return Environment.prod;
-      case 'staging':
-      case 'stage':
-        return Environment.staging;
-      default:
-        return Environment.dev;
-    }
-  }
-
-  /// Default production API endpoint (never localhost in release mode)
-  static const String _prodApiUrl = 'https://api.zerodalali.com';
-  static const String _stagingApiUrl = 'https://staging-api.zerodalali.com';
-  static const String _devApiUrl = 'http://localhost:5000';
-
   static String get defaultBaseUrl {
     if (_definedBaseUrl.isNotEmpty) {
       return _definedBaseUrl;
     }
-    if (kReleaseMode) {
-      // In production release builds, NEVER allow localhost fallback
-      return _prodApiUrl;
-    }
-    switch (currentEnvironment) {
-      case Environment.prod:
-        return _prodApiUrl;
-      case Environment.staging:
-        return _stagingApiUrl;
-      case Environment.dev:
-        return _devApiUrl;
-    }
+    return serverUrl;
   }
 
   static String get defaultSocketUrl {

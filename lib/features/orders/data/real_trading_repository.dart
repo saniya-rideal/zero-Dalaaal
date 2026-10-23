@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_paths.dart';
 import '../../../core/network/response_reader.dart';
+import '../../../core/network/socket_service.dart';
 import '../../../data/models/models.dart';
 import '../domain/trading_repository.dart';
 
@@ -178,12 +179,13 @@ class RealTradingRepository implements TradingRepository {
     int? quantity,
   }) async {
     // Contract Section 6.3: POST /api/positions/:id/close
+    final key = (idempotencyKey != null && idempotencyKey.trim().isNotEmpty)
+        ? idempotencyKey.trim()
+        : 'cls_${id}_${DateTime.now().millisecondsSinceEpoch}';
     final data = await _apiClient.post(
       ApiPaths.closePosition(id),
       data: quantity != null ? {'quantity': quantity} : null,
-      options: idempotencyKey != null
-          ? Options(headers: {'Idempotency-Key': idempotencyKey})
-          : null,
+      options: Options(headers: {'Idempotency-Key': key}),
     );
 
     final obj = ResponseReader.object(data, 'order');
@@ -230,6 +232,11 @@ final tradingRepositoryProvider = Provider<TradingRepository>((ref) {
 
 final ordersListProvider = FutureProvider<List<Order>>((ref) async {
   final repo = ref.watch(tradingRepositoryProvider);
+  final socketService = ref.watch(socketServiceProvider);
+  final sub = socketService.orderUpdatesStream.listen((_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(() => sub.cancel());
   return repo.getOrders();
 });
 
@@ -237,6 +244,17 @@ final ordersProvider = ordersListProvider;
 
 final positionsListProvider = FutureProvider<List<Position>>((ref) async {
   final repo = ref.watch(tradingRepositoryProvider);
+  final socketService = ref.watch(socketServiceProvider);
+  final subPos = socketService.positionUpdatesStream.listen((_) {
+    ref.invalidateSelf();
+  });
+  final subOrd = socketService.orderUpdatesStream.listen((_) {
+    ref.invalidateSelf();
+  });
+  ref.onDispose(() {
+    subPos.cancel();
+    subOrd.cancel();
+  });
   return repo.getPositions(status: 'OPEN');
 });
 

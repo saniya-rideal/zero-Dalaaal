@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../data/models/models.dart';
 import '../../../shared_widgets/shared_widgets.dart';
 import '../../../shared_widgets/zero_drawer.dart';
+import '../data/notifications_repository.dart';
 
 class MailItem {
   final String id;
@@ -24,19 +27,51 @@ class MailItem {
   });
 }
 
-class MailsScreen extends StatefulWidget {
-  const MailsScreen({super.key});
+final userMailsProvider = FutureProvider.autoDispose<List<MailItem>>((ref) async {
+  final repo = ref.watch(notificationsRepositoryProvider);
+  try {
+    final notifs = await repo.getNotifications(limit: 50);
+    if (notifs.isNotEmpty) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return notifs.map((n) {
+        String sender = 'Zero Life';
+        if (n.category == NotificationCategory.orders) {
+          sender = 'Exchange Execution';
+        } else if (n.category == NotificationCategory.riskMargin) {
+          sender = 'Risk Management';
+        } else if (n.category == NotificationCategory.security) {
+          sender = 'Security Desk';
+        } else if (n.category == NotificationCategory.funds) {
+          sender = 'Account Operations';
+        }
 
-  @override
-  State<MailsScreen> createState() => _MailsScreenState();
-}
+        final dt = n.timestamp;
+        final now = DateTime.now();
+        String dateStr;
+        if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+          final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+          final m = dt.minute.toString().padLeft(2, '0');
+          final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+          dateStr = 'Today, $h:$m $ampm';
+        } else {
+          dateStr = '${dt.day.toString().padLeft(2, '0')} ${months[dt.month - 1]} ${dt.year}';
+        }
 
-class _MailsScreenState extends State<MailsScreen> {
-  final TextEditingController _searchController = TextEditingController();
+        return MailItem(
+          id: n.id,
+          sender: sender,
+          subject: n.title,
+          date: dateStr,
+          body: n.body,
+          isRead: n.isRead,
+        );
+      }).toList();
+    }
+  } catch (_) {}
 
-  final List<MailItem> _mails = [
+  return [
     MailItem(
-      id: '1',
+      id: 'welcome_1',
       sender: 'Zero Desk',
       subject: 'Welcome to Zero Life! Your trading account is active',
       date: 'Today, 10:15 AM',
@@ -45,7 +80,7 @@ class _MailsScreenState extends State<MailsScreen> {
       isRead: false,
     ),
     MailItem(
-      id: '2',
+      id: 'welcome_2',
       sender: 'Deposit Department',
       subject: 'Special Offer: 50% Deposit Bonus on your first funding',
       date: 'Yesterday, 04:30 PM',
@@ -53,16 +88,18 @@ class _MailsScreenState extends State<MailsScreen> {
           'Exclusive Trader Promotion!\n\nFund your account with ₹10,000 or more via instant UPI / Netbanking and receive a 50% extra margin credit instantly to boost your trading capacity.\n\nTerms & conditions apply.',
       isRead: true,
     ),
-    MailItem(
-      id: '3',
-      sender: 'Risk Management',
-      subject: 'Market Volatility Advisory: FOMC & RBI Policy Decision',
-      date: '01 Sep 2026, 02:00 PM',
-      body:
-          'Dear Trader,\n\nPlease note that heightened volatility is anticipated across Commodities and Metals ahead of global central bank policy rate announcements. Ensure adequate margin buffer in your account to avoid automated square-offs.',
-      isRead: true,
-    ),
   ];
+});
+
+class MailsScreen extends ConsumerStatefulWidget {
+  const MailsScreen({super.key});
+
+  @override
+  ConsumerState<MailsScreen> createState() => _MailsScreenState();
+}
+
+class _MailsScreenState extends ConsumerState<MailsScreen> {
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void dispose() {
@@ -71,7 +108,10 @@ class _MailsScreenState extends State<MailsScreen> {
   }
 
   void _showMailDetail(MailItem mail, TradingColors colors) {
-    setState(() => mail.isRead = true);
+    if (!mail.isRead) {
+      setState(() => mail.isRead = true);
+      ref.read(notificationsRepositoryProvider).markRead(mail.id).catchError((_) {});
+    }
 
     showModalBottomSheet(
       context: context,
@@ -153,11 +193,13 @@ class _MailsScreenState extends State<MailsScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = context.tradingColors;
+    final mailsAsync = ref.watch(userMailsProvider);
+    final allMails = mailsAsync.valueOrNull ?? const <MailItem>[];
     final query = _searchController.text.trim().toLowerCase();
 
-    var filteredMails = _mails;
+    var filteredMails = allMails;
     if (query.isNotEmpty) {
-      filteredMails = _mails
+      filteredMails = allMails
           .where((m) =>
               m.sender.toLowerCase().contains(query) ||
               m.subject.toLowerCase().contains(query) ||
@@ -179,6 +221,28 @@ class _MailsScreenState extends State<MailsScreen> {
                 color: colors.textPrimary,
                 fontWeight: FontWeight.w700,
                 fontSize: 18)),
+        actions: [
+          IconButton(
+            icon: Icon(LucideIcons.checkCheck, color: colors.textSecondary, size: 20),
+            tooltip: 'Mark all as read',
+            onPressed: () async {
+              try {
+                await ref.read(notificationsRepositoryProvider).markAllRead();
+                ref.invalidate(userMailsProvider);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('All mails marked as read'),
+                      backgroundColor: colors.cardBackground,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (_) {}
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -226,92 +290,116 @@ class _MailsScreenState extends State<MailsScreen> {
 
           // Mails List
           Expanded(
-            child: filteredMails.isEmpty
+            child: mailsAsync.isLoading && allMails.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(LucideIcons.mailCheck,
-                            size: 42,
-                            color: colors.textSecondary.withValues(alpha: 0.5)),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No Mails Found',
-                          style: GoogleFonts.inter(
-                              color: colors.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ],
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: colors.primary,
                     ),
                   )
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: filteredMails.length,
-                    separatorBuilder: (_, __) =>
-                        Divider(height: 1, color: colors.divider),
-                    itemBuilder: (context, index) {
-                      final item = filteredMails[index];
-
-                      return Material(
-                        color: Colors.transparent,
-                        child: ListTile(
-                          onTap: () => _showMailDetail(item, colors),
-                          leading: CircleAvatar(
-                            backgroundColor: item.isRead
-                                ? colors.divider.withValues(alpha: 0.5)
-                                : colors.primary.withValues(alpha: 0.15),
-                            child: Icon(
-                              item.isRead
-                                  ? LucideIcons.mailOpen
-                                  : LucideIcons.mail,
-                              color: item.isRead
-                                  ? colors.textSecondary
-                                  : colors.primary,
-                              size: 18,
-                            ),
-                          ),
-                          title: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                : RefreshIndicator(
+                    color: colors.primary,
+                    backgroundColor: colors.cardBackground,
+                    onRefresh: () async {
+                      ref.invalidate(userMailsProvider);
+                      await ref.read(userMailsProvider.future);
+                    },
+                    child: filteredMails.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              Expanded(
-                                child: Text(
-                                  item.sender,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(
-                                    fontWeight: item.isRead
-                                        ? FontWeight.w600
-                                        : FontWeight.w800,
-                                    color: colors.textPrimary,
-                                    fontSize: 14,
+                              SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.45,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(LucideIcons.mailCheck,
+                                          size: 42,
+                                          color: colors.textSecondary.withValues(alpha: 0.5)),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'No Mails Found',
+                                        style: GoogleFonts.inter(
+                                            color: colors.textSecondary,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(item.date,
-                                  style: GoogleFonts.inter(
-                                      color: colors.textSecondary,
-                                      fontSize: 11.5)),
                             ],
+                          )
+                        : ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            itemCount: filteredMails.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(height: 1, color: colors.divider),
+                            itemBuilder: (context, index) {
+                              final item = filteredMails[index];
+
+                              return Material(
+                                color: Colors.transparent,
+                                child: ListTile(
+                                  onTap: () => _showMailDetail(item, colors),
+                                  leading: CircleAvatar(
+                                    backgroundColor: item.isRead
+                                        ? colors.divider.withValues(alpha: 0.5)
+                                        : colors.primary.withValues(alpha: 0.15),
+                                    child: Icon(
+                                      item.isRead
+                                          ? LucideIcons.mailOpen
+                                          : LucideIcons.mail,
+                                      color: item.isRead
+                                          ? colors.textSecondary
+                                          : colors.primary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  title: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          item.sender,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: GoogleFonts.inter(
+                                            fontWeight: item.isRead
+                                                ? FontWeight.w600
+                                                : FontWeight.w800,
+                                            color: colors.textPrimary,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(item.date,
+                                          style: GoogleFonts.inter(
+                                              color: colors.textSecondary,
+                                              fontSize: 11.5)),
+                                    ],
+                                  ),
+                                  subtitle: Text(
+                                    item.subject,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.inter(
+                                        color: item.isRead
+                                            ? colors.textSecondary
+                                            : colors.textPrimary,
+                                        fontWeight: item.isRead
+                                            ? FontWeight.w400
+                                            : FontWeight.w600,
+                                        fontSize: 13),
+                                  ),
+                                  trailing: Icon(LucideIcons.chevronRight,
+                                      color: colors.textSecondary, size: 18),
+                                ),
+                              );
+                            },
                           ),
-                          subtitle: Text(
-                            item.subject,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                                color: item.isRead
-                                    ? colors.textSecondary
-                                    : colors.textPrimary,
-                                fontWeight: item.isRead
-                                    ? FontWeight.w400
-                                    : FontWeight.w600,
-                                fontSize: 13),
-                          ),
-                          trailing: Icon(LucideIcons.chevronRight,
-                              color: colors.textSecondary, size: 18),
-                        ),
-                      );
-                    },
                   ),
           ),
         ],

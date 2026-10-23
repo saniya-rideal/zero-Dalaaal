@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../../../core/constants/charges_config.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../../core/services/maintenance_service.dart';
 import '../../../core/services/realtime_quote_service.dart';
@@ -17,23 +18,39 @@ import 'widgets/order_review_sheet.dart';
 class OrderEntrySheet extends ConsumerStatefulWidget {
   final Instrument instrument;
   final TransactionType initialSide;
+  final double? initialLots;
+  final int? initialQuantity;
+  final double? initialStopLoss;
+  final double? initialTakeProfit;
 
   const OrderEntrySheet({
     super.key,
     required this.instrument,
     this.initialSide = TransactionType.BUY,
+    this.initialLots,
+    this.initialQuantity,
+    this.initialStopLoss,
+    this.initialTakeProfit,
   });
 
   static Future<void> show(
     BuildContext context, {
     required Instrument instrument,
     TransactionType side = TransactionType.BUY,
+    double? initialLots,
+    int? initialQuantity,
+    double? initialStopLoss,
+    double? initialTakeProfit,
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => OrderEntrySheet(
           instrument: instrument,
           initialSide: side,
+          initialLots: initialLots,
+          initialQuantity: initialQuantity,
+          initialStopLoss: initialStopLoss,
+          initialTakeProfit: initialTakeProfit,
         ),
       ),
     );
@@ -57,12 +74,41 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
     super.initState();
     _familyKey = (instrument: widget.instrument, initialSide: widget.initialSide);
 
-    _lotCtrl = TextEditingController(text: '1.00');
-    _qtyCtrl = TextEditingController(text: '1');
-    _slCtrl = TextEditingController();
-    _tpCtrl = TextEditingController();
+    final lotText = widget.initialLots != null && widget.initialLots! > 0
+        ? widget.initialLots!.toStringAsFixed(2)
+        : '1.00';
+    final qtyText = widget.initialQuantity != null && widget.initialQuantity! > 0
+        ? widget.initialQuantity!.toString()
+        : '1';
+    final slText = widget.initialStopLoss != null && widget.initialStopLoss! > 0
+        ? widget.initialStopLoss!.toStringAsFixed(2)
+        : '';
+    final tpText = widget.initialTakeProfit != null && widget.initialTakeProfit! > 0
+        ? widget.initialTakeProfit!.toStringAsFixed(2)
+        : '';
+
+    _lotCtrl = TextEditingController(text: lotText);
+    _qtyCtrl = TextEditingController(text: qtyText);
+    _slCtrl = TextEditingController(text: slText);
+    _tpCtrl = TextEditingController(text: tpText);
     _atPriceCtrl = TextEditingController();
     _commentCtrl = TextEditingController();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final notifier = ref.read(orderEntryControllerProvider(_familyKey).notifier);
+      if (widget.initialLots != null && widget.initialLots! > 0) {
+        notifier.setLots(widget.initialLots!);
+      } else if (widget.initialQuantity != null && widget.initialQuantity! > 0) {
+        notifier.setQuantity(widget.initialQuantity!);
+      }
+      if (widget.initialStopLoss != null && widget.initialStopLoss! > 0) {
+        notifier.setSlPrice(widget.initialStopLoss!);
+      }
+      if (widget.initialTakeProfit != null && widget.initialTakeProfit! > 0) {
+        notifier.setTpPrice(widget.initialTakeProfit!);
+      }
+    });
   }
 
   @override
@@ -110,6 +156,53 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
         ? (side == TransactionType.BUY ? (quote?.ask ?? quote?.ltp ?? 0.0) : (quote?.bid ?? quote?.ltp ?? 0.0))
         : (state.limitPrice > 0 ? state.limitPrice : state.triggerPrice);
 
+    // Immediate user-friendly pre-validation check for Stop Loss & Take Profit
+    if (state.slPrice > 0) {
+      if (side == TransactionType.BUY && state.slPrice >= execPrice) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stop Loss for BUY must be lower than entry price (₹${execPrice.toStringAsFixed(2)})'),
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      } else if (side == TransactionType.SELL && state.slPrice <= execPrice) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Stop Loss for SELL must be higher than entry price (₹${execPrice.toStringAsFixed(2)})'),
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
+    if (state.tpPrice > 0) {
+      if (side == TransactionType.BUY && state.tpPrice <= execPrice) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Take Profit for BUY must be higher than entry price (₹${execPrice.toStringAsFixed(2)})'),
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      } else if (side == TransactionType.SELL && state.tpPrice >= execPrice) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Take Profit for SELL must be lower than entry price (₹${execPrice.toStringAsFixed(2)})'),
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
+    notifier.setSide(side);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -123,10 +216,23 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
               side: side,
               executionPrice: execPrice,
               onConfirm: () async {
-                await notifier.submitOrder(
+                final order = await notifier.submitOrder(
                   context: context,
                   overrideSide: side,
                 );
+                if (order == null && context.mounted) {
+                  final err = ref.read(orderEntryControllerProvider(_familyKey)).submissionError;
+                  if (err != null && err.isNotEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(err),
+                        backgroundColor: const Color(0xFFD32F2F),
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
+                }
               },
               onCancel: () => Navigator.of(bottomSheetContext).pop(),
             );
@@ -181,9 +287,17 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
     final qty = state.quantity > 0 ? state.quantity : 1;
     final estBuyMargin = (qty * ask) / leverage;
     final estSellMargin = (qty * bid) / leverage;
+    final chargesBreakdown = ChargesConfig.calculateCharges(
+      price: ltp,
+      quantity: qty,
+      side: state.side,
+      product: state.product,
+      instrumentType: state.instrument.type,
+    );
+    final estCharges = state.preview?.charges.total ?? chargesBreakdown.total;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F1218) : Colors.white,
+      backgroundColor: isDark ? const Color(0xFF0B0E14) : Colors.white,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -232,32 +346,36 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                   IconButton(
                     icon: Icon(
                       LucideIcons.arrowLeft,
-                      color: isDark ? Colors.white : Colors.black87,
-                      size: 18,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      size: 19,
                     ),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.of(context).maybePop();
+                    },
                   ),
                   Expanded(
                     child: InkWell(
-                      onTap: () => _showInstrumentPicker(context),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _showInstrumentPicker(context);
+                      },
                       borderRadius: BorderRadius.circular(6),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Flexible(
                               child: Text(
-                                state.instrument.name.isNotEmpty
-                                    ? state.instrument.name
-                                    : state.instrument.symbol,
+                                state.instrument.displayName,
                                 style: GoogleFonts.inter(
-                                  fontSize: 15,
+                                  fontSize: 15.5,
                                   fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : const Color(0xFF111827),
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -266,21 +384,21 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                             Icon(
                               Icons.arrow_drop_down,
                               size: 20,
-                              color: isDark ? Colors.white70 : Colors.black87,
+                              color: isDark ? Colors.white70 : const Color(0xFF475569),
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 18),
+                  const SizedBox(width: 19),
                 ],
               ),
             ),
             Divider(
               height: 1,
               thickness: 1,
-              color: isDark ? const Color(0xFF2C3240) : const Color(0xFFE5E7EB),
+              color: isDark ? const Color(0xFF232936) : const Color(0xFFE2E8F0),
             ),
 
             // Scrollable Form Area
@@ -312,7 +430,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Dual Bid / Ask Box with Live Tick Color (Blue on profit/up, Red on loss/down)
+                    // Dual Bid / Ask Box with Live Tick Flash & Micro-Animation
                     _LiveBidAskBox(
                       quote: quote,
                       isDark: isDark,
@@ -333,12 +451,12 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                   style: GoogleFonts.inter(
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : const Color(0xFF111827),
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              _buildInfoIcon(),
+                              _buildInfoIcon('Specify trade volume either in contract lots or unit quantity.'),
                             ],
                           ),
                         ),
@@ -367,7 +485,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     const SizedBox(height: 6),
 
                     // Amount Stepper Box: Red minus circle, centered amount, Blue plus circle
-                    _buildStepperInputBox(
+                    _SmoothStepperBox(
                       controller: isLotMode ? _lotCtrl : _qtyCtrl,
                       onMinus: isLotMode ? () => notifier.stepLots(false) : () => notifier.stepQuantity(false),
                       onPlus: isLotMode ? () => notifier.stepLots(true) : () => notifier.stepQuantity(true),
@@ -382,14 +500,16 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                       },
                       isDark: isDark,
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
 
                     // Subtitle Estimated Quantity
                     Text(
                       'Estimated Quantity: \u2248 ${isLotMode ? (state.lots * (state.instrument.lotSize > 0 ? state.instrument.lotSize : 1.0)).toStringAsFixed(2) : state.quantity.toString()}',
                       style: GoogleFonts.inter(
                         fontSize: 10.5,
-                        color: isDark ? Colors.white54 : const Color(0xFF78909C),
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -399,6 +519,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                       // Pending type radio options: Buy Limit, Sell Limit, Buy Stop, Sell Stop
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
                         child: Row(
                           children: [
                             _buildRadioItem(
@@ -445,14 +566,14 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                             style: GoogleFonts.inter(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
-                              color: isDark ? Colors.white : const Color(0xFF111827),
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
-                          _buildInfoIcon(),
+                          _buildInfoIcon('Execution trigger target price for the order.'),
                         ],
                       ),
                       const SizedBox(height: 6),
-                      _buildStepperInputBox(
+                      _SmoothStepperBox(
                         controller: _atPriceCtrl,
                         hintText: (quote?.ltp ?? 0.0).toStringAsFixed(2),
                         onMinus: () {
@@ -483,14 +604,21 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
 
                       // Expiry Date Box
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1A1F2C) : Colors.white,
-                          borderRadius: BorderRadius.circular(4),
+                          color: isDark ? const Color(0xFF151922) : Colors.white,
+                          borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: isDark ? const Color(0xFF2C3240) : const Color(0xFFCFD8DC),
+                            color: isDark ? const Color(0xFF232936) : const Color(0xFFCFD8DC),
                             width: 1,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: isDark ? Colors.black.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -503,7 +631,7 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                   style: GoogleFonts.inter(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : const Color(0xFF263238),
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -513,7 +641,8 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                       : 'Good till cancel',
                                   style: GoogleFonts.inter(
                                     fontSize: 11.5,
-                                    color: isDark ? Colors.white70 : const Color(0xFF546E7A),
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -523,13 +652,17 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                 if (state.gtcExpiry != null)
                                   IconButton(
                                     icon: const Icon(LucideIcons.trash2, size: 16, color: Color(0xFF03A9F4)),
-                                    onPressed: () => notifier.setGtcExpiry(null),
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      notifier.setGtcExpiry(null);
+                                    },
                                     constraints: const BoxConstraints(),
-                                    padding: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.only(right: 8),
                                   ),
                                 IconButton(
                                   icon: const Icon(LucideIcons.calendar, size: 16, color: Color(0xFF03A9F4)),
                                   onPressed: () async {
+                                    HapticFeedback.lightImpact();
                                     final picked = await showDatePicker(
                                       context: context,
                                       initialDate: DateTime.now().add(const Duration(days: 30)),
@@ -566,12 +699,12 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                     style: GoogleFonts.inter(
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w700,
-                                      color: isDark ? Colors.white : const Color(0xFF111827),
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                _buildInfoIcon(),
+                                _buildInfoIcon('Automatic risk management orders to protect profit and cap loss.'),
                               ],
                             ),
                           ),
@@ -613,14 +746,14 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: isDark ? Colors.white : const Color(0xFF111827),
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                                       ),
                                     ),
-                                    _buildInfoIcon(),
+                                    _buildInfoIcon('Stop Loss threshold.'),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                _buildStepperInputBox(
+                                _SmoothStepperBox(
                                   controller: _slCtrl,
                                   hintText: isAtPrice ? 'Price' : 'Points',
                                   onMinus: () {
@@ -653,14 +786,14 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                                       style: GoogleFonts.inter(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
-                                        color: isDark ? Colors.white : const Color(0xFF111827),
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                                       ),
                                     ),
-                                    _buildInfoIcon(),
+                                    _buildInfoIcon('Take Profit target.'),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                _buildStepperInputBox(
+                                _SmoothStepperBox(
                                   controller: _tpCtrl,
                                   hintText: isAtPrice ? 'Price' : 'Points',
                                   onMinus: () {
@@ -686,40 +819,131 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                       const SizedBox(height: 12),
                     ],
 
-                    // Comment Section
+                    // Estimates Section (Placed Before Comment)
+                    Row(
+                      children: [
+                        Text(
+                          'Estimates',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        _buildInfoIcon('Live exchange margin and regulatory charges calculation.'),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF151922) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF232936) : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark ? Colors.black.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildEstimateRow(
+                            label: 'Est. Buy Margin:',
+                            value: estBuyMargin.toStringAsFixed(2),
+                            valueColor: const Color(0xFF0288D1),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 5),
+                          _buildEstimateRow(
+                            label: 'Est. Sell Margin:',
+                            value: estSellMargin.toStringAsFixed(2),
+                            valueColor: const Color(0xFFE91E63),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 5),
+                          _buildEstimateRow(
+                            label: 'Est. Brokerage & Taxes:',
+                            value: estCharges.toStringAsFixed(2),
+                            valueColor: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(height: 5),
+                          _buildEstimateRow(
+                            label: 'Available Margin:',
+                            value: availMargin.toStringAsFixed(2),
+                            valueColor: isDark ? Colors.white : const Color(0xFF0F172A),
+                            isDark: isDark,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Comment Section (At the end)
                     Text(
                       'Comment',
                       style: GoogleFonts.inter(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF263238),
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1A1F2C) : Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
-                          color: isDark ? const Color(0xFF2C3240) : const Color(0xFFCFD8DC),
-                          width: 1,
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: TextField(
-                        controller: _commentCtrl,
-                        maxLines: 2,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: notifier.setComment,
+                    const SizedBox(height: 5),
+                    Focus(
+                      child: Builder(
+                        builder: (context) {
+                          final hasFocus = Focus.of(context).hasFocus;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF151922) : Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: hasFocus
+                                    ? const Color(0xFF2979FF)
+                                    : (isDark ? const Color(0xFF232936) : const Color(0xFFCFD8DC)),
+                                width: hasFocus ? 1.5 : 1,
+                              ),
+                              boxShadow: hasFocus
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFF2979FF).withValues(alpha: 0.15),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            child: TextField(
+                              controller: _commentCtrl,
+                              maxLines: 2,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              cursorColor: const Color(0xFF2979FF),
+                              decoration: InputDecoration(
+                                hintText: 'Add a comment (optional)',
+                                hintStyle: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                                ),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onChanged: notifier.setComment,
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -727,11 +951,11 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                     // Direction Validation Banner if present
                     if (state.directionValidationError != null && state.directionValidationError!.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(8),
                         margin: const EdgeInsets.only(bottom: 6),
                         decoration: BoxDecoration(
                           color: Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: Colors.red.shade400),
                         ),
                         child: Text(
@@ -744,103 +968,27 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
               ),
             ),
 
-            // Bottom Section: Margins Summary & Edge-to-Edge Action Buttons
+            // Bottom Section: Edge-to-Edge Action Buttons
             Container(
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF12151C) : Colors.white,
+                color: isDark ? const Color(0xFF10131A) : Colors.white,
                 border: Border(
                   top: BorderSide(
-                    color: isDark ? const Color(0xFF2C3240) : const Color(0xFFECEFF1),
+                    color: isDark ? const Color(0xFF232936) : const Color(0xFFE2E8F0),
                     width: 1,
                   ),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark ? Colors.black.withValues(alpha: 0.35) : Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Three-Row Margin Summary
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Est. Buy Margin:',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF0288D1),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(
-                              estBuyMargin.toStringAsFixed(2),
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0288D1),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Est. Sell Margin:',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFFE91E63),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(
-                              estSellMargin.toStringAsFixed(2),
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFFE91E63),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Available Margin:',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : const Color(0xFF263238),
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(
-                              availMargin.toStringAsFixed(2),
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: isDark ? Colors.white : const Color(0xFF263238),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
                   // Action Buttons: SELL (Red) & BUY (Navy Blue) or PLACE
                   if (isMarket)
                     Row(
@@ -848,22 +996,26 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                         // SELL (Red)
                         Expanded(
                           child: SizedBox(
-                            height: 44,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFEB2A53),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                              ),
-                              onPressed: () => _onConfirmPlacement(context, TransactionType.SELL),
-                              child: Text(
-                                'SELL',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                  color: Colors.white,
+                            height: 48,
+                            child: Material(
+                              color: const Color(0xFFEB2A53),
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.mediumImpact();
+                                  _onConfirmPlacement(context, TransactionType.SELL);
+                                },
+                                splashColor: Colors.white.withValues(alpha: 0.25),
+                                highlightColor: Colors.black.withValues(alpha: 0.12),
+                                child: Center(
+                                  child: Text(
+                                    'SELL',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -872,22 +1024,26 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                         // BUY (Navy Blue)
                         Expanded(
                           child: SizedBox(
-                            height: 44,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1B357F),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                              ),
-                              onPressed: () => _onConfirmPlacement(context, TransactionType.BUY),
-                              child: Text(
-                                'BUY',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                  color: Colors.white,
+                            height: 48,
+                            child: Material(
+                              color: const Color(0xFF1B357F),
+                              child: InkWell(
+                                onTap: () {
+                                  HapticFeedback.mediumImpact();
+                                  _onConfirmPlacement(context, TransactionType.BUY);
+                                },
+                                splashColor: Colors.white.withValues(alpha: 0.25),
+                                highlightColor: Colors.black.withValues(alpha: 0.12),
+                                child: Center(
+                                  child: Text(
+                                    'BUY',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14.5,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -898,27 +1054,29 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
                   else
                     SizedBox(
                       width: double.infinity,
-                      height: 44,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFEB2A53),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-                        ),
-                        onPressed: () {
-                          final side = state.pendingType.startsWith('Buy')
-                              ? TransactionType.BUY
-                              : TransactionType.SELL;
-                          _onConfirmPlacement(context, side);
-                        },
-                        child: Text(
-                          'PLACE',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.5,
-                            color: Colors.white,
+                      height: 48,
+                      child: Material(
+                        color: const Color(0xFFEB2A53),
+                        child: InkWell(
+                          onTap: () {
+                            HapticFeedback.mediumImpact();
+                            final side = state.pendingType.startsWith('Buy')
+                                ? TransactionType.BUY
+                                : TransactionType.SELL;
+                            _onConfirmPlacement(context, side);
+                          },
+                          splashColor: Colors.white.withValues(alpha: 0.25),
+                          highlightColor: Colors.black.withValues(alpha: 0.12),
+                          child: Center(
+                            child: Text(
+                              'PLACE',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -933,13 +1091,66 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
     );
   }
 
-  Widget _buildInfoIcon() {
-    return const Padding(
-      padding: EdgeInsets.only(left: 4),
-      child: Icon(
-        Icons.info_outline,
-        size: 14,
-        color: Color(0xFF03A9F4),
+  Widget _buildEstimateRow({
+    required String label,
+    required String value,
+    required Color valueColor,
+    required bool isDark,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: valueColor,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoIcon(String message) {
+    return Tooltip(
+      message: message,
+      triggerMode: TooltipTriggerMode.tap,
+      showDuration: const Duration(seconds: 3),
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      textStyle: GoogleFonts.inter(
+        fontSize: 11.5,
+        color: Colors.white,
+        fontWeight: FontWeight.w500,
+        height: 1.3,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: const [
+          BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: const Padding(
+        padding: EdgeInsets.only(left: 4),
+        child: Icon(
+          Icons.info_outline,
+          size: 14,
+          color: Color(0xFF03A9F4),
+        ),
       ),
     );
   }
@@ -952,35 +1163,42 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
     double fontSize = 12.5,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
               width: 15,
               height: 15,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: selected ? const Color(0xFF1E88E5) : (isDark ? Colors.white54 : const Color(0xFF90A4AE)),
+                  color: selected
+                      ? const Color(0xFF1E88E5)
+                      : (isDark ? const Color(0xFF5A6678) : const Color(0xFF90A4AE)),
                   width: 1.5,
                 ),
               ),
-              child: selected
-                  ? Center(
-                      child: Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFF1E88E5),
-                        ),
-                      ),
-                    )
-                  : null,
+              child: Center(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutBack,
+                  width: selected ? 7 : 0,
+                  height: selected ? 7 : 0,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF1E88E5),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 6),
             Text(
@@ -988,7 +1206,9 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
               style: GoogleFonts.inter(
                 fontSize: fontSize,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                color: isDark ? Colors.white : const Color(0xFF1F2937),
+                color: selected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
               ),
             ),
           ],
@@ -996,94 +1216,9 @@ class _OrderEntrySheetState extends ConsumerState<OrderEntrySheet> {
       ),
     );
   }
-
-  Widget _buildStepperInputBox({
-    required TextEditingController controller,
-    required VoidCallback onMinus,
-    required VoidCallback onPlus,
-    required ValueChanged<String> onChanged,
-    String? hintText,
-    required bool isDark,
-  }) {
-    return Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1F2C) : Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2C3240) : const Color(0xFFCFD8DC),
-          width: 1,
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: Row(
-        children: [
-          // Red Minus Circle Button
-          InkWell(
-            onTap: onMinus,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFFEB2A53),
-              ),
-              child: const Center(
-                child: Icon(Icons.remove, color: Colors.white, size: 15),
-              ),
-            ),
-          ),
-          // Centered Text Input
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textAlign: TextAlign.center,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
-              ],
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: isDark ? Colors.white : const Color(0xFF111827),
-              ),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                isDense: true,
-                hintText: hintText ?? '',
-                hintStyle: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  color: isDark ? Colors.white38 : Colors.black26,
-                ),
-                contentPadding: EdgeInsets.zero,
-              ),
-              onChanged: onChanged,
-            ),
-          ),
-          // Blue Plus Circle Button
-          InkWell(
-            onTap: onPlus,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: 26,
-              height: 26,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF2979FF),
-              ),
-              child: const Center(
-                child: Icon(Icons.add, color: Colors.white, size: 15),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-/// Dual Bid / Ask Box with Live Tick Color (Blue on tick up / profit, Red on tick down / loss)
+/// Dual Bid / Ask Box with Live Tick Color & Smooth Flash Animation
 class _LiveBidAskBox extends StatefulWidget {
   final Quote? quote;
   final bool isDark;
@@ -1100,8 +1235,8 @@ class _LiveBidAskBox extends StatefulWidget {
 class _LiveBidAskBoxState extends State<_LiveBidAskBox> {
   double? _prevBid;
   double? _prevAsk;
-  Color _bidColor = const Color(0xFF1976D2); // Blue default
-  Color _askColor = const Color(0xFF1976D2); // Blue default
+  int _bidTickDirection = 0; // 1 = up, -1 = down, 0 = neutral
+  int _askTickDirection = 0; // 1 = up, -1 = down, 0 = neutral
 
   @override
   void didUpdateWidget(_LiveBidAskBox oldWidget) {
@@ -1111,23 +1246,23 @@ class _LiveBidAskBoxState extends State<_LiveBidAskBox> {
 
     if (_prevBid != null && curBid != _prevBid) {
       if (curBid > _prevBid!) {
-        _bidColor = const Color(0xFF1976D2); // Blue (tick up / profit)
+        _bidTickDirection = 1;
       } else if (curBid < _prevBid!) {
-        _bidColor = const Color(0xFFE53935); // Red (tick down / loss)
+        _bidTickDirection = -1;
       }
     } else if (_prevBid == null && widget.quote != null) {
-      _bidColor = (widget.quote!.change >= 0) ? const Color(0xFF1976D2) : const Color(0xFFE53935);
+      _bidTickDirection = widget.quote!.change >= 0 ? 1 : -1;
     }
     _prevBid = curBid;
 
     if (_prevAsk != null && curAsk != _prevAsk) {
       if (curAsk > _prevAsk!) {
-        _askColor = const Color(0xFF1976D2); // Blue (tick up / profit)
+        _askTickDirection = 1;
       } else if (curAsk < _prevAsk!) {
-        _askColor = const Color(0xFFE53935); // Red (tick down / loss)
+        _askTickDirection = -1;
       }
     } else if (_prevAsk == null && widget.quote != null) {
-      _askColor = (widget.quote!.change >= 0) ? const Color(0xFF1976D2) : const Color(0xFFE53935);
+      _askTickDirection = widget.quote!.change >= 0 ? 1 : -1;
     }
     _prevAsk = curAsk;
   }
@@ -1138,90 +1273,378 @@ class _LiveBidAskBoxState extends State<_LiveBidAskBox> {
     final bid = widget.quote?.bid ?? ltp;
     final ask = widget.quote?.ask ?? ltp;
 
+    final baseTextColor = widget.isDark ? Colors.white : const Color(0xFF0F172A);
+    const tickUpColor = Color(0xFF2979FF);
+    const tickDownColor = Color(0xFFEB2A53);
+
     return Container(
       decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF1A1F2C) : Colors.white,
+        color: widget.isDark ? const Color(0xFF151922) : Colors.white,
         border: Border.all(
-          color: widget.isDark ? const Color(0xFF2C3240) : const Color(0xFFB0BEC5),
+          color: widget.isDark ? const Color(0xFF232936) : const Color(0xFFCFD8DC),
           width: 1,
         ),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: widget.isDark ? Colors.black.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
       child: IntrinsicHeight(
         child: Row(
           children: [
             // Left Half: Bid
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Bid',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _bidColor,
-                      ),
+              child: TweenAnimationBuilder<Color?>(
+                key: ValueKey('bid_${bid}_$_bidTickDirection'),
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutCubic,
+                tween: ColorTween(
+                  begin: _bidTickDirection > 0
+                      ? tickUpColor.withValues(alpha: 0.15)
+                      : (_bidTickDirection < 0 ? tickDownColor.withValues(alpha: 0.15) : Colors.transparent),
+                  end: Colors.transparent,
+                ),
+                builder: (context, highlightBg, child) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: highlightBg,
+                      borderRadius: const BorderRadius.horizontal(left: Radius.circular(5)),
                     ),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          bid.toStringAsFixed(2),
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: _bidColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Bid',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF0288D1),
+                              ),
+                            ),
+                            if (_bidTickDirection != 0) ...[
+                              const SizedBox(width: 3),
+                              Icon(
+                                _bidTickDirection > 0 ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                                size: 14,
+                                color: _bidTickDirection > 0 ? tickUpColor : tickDownColor,
+                              ),
+                            ],
+                          ],
+                        ),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              bid.toStringAsFixed(2),
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: _bidTickDirection > 0
+                                    ? tickUpColor
+                                    : (_bidTickDirection < 0 ? tickDownColor : baseTextColor),
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
             // Vertical Divider
             VerticalDivider(
               width: 1,
               thickness: 1,
-              color: widget.isDark ? const Color(0xFF2C3240) : const Color(0xFFB0BEC5),
+              color: widget.isDark ? const Color(0xFF232936) : const Color(0xFFCFD8DC),
             ),
             // Right Half: Ask
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Ask',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _askColor,
-                      ),
+              child: TweenAnimationBuilder<Color?>(
+                key: ValueKey('ask_${ask}_$_askTickDirection'),
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutCubic,
+                tween: ColorTween(
+                  begin: _askTickDirection > 0
+                      ? tickUpColor.withValues(alpha: 0.15)
+                      : (_askTickDirection < 0 ? tickDownColor.withValues(alpha: 0.15) : Colors.transparent),
+                  end: Colors.transparent,
+                ),
+                builder: (context, highlightBg, child) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: highlightBg,
+                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(5)),
                     ),
-                    Flexible(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          ask.toStringAsFixed(2),
-                          style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: _askColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Ask',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFE91E63),
+                              ),
+                            ),
+                            if (_askTickDirection != 0) ...[
+                              const SizedBox(width: 3),
+                              Icon(
+                                _askTickDirection > 0 ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                                size: 14,
+                                color: _askTickDirection > 0 ? tickUpColor : tickDownColor,
+                              ),
+                            ],
+                          ],
+                        ),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              ask.toStringAsFixed(2),
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: _askTickDirection > 0
+                                    ? tickUpColor
+                                    : (_askTickDirection < 0 ? tickDownColor : baseTextColor),
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Smooth Stepper Box with Focus Glow, Tactile Scale Buttons, and Tabular Figures
+class _SmoothStepperBox extends StatefulWidget {
+  final TextEditingController controller;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+  final ValueChanged<String> onChanged;
+  final String? hintText;
+  final bool isDark;
+
+  const _SmoothStepperBox({
+    required this.controller,
+    required this.onMinus,
+    required this.onPlus,
+    required this.onChanged,
+    this.hintText,
+    required this.isDark,
+  });
+
+  @override
+  State<_SmoothStepperBox> createState() => _SmoothStepperBoxState();
+}
+
+class _SmoothStepperBoxState extends State<_SmoothStepperBox> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus != _isFocused) {
+        setState(() => _isFocused = _focusNode.hasFocus);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      height: 40,
+      decoration: BoxDecoration(
+        color: widget.isDark ? const Color(0xFF151922) : Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(
+          color: _isFocused
+              ? const Color(0xFF2979FF)
+              : (widget.isDark ? const Color(0xFF232936) : const Color(0xFFCFD8DC)),
+          width: _isFocused ? 1.5 : 1,
+        ),
+        boxShadow: _isFocused
+            ? [
+                BoxShadow(
+                  color: const Color(0xFF2979FF).withValues(alpha: 0.15),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1),
+                ),
+              ]
+            : null,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Row(
+        children: [
+          // Red Minus Circle Button with Tactile Scale
+          _ScaleButton(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.onMinus();
+            },
+            child: Container(
+              width: 27,
+              height: 27,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFFEB2A53),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFEB2A53).withValues(alpha: 0.3),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.remove, color: Colors.white, size: 15),
+              ),
+            ),
+          ),
+          // Centered Text Input with Tabular Figures
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              textAlign: TextAlign.center,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
+              ],
+              style: GoogleFonts.inter(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: widget.isDark ? Colors.white : const Color(0xFF0F172A),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+              cursorColor: const Color(0xFF2979FF),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                hintText: widget.hintText ?? '',
+                hintStyle: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: widget.isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: widget.onChanged,
+            ),
+          ),
+          // Blue Plus Circle Button with Tactile Scale
+          _ScaleButton(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.onPlus();
+            },
+            child: Container(
+              width: 27,
+              height: 27,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF2979FF),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2979FF).withValues(alpha: 0.3),
+                    blurRadius: 3,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(Icons.add, color: Colors.white, size: 15),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tactile Scale Micro-Animation Wrapper
+class _ScaleButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _ScaleButton({
+    required this.child,
+    required this.onTap,
+  });
+
+  @override
+  State<_ScaleButton> createState() => _ScaleButtonState();
+}
+
+class _ScaleButtonState extends State<_ScaleButton> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 80),
+      reverseDuration: const Duration(milliseconds: 120),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.88).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: ScaleTransition(
+        scale: _scale,
+        child: widget.child,
       ),
     );
   }

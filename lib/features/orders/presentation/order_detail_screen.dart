@@ -98,23 +98,29 @@ class OrderDetailScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          TransactionSideBadge(
-                            side: order.request.side,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            fontSize: 11,
-                            borderRadius: 4,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            order.instrument.symbol,
-                            style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700),
-                          ),
-                          const SizedBox(width: 6),
-                          ExchangeChip(exchange: order.instrument.exchange, type: order.instrument.type),
-                        ],
+                      Expanded(
+                        child: Row(
+                          children: [
+                            TransactionSideBadge(
+                              side: order.request.side,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              fontSize: 11,
+                              borderRadius: 4,
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                order.instrument.symbol,
+                                style: AppTypography.h2(color: colors.textPrimary, weight: FontWeight.w700),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            ExchangeChip(exchange: order.instrument.exchange, type: order.instrument.type),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -132,10 +138,10 @@ class OrderDetailScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildSummaryItem('Qty', '${order.filledQty} / ${order.request.quantity}', colors),
-                      _buildSummaryItem('Avg Price', CurrencyFormatter.format(order.averagePrice), colors),
-                      _buildSummaryItem('Product', order.request.product.name, colors),
-                      _buildSummaryItem('Type', order.request.kind.name, colors),
+                      Expanded(child: _buildSummaryItem('Qty', '${order.filledQty} / ${order.request.quantity}', colors)),
+                      Expanded(child: _buildSummaryItem('Avg Price', CurrencyFormatter.format(order.averagePrice), colors)),
+                      Expanded(child: _buildSummaryItem('Product', order.request.product.name, colors)),
+                      Expanded(child: _buildSummaryItem('Type', order.request.kind.name, colors)),
                     ],
                   ),
                 ],
@@ -311,7 +317,13 @@ class OrderDetailScreen extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: isBold ? AppTypography.body(color: colors.textPrimary, weight: FontWeight.w700) : AppTypography.caption(color: colors.textSecondary)),
+          Expanded(
+            child: Text(
+              label,
+              style: isBold ? AppTypography.body(color: colors.textPrimary, weight: FontWeight.w700) : AppTypography.caption(color: colors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             isZeroHighlight && amount == 0 ? '₹0.00' : CurrencyFormatter.format(amount),
             style: isBold
@@ -330,7 +342,15 @@ class OrderDetailScreen extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: AppTypography.caption(color: colors.textSecondary)),
-          Text(value, style: AppTypography.caption(color: colors.textPrimary, weight: FontWeight.w600, tabular: true)),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption(color: colors.textPrimary, weight: FontWeight.w600, tabular: true),
+            ),
+          ),
         ],
       ),
     );

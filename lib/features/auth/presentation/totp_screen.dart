@@ -39,7 +39,9 @@ class _TotpScreenState extends ConsumerState<TotpScreen> {
   @override
   void dispose() {
     _lockoutTimer?.cancel();
-    _securityService.setScreenProtection(false);
+    scheduleMicrotask(() {
+      _securityService.setScreenProtection(false);
+    });
     super.dispose();
   }
 
