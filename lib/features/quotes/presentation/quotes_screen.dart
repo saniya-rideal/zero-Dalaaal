@@ -10,6 +10,7 @@ import '../../../core/services/realtime_quote_service.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/utils/currency_formatter.dart';
+import '../../../core/utils/app_snack_bar.dart';
 import '../../../data/models/models.dart';
 import '../../market/data/real_market_repository.dart';
 import '../../orders/data/real_trading_repository.dart';
@@ -192,28 +193,22 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
         _selectedForDelete.clear();
         _isEditMode = false;
       });
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removed ${toDelete.length} script(s) from Watchlist'),
-          action: SnackBarAction(
-            label: 'UNDO',
-            textColor: Colors.white,
-            onPressed: () {
-              for (final sym in toDelete.reversed) {
-                ref.read(watchlistControllerProvider.notifier).addInstrument(sym);
-              }
-            },
-          ),
-        ),
+      showAppSnackBar(
+        context,
+        message: 'Removed ${toDelete.length} script(s) from Watchlist',
+        actionLabel: 'UNDO',
+        onAction: () {
+          for (final sym in toDelete.reversed) {
+            ref.read(watchlistControllerProvider.notifier).addInstrument(sym);
+          }
+        },
       );
     } else {
       final err = ref.read(watchlistControllerProvider).errorMessage;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(err ?? 'Failed to remove selected scripts'),
-          backgroundColor: const Color(0xFFC62828),
-        ),
+      showAppSnackBar(
+        context,
+        message: err ?? 'Failed to remove selected scripts',
+        backgroundColor: const Color(0xFFC62828),
       );
     }
   }
@@ -841,18 +836,13 @@ class _QuotesScreenState extends ConsumerState<QuotesScreen> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Removed ${item.symbol} from Watchlist'),
-              action: SnackBarAction(
-                label: 'UNDO',
-                textColor: Colors.white,
-                onPressed: () {
-                  notifier.addInstrument(item.symbol);
-                },
-              ),
-            ),
+          showAppSnackBar(
+            context,
+            message: 'Removed ${item.symbol} from Watchlist',
+            actionLabel: 'UNDO',
+            onAction: () {
+              notifier.addInstrument(item.symbol);
+            },
           );
         }
         return true;

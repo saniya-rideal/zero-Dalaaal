@@ -15,6 +15,7 @@ import '../../order_entry/presentation/order_entry_sheet.dart';
 import 'watchlist_controller.dart';
 import 'watchlist_row_actions.dart';
 import '../../../core/services/notification_service.dart';
+import '../../../core/utils/app_snack_bar.dart';
 
 class WatchlistScreen extends ConsumerWidget {
   const WatchlistScreen({super.key});
@@ -155,16 +156,11 @@ class WatchlistScreen extends ConsumerWidget {
                                   final notifier = ref.read(watchlistControllerProvider.notifier);
                                   final success = await notifier.removeInstrument(token);
                                   if (context.mounted && success) {
-                                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Removed ${instrument.symbol} from Watchlist'),
-                                        action: SnackBarAction(
-                                          label: 'UNDO',
-                                          textColor: Colors.white,
-                                          onPressed: () => notifier.addInstrument(token),
-                                        ),
-                                      ),
+                                    showAppSnackBar(
+                                      context,
+                                      message: 'Removed ${instrument.symbol} from Watchlist',
+                                      actionLabel: 'UNDO',
+                                      onAction: () => notifier.addInstrument(token),
                                     );
                                   }
                                   return success;
@@ -207,16 +203,11 @@ class WatchlistScreen extends ConsumerWidget {
                                           final notifier = ref.read(watchlistControllerProvider.notifier);
                                           final success = await notifier.removeInstrument(instrument.token);
                                           if (context.mounted && success) {
-                                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Removed ${instrument.symbol} from Watchlist'),
-                                                action: SnackBarAction(
-                                                  label: 'UNDO',
-                                                  textColor: Colors.white,
-                                                  onPressed: () => notifier.addInstrument(instrument.token),
-                                                ),
-                                              ),
+                                            showAppSnackBar(
+                                              context,
+                                              message: 'Removed ${instrument.symbol} from Watchlist',
+                                              actionLabel: 'UNDO',
+                                              onAction: () => notifier.addInstrument(instrument.token),
                                             );
                                           }
                                         },

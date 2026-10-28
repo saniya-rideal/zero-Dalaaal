@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
 import '../../../core/services/realtime_quote_service.dart';
+import '../../../core/utils/app_snack_bar.dart';
 import '../../../data/models/models.dart';
 import '../../../shared_widgets/exchange_chip.dart';
 import '../../../shared_widgets/price_text.dart';
@@ -169,42 +170,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                     if (isInWatchlist) {
                                       final success = await notifier.removeInstrument(instrument.symbol);
                                       if (context.mounted && success) {
-                                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Removed ${instrument.symbol} from Watchlist'),
-                                            action: SnackBarAction(
-                                              label: 'UNDO',
-                                              textColor: Colors.white,
-                                              onPressed: () => notifier.addInstrument(instrument.symbol),
-                                            ),
-                                          ),
+                                        showAppSnackBar(
+                                          context,
+                                          message: 'Removed ${instrument.symbol} from Watchlist',
+                                          actionLabel: 'UNDO',
+                                          onAction: () => notifier.addInstrument(instrument.symbol),
                                         );
                                       }
                                     } else {
                                       final success = await notifier.addInstrument(instrument.symbol);
                                       if (context.mounted) {
                                         if (success) {
-                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Added ${instrument.symbol} to Watchlist'),
-                                              action: SnackBarAction(
-                                                label: 'UNDO',
-                                                textColor: Colors.white,
-                                                onPressed: () => notifier.removeInstrument(instrument.symbol),
-                                              ),
-                                            ),
+                                          showAppSnackBar(
+                                            context,
+                                            message: 'Added ${instrument.symbol} to Watchlist',
+                                            actionLabel: 'UNDO',
+                                            onAction: () => notifier.removeInstrument(instrument.symbol),
                                           );
                                         } else {
                                           final err = ref.read(watchlistControllerProvider).errorMessage;
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text(err == 'MAX_SYMBOLS_EXCEEDED'
-                                                  ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
-                                                  : (err ?? 'Failed to add ${instrument.symbol}')),
-                                              backgroundColor: const Color(0xFFC62828),
-                                            ),
+                                          showAppSnackBar(
+                                            context,
+                                            message: err == 'MAX_SYMBOLS_EXCEEDED'
+                                                ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
+                                                : (err ?? 'Failed to add ${instrument.symbol}'),
+                                            backgroundColor: const Color(0xFFC62828),
                                           );
                                         }
                                       }

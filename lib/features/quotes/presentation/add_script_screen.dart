@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../../core/theme/trading_colors.dart';
 import '../../../core/theme/typography.dart';
+import '../../../core/utils/app_snack_bar.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/instrument.dart';
 import '../../market/data/real_market_repository.dart';
@@ -192,26 +193,20 @@ class _AddScriptScreenState extends ConsumerState<AddScriptScreen> {
       final success = await notifier.removeInstrument(sym);
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Removed ${script.symbol} from Watchlist'),
-              action: SnackBarAction(
-                label: 'UNDO',
-                textColor: Colors.white,
-                onPressed: () => notifier.addInstrument(sym),
-              ),
-            ),
+          showAppSnackBar(
+            context,
+            message: 'Removed ${script.symbol} from Watchlist',
+            actionLabel: 'UNDO',
+            onAction: () => notifier.addInstrument(sym),
           );
         }
       }
     } else {
       if (_selectedTokens.length >= 50) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Watchlist limit reached: Maximum 50 symbols allowed.'),
-            backgroundColor: Color(0xFFC62828),
-          ),
+        showAppSnackBar(
+          context,
+          message: 'Watchlist limit reached: Maximum 50 symbols allowed.',
+          backgroundColor: const Color(0xFFC62828),
         );
         return;
       }
@@ -221,16 +216,11 @@ class _AddScriptScreenState extends ConsumerState<AddScriptScreen> {
       final success = await notifier.addInstrument(sym);
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added ${script.symbol} to Watchlist'),
-              action: SnackBarAction(
-                label: 'UNDO',
-                textColor: Colors.white,
-                onPressed: () => notifier.removeInstrument(sym),
-              ),
-            ),
+          showAppSnackBar(
+            context,
+            message: 'Added ${script.symbol} to Watchlist',
+            actionLabel: 'UNDO',
+            onAction: () => notifier.removeInstrument(sym),
           );
         } else {
           setState(() {
@@ -239,13 +229,12 @@ class _AddScriptScreenState extends ConsumerState<AddScriptScreen> {
             );
           });
           final err = ref.read(watchlistControllerProvider).errorMessage;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(err == 'MAX_SYMBOLS_EXCEEDED'
-                  ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
-                  : (err ?? 'Failed to add ${script.symbol}')),
-              backgroundColor: const Color(0xFFC62828),
-            ),
+          showAppSnackBar(
+            context,
+            message: err == 'MAX_SYMBOLS_EXCEEDED'
+                ? 'Watchlist limit reached: Maximum 50 symbols allowed.'
+                : (err ?? 'Failed to add ${script.symbol}'),
+            backgroundColor: const Color(0xFFC62828),
           );
         }
       }
@@ -265,24 +254,36 @@ class _AddScriptScreenState extends ConsumerState<AddScriptScreen> {
       }
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: colors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
-          onPressed: () {
-            if (_openedCategory != null) {
-              setState(() => _openedCategory = null);
-            } else if (_openedFolder != null) {
-              setState(() => _openedFolder = null);
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
-        centerTitle: true,
+    return PopScope(
+      canPop: _openedCategory == null && _openedFolder == null,
+      onPopInvokedWithResult: (didPop, result) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        if (didPop) return;
+        if (_openedCategory != null) {
+          setState(() => _openedCategory = null);
+        } else if (_openedFolder != null) {
+          setState(() => _openedFolder = null);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: colors.background,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: Icon(LucideIcons.arrowLeft, color: colors.textPrimary, size: 22),
+            onPressed: () {
+              ScaffoldMessenger.of(context).clearSnackBars();
+              if (_openedCategory != null) {
+                setState(() => _openedCategory = null);
+              } else if (_openedFolder != null) {
+                setState(() => _openedFolder = null);
+              } else {
+                Navigator.pop(context);
+              }
+            },
+          ),
+          centerTitle: true,
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -385,8 +386,9 @@ class _AddScriptScreenState extends ConsumerState<AddScriptScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // 1. Root Folder List
   Widget _buildRootFolderList(TradingColors colors) {

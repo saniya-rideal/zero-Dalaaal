@@ -6,7 +6,7 @@ class AppConfig {
   /// - Currently for local: 'http://localhost:5000' (or Wi-Fi IP: 'http://192.168.1.35:5000')
   /// - When she sends the live link, JUST PASTE IT HERE (e.g. 'https://api.yourdomain.com')
   /// =========================================================================
-  static const String serverUrl = 'http://localhost:5000';
+  static const String serverUrl = 'https://odalalibackend.tradewithlearning.tech';
 
   static const String _definedBaseUrl = String.fromEnvironment('API_URL', defaultValue: '') != ''
       ? String.fromEnvironment('API_URL')
